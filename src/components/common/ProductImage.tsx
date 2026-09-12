@@ -106,7 +106,7 @@ export function SnackFallbackIllustration({
 
         {/* Brand signature & label */}
         <span className="font-serif font-bold text-sm md:text-base tracking-wide text-theme-primary">
-          Zelleroa
+          Zellora
         </span>
         <span className="text-[11px] md:text-xs text-theme-muted font-medium mt-0.5 line-clamp-1">
           {title || "Couture & Lifestyle"}
@@ -227,7 +227,7 @@ export function ProductImage({
           {fill ? (
             <Image
               src={src!}
-              alt={alt || "Zelleroa Product"}
+              alt={alt || "Zellora Product"}
               fill
               sizes={sizes}
               priority={priority}
@@ -242,7 +242,7 @@ export function ProductImage({
           ) : (
             <Image
               src={src!}
-              alt={alt || "Zelleroa Product"}
+              alt={alt || "Zellora Product"}
               width={width || 400}
               height={height || 400}
               sizes={sizes}

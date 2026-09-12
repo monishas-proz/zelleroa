@@ -6,6 +6,7 @@ import { createCategorySchema } from "../validations/category.schema";
 import { FormInput } from "@/components/forms/form-input";
 import { FormTextarea } from "@/components/forms/form-textarea";
 import { FormImageUpload } from "@/components/forms/form-image-upload";
+import { FormSelect } from "@/components/forms/form-select";
 import { FormSubmitButton } from "@/components/forms/form-submit-button";
 import type { z } from "zod";
 
@@ -20,6 +21,8 @@ interface CategoryFormProps {
   initialData?: Record<string, unknown>;
   isEditing?: boolean;
   parentCategories?: ParentCategoryOption[];
+  /** When true, a parent must be chosen — used by the Subcategories page, where "None" doesn't make sense. */
+  requireParent?: boolean;
   onSubmit: (data: CategoryFormData) => Promise<void>;
   isLoading?: boolean;
   submitLabel?: string;
@@ -28,6 +31,8 @@ interface CategoryFormProps {
 function CategoryForm({
   initialData,
   isEditing = false,
+  parentCategories = [],
+  requireParent = false,
   onSubmit,
   isLoading = false,
   submitLabel = "Save Category",
@@ -41,7 +46,7 @@ function CategoryForm({
       slug: (initialData?.slug as string) || "",
       description: (initialData?.description as string) || "",
       image: (initialData?.image as string) || "",
-      parentId: (initialData?.parentId as number) ?? undefined,
+      parentId: (initialData?.parentId as string) || "",
       isActive: (initialData?.isActive as boolean) ?? true,
       sortOrder: (initialData?.sortOrder as number) || 0,
       metaTitle: (initialData?.metaTitle as string) || "",
@@ -89,22 +94,17 @@ function CategoryForm({
           required
         />
 
-        {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <FormInput
-            name="image"
-            label="Image URL"
-            placeholder="https://example.com/image.jpg"
-          />
-
-          <FormSelect
-            name="parentId"
-            label="Parent Category"
-            placeholder="None (Top Level)"
-            options={[{ value: "", label: "None (Top Level)" }, ...parentCategories]}
-          />
-
-          
-        </div> */}
+        <FormSelect
+          name="parentId"
+          label="Parent Category"
+          placeholder={requireParent ? "Select a parent category" : "None (Top Level)"}
+          required={requireParent}
+          options={
+            requireParent
+              ? parentCategories
+              : [{ value: "", label: "None (Top Level)" }, ...parentCategories]
+          }
+        />
 
         {/* <FormCheckbox
           name="isActive"

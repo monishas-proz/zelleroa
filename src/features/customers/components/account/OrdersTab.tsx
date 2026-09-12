@@ -166,7 +166,7 @@ export function OrdersTab({
         key: rzpData.keyId,
         amount: rzpData.amount,
         currency: rzpData.currency || "INR",
-        name: "Zelleroa",
+        name: "Zellora",
         description: `Order #${order.orderNumber || rzpData.orderNumber}`,
         order_id: rzpData.razorpayOrderId,
         theme: {

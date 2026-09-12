@@ -5,21 +5,21 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ChevronRight, LogIn } from "lucide-react";
-import { LOGOS, ICONS, navigation, desktopIcons, mobileBottomIcons } from "@/constants/storefront";
+import { LogIn } from "lucide-react";
+import { LOGOS, ICONS, desktopIcons, mobileBottomIcons } from "@/constants/storefront";
 import { NavButton } from "@/components/storefront/buttons/NavButton";
 import { IconButton } from "@/components/storefront/buttons/IconButton";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { getInitials } from "@/lib/utils";
 import { useCustomerWishlistCount } from "@/features/customers/hooks/use-customer-wishlist";
 import { useCustomerCartCount } from "@/features/customers/hooks/use-customer-cart";
-import { useCustomerCategories } from "@/features/customers/hooks/use-customer-catalog";
 import { useCustomerProfile } from "@/features/customers/hooks/use-customer-profile";
-import { CategoryNavDropdown, resolveCategoryIcon } from "./CategoryNavDropdown";
+import { useCategoryTree } from "@/features/categories/hooks";
+import { MegaMenu } from "./MegaMenu";
+import { MobileCategoryAccordion } from "./MobileCategoryAccordion";
 
 export function Header() {
   const [isOpen, setIsOpen] = React.useState(false);
-  const [isMobileCategoriesOpen, setIsMobileCategoriesOpen] = React.useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { data: session, status } = useSession();
@@ -60,21 +60,15 @@ export function Header() {
         (cartCountData as { count?: number })?.count ??
         0;
 
-  // Categories list for mobile drawer navigation
-  const { data: categoriesData, isLoading: isCategoriesLoading } = useCustomerCategories({
-    page: 1,
-    pageSize: 50,
-    sortBy: "name",
-    sortOrder: "asc",
-  });
-  const categories = categoriesData?.data ?? [];
+  // Full category tree (Women/Men/Kids/Beauty/... roots with nested children)
+  // drives both the desktop mega-menu and the mobile accordion.
+  const { data: categoryTree = [], isLoading: isCategoriesLoading } = useCategoryTree();
 
   const menuRef = React.useRef<HTMLDivElement>(null);
   const buttonRef = React.useRef<HTMLDivElement>(null);
 
   useClickOutside([menuRef, buttonRef], () => {
     setIsOpen(false);
-    setIsMobileCategoriesOpen(false);
   });
 
   const resolvePath = React.useCallback(
@@ -143,36 +137,21 @@ export function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden lg:flex items-center gap-8">
-          {navigation.map((item) => {
-            const isCategories =
-              item.text === "COLLECTIONS" ||
-              item.text === "OUR SNACKS" ||
-              item.path === "/categories";
+          {categoryTree.map((root) => (
+            <MegaMenu
+              key={root.id}
+              root={root}
+              path={[root.slug]}
+              isActive={pathname === `/${root.slug}` || pathname.startsWith(`/${root.slug}/`)}
+            />
+          ))}
 
-            if (isCategories) {
-              return (
-                <CategoryNavDropdown
-                  key={item.id}
-                  text={item.text}
-                  icon={item.icon}
-                  isActive={
-                    pathname === item.path || pathname.startsWith("/categories")
-                  }
-                />
-              );
-            }
-
-            return (
-              <NavButton
-                key={item.id}
-                variant="desktop"
-                text={item.text}
-                icon={item.icon}
-                href={item.path}
-                isActive={pathname === item.path}
-              />
-            );
-          })}
+          <Link
+            href="/products?sortBy=discount"
+            className="text-sm font-semibold text-red-600 hover:-translate-y-0.5 transition-transform"
+          >
+            Sale
+          </Link>
         </nav>
 
         {/* Right Section (Icons & Hamburger) */}
@@ -261,7 +240,6 @@ export function Header() {
         <div
           onClick={() => {
             setIsOpen(false);
-            setIsMobileCategoriesOpen(false);
           }}
           className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-xs transition-all duration-500 ${
             isOpen ? "opacity-100 visible" : "opacity-0 invisible"
@@ -284,7 +262,6 @@ export function Header() {
               type="button"
               onClick={() => {
                 setIsOpen(false);
-                setIsMobileCategoriesOpen(false);
               }}
               className="text-2xl text-white hover:text-gray-300 cursor-pointer"
             >
@@ -293,133 +270,28 @@ export function Header() {
           </div>
 
           <nav className="flex-1 overflow-y-auto py-3 scrollbar-thin scrollbar-thumb-white/20">
-            {navigation.map((item) => {
-              const isCategories =
-                item.text === "COLLECTIONS" ||
-                item.text === "OUR SNACKS" ||
-                item.path === "/categories";
+            {isCategoriesLoading ? (
+              <div className="space-y-2 px-6 py-3">
+                {[1, 2, 3, 4].map((n) => (
+                  <div key={`mob-skel-${n}`} className="h-8 bg-white/10 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : (
+              <MobileCategoryAccordion
+                nodes={categoryTree}
+                onNavigate={() => {
+                  setIsOpen(false);
+                }}
+              />
+            )}
 
-              if (isCategories) {
-                return (
-                  <div key={item.id} className="border-b border-white/10">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setIsMobileCategoriesOpen((prev) => !prev)
-                      }
-                      className="flex w-full items-center justify-between px-6 py-4 text-white hover:bg-white/10 transition-colors cursor-pointer"
-                    >
-                      <span className="font-medium text-sm">{item.text}</span>
-                      <div className="flex items-center gap-2">
-                        {categories.length > 0 && (
-                          <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">
-                            {categories.length}
-                          </span>
-                        )}
-                        <Image
-                          src={item.icon || ICONS.drop_icon}
-                          alt="dropdown"
-                          width={14}
-                          height={14}
-                          className={`w-auto h-auto transition-transform duration-300 ${
-                            isMobileCategoriesOpen ? "rotate-180" : ""
-                          }`}
-                        />
-                      </div>
-                    </button>
-
-                    {/* Expandable Category Submenu */}
-                    {isMobileCategoriesOpen && (
-                      <div className="bg-black/20 py-2 px-4 space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
-                        {isCategoriesLoading ? (
-                          <div className="space-y-2 py-2">
-                            {[1, 2, 3].map((n) => (
-                              <div
-                                key={`mob-skel-${n}`}
-                                className="h-8 bg-white/10 rounded-lg animate-pulse"
-                              />
-                            ))}
-                          </div>
-                        ) : categories.length > 0 ? (
-                          <>
-                            {categories.map((cat) => {
-                              const catIcon = resolveCategoryIcon(cat);
-                              const isCatActive =
-                                pathname === `/categories/${cat.id}`;
-
-                              return (
-                                <Link
-                                  key={cat.id}
-                                  href={`/categories/${cat.id}`}
-                                  onClick={() => {
-                                    setIsOpen(false);
-                                    setIsMobileCategoriesOpen(false);
-                                  }}
-                                  className={`
-                                    w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs
-                                    transition-colors cursor-pointer
-                                    ${
-                                      isCatActive
-                                        ? "bg-white/20 text-white font-bold"
-                                        : "text-white/85 hover:bg-white/10 hover:text-white"
-                                    }
-                                  `}
-                                >
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center p-0.5 shrink-0">
-                                      <Image
-                                        src={catIcon}
-                                        alt={cat.name}
-                                        width={18}
-                                        height={18}
-                                        className="w-4 h-4 object-contain"
-                                      />
-                                    </div>
-                                    <span className="truncate">{cat.name}</span>
-                                  </div>
-                                  <ChevronRight className="w-3.5 h-3.5 text-white/50 shrink-0" />
-                                </Link>
-                              );
-                            })}
-
-                            <Link
-                              href="/categories"
-                              onClick={() => {
-                                setIsOpen(false);
-                                setIsMobileCategoriesOpen(false);
-                              }}
-                              className="flex items-center justify-center gap-1.5 w-full mt-2 py-2 text-[11px] font-semibold text-white/90 bg-white/15 hover:bg-white/25 rounded-lg transition-colors"
-                            >
-                              <span>View All Categories</span>
-                              <ChevronRight className="w-3 h-3" />
-                            </Link>
-                          </>
-                        ) : (
-                          <div className="py-2 text-center text-xs text-white/60">
-                            No categories available
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-
-              return (
-                <NavButton
-                  key={item.id}
-                  variant="drawer"
-                  text={item.text}
-                  icon={item.icon}
-                  isActive={pathname === item.path}
-                  href={item.path}
-                  onClick={() => {
-                    setIsOpen(false);
-                    setIsMobileCategoriesOpen(false);
-                  }}
-                />
-              );
-            })}
+            <Link
+              href="/products?sortBy=discount"
+              onClick={() => setIsOpen(false)}
+              className="block px-6 py-4 text-sm font-semibold text-red-400 hover:bg-white/10 transition-colors"
+            >
+              Sale
+            </Link>
           </nav>
         </div>
       </>

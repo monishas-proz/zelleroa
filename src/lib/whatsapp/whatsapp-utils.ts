@@ -42,24 +42,24 @@ export const WHATSAPP_TEMPLATES = [
     id: "order_confirmed",
     name: "Order Confirmed",
     template: (orderId = "1001", customerName = "Customer", amount = "450") =>
-      `Hello ${customerName}! 🙏\n\nYour Zelleroa order *#${orderId}* for *₹${amount}* has been confirmed and is being carefully prepared! ✨\n\nWe will notify you as soon as your parcel is dispatched.\n\nThank you for shopping with Zelleroa! ❤️`,
+      `Hello ${customerName}! 🙏\n\nYour Zellora order *#${orderId}* for *₹${amount}* has been confirmed and is being carefully prepared! ✨\n\nWe will notify you as soon as your parcel is dispatched.\n\nThank you for shopping with Zellora! ❤️`,
   },
   {
     id: "out_for_delivery",
     name: "Out for Delivery",
     template: (orderId = "1001", customerName = "Customer") =>
-      `Hello ${customerName}! 🚚\n\nGreat news! Your Zelleroa order *#${orderId}* is out for delivery. Our courier partner will reach you shortly.\n\nGet ready to elevate your style! ✨`,
+      `Hello ${customerName}! 🚚\n\nGreat news! Your Zellora order *#${orderId}* is out for delivery. Our courier partner will reach you shortly.\n\nGet ready to elevate your style! ✨`,
   },
   {
     id: "order_delivered",
     name: "Order Delivered",
     template: (orderId = "1001", customerName = "Customer") =>
-      `Dear ${customerName}, your Zelleroa order *#${orderId}* has been delivered successfully! 🎉\n\nWe hope you love your new pieces! If you have any feedback or sizing inquiries, please reply directly to this message.\n\nHave a stylish day! ❤️`,
+      `Dear ${customerName}, your Zellora order *#${orderId}* has been delivered successfully! 🎉\n\nWe hope you love your new pieces! If you have any feedback or sizing inquiries, please reply directly to this message.\n\nHave a stylish day! ❤️`,
   },
   {
     id: "payment_reminder",
     name: "Payment Reminder",
     template: (orderId = "1001", customerName = "Customer", amount = "450") =>
-      `Hello ${customerName},\n\nThis is a friendly reminder regarding your pending payment of *₹${amount}* for Zelleroa order *#${orderId}*.\n\nPlease complete your payment using UPI/card or contact us for assistance. Thank you! 🙏`,
+      `Hello ${customerName},\n\nThis is a friendly reminder regarding your pending payment of *₹${amount}* for Zellora order *#${orderId}*.\n\nPlease complete your payment using UPI/card or contact us for assistance. Thank you! 🙏`,
   },
 ];

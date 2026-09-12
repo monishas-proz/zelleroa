@@ -7,7 +7,7 @@ interface AuthLayoutProps {
 
 export default function AuthLayout({ children }: AuthLayoutProps) {
   return (
-    <div className="grid h-screen w-full overflow-hidden lg:grid-cols-[43%_57%]">
+    <div className="grid h-screen w-full overflow-hidden lg:grid-cols-[45%_55%]">
       {/* Left Banner - strictly fixed & non-scrollable on desktop */}
       <div className="hidden h-screen min-h-0 w-full overflow-hidden lg:block">
         <AuthBanner />

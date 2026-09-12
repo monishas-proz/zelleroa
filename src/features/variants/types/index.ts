@@ -30,7 +30,7 @@ export interface UnitOption {
   id: string;
   name: string;
   code: string;
-  type: "weight" | "volume" | "count";
+  type: "weight" | "volume" | "count" | "size";
   conversionFactor?: number;
   baseUnitId?: string | null;
 }
@@ -71,6 +71,8 @@ export interface AdminVariantResponse {
   cookingRecipe: string | null;
   shelfLife: string | null;
   vegType: "veg" | "nonveg" | "vegan" | "na";
+  colorName: string | null;
+  colorHex: string | null;
   isFeatured: boolean;
   primaryImage: string | null;
   isActive: boolean;
@@ -128,7 +130,7 @@ export interface AdminVariantListParams {
   productIds?: string[];
   brandIds?: string[];
   categoryIds?: string[];
-  measurementTypes?: Array<"weight" | "volume" | "count">;
+  measurementTypes?: Array<"weight" | "volume" | "count" | "size">;
   unitIds?: string[];
   isActive?: boolean;
   outOfStock?: boolean;

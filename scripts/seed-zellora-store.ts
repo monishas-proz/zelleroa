@@ -26,7 +26,7 @@ const prisma = createClient();
 
 async function main() {
   console.log("=========================================");
-  console.log("STARTING ZELLEROA DATABASE SEEDING");
+  console.log("STARTING ZELLORA DATABASE SEEDING");
   console.log("=========================================\n");
 
   await prisma.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 0;");
@@ -101,13 +101,13 @@ async function main() {
   const customerRole = await getOrCreateRole("CUSTOMER", "customer", "Registered customer");
 
   // Admin user
-  let adminUser = await prisma.user.findFirst({ where: { email: "admin@zelleroa.com" } });
+  let adminUser = await prisma.user.findFirst({ where: { email: "admin@zellora.com" } });
   if (!adminUser) {
     adminUser = await prisma.user.create({
       data: {
         uuid: crypto.randomUUID(),
-        name: "Zelleroa Admin",
-        email: "admin@zelleroa.com",
+        name: "Zellora Admin",
+        email: "admin@zellora.com",
         password_hash: adminPassword,
         roleId: adminRole.id,
         status: "active",
@@ -133,13 +133,13 @@ async function main() {
   }
 
   // Customer users
-  let customerUser = await prisma.user.findFirst({ where: { email: "customer@zelleroa.com" } });
+  let customerUser = await prisma.user.findFirst({ where: { email: "customer@zellora.com" } });
   if (!customerUser) {
     customerUser = await prisma.user.create({
       data: {
         uuid: crypto.randomUUID(),
         name: "Priya Sharma",
-        email: "customer@zelleroa.com",
+        email: "customer@zellora.com",
         phone: "9876543210",
         password_hash: customerPassword,
         roleId: customerRole.id,
@@ -165,9 +165,9 @@ async function main() {
     });
   }
 
-  console.log(`✓ Admin User: admin@zelleroa.com / admin123`);
+  console.log(`✓ Admin User: admin@zellora.com / admin123`);
   console.log(`✓ Admin User (alt): admin@rithusnacks.com / admin123`);
-  console.log(`✓ Customer User: customer@zelleroa.com / customer123`);
+  console.log(`✓ Customer User: customer@zellora.com / customer123`);
   console.log(`✓ Customer User: customer@example.com / customer123\n`);
 
   // 2. CUSTOMER ADDRESSES
@@ -223,12 +223,12 @@ async function main() {
         \`uuid\`, \`company_name\`, \`email\`, \`phone\`, \`address\`, \`city\`, \`state\`, \`country\`, \`pincode\`,
         \`gst_number\`, \`pan_number\`, \`website\`, \`is_active\`, \`created_at\`, \`updated_at\`
       ) VALUES (
-        UUID(), 'Zelleroa Couture & Lifestyle', 'support@zelleroa.com', '+91 9876543210',
+        UUID(), 'Zellora Couture & Lifestyle', 'support@zellora.com', '+91 9876543210',
         '104, Boutique Boulevard, 100 Feet Road, Indiranagar', 'Bengaluru', 'Karnataka', 'India', '560038',
-        '29AAAAA0000A1Z5', 'AAAAA0000A', 'https://zelleroa.com', 1, NOW(), NOW()
+        '29AAAAA0000A1Z5', 'AAAAA0000A', 'https://zellora.com', 1, NOW(), NOW()
       );
     `);
-    console.log(`✓ Created Zelleroa company profile\n`);
+    console.log(`✓ Created Zellora company profile\n`);
   } catch (e: any) {
     console.warn(`! Company insert notice: ${e.message}\n`);
   }
@@ -269,8 +269,8 @@ async function main() {
   const brandCouture = await prisma.productBrand.create({
     data: {
       uuid: crypto.randomUUID(),
-      name: "Zelleroa Couture",
-      slug: "zelleroa-couture",
+      name: "Zellora Couture",
+      slug: "zellora-couture",
       description: "Signature designer dresses, gowns, and ethnic couture crafted with handpicked fabrics.",
       isActive: true,
       status: true,
@@ -280,8 +280,8 @@ async function main() {
   const brandChrono = await prisma.productBrand.create({
     data: {
       uuid: crypto.randomUUID(),
-      name: "Zelleroa Chrono",
-      slug: "zelleroa-chrono",
+      name: "Zellora Chrono",
+      slug: "zellora-chrono",
       description: "Precision engineered luxury timepieces, automatic watches, and minimalist chronographs.",
       isActive: true,
       status: true,
@@ -291,14 +291,14 @@ async function main() {
   const brandAtelier = await prisma.productBrand.create({
     data: {
       uuid: crypto.randomUUID(),
-      name: "Zelleroa Atelier",
-      slug: "zelleroa-atelier",
+      name: "Zellora Atelier",
+      slug: "zellora-atelier",
       description: "Artisan handcrafted full-grain leather bags, clutches, and premium everyday accessories.",
       isActive: true,
       status: true,
     },
   });
-  console.log(`✓ Created 3 Zelleroa brands\n`);
+  console.log(`✓ Created 3 Zellora brands\n`);
 
   // 6. CATEGORIES
   console.log("6. SEEDING CATEGORIES...");
@@ -925,14 +925,14 @@ async function main() {
   }
 
   console.log("\n=========================================");
-  console.log("ZELLEROA DEMO DATABASE READY!");
+  console.log("ZELLORA DEMO DATABASE READY!");
   console.log("=========================================");
-  console.log(`✓ Database: zelleroa_db`);
+  console.log(`✓ Database: zellora_db`);
   console.log(`✓ Categories: 6 (Dresses, Ethnic Wear, Shirts, Watches, Bags, Jeans)`);
   console.log(`✓ Products: ${totalProducts}`);
   console.log(`✓ Size Options / Unit Prices: ${totalUnitPrices} (All In Stock: 100 units each)`);
-  console.log(`✓ Admin User: admin@zelleroa.com / admin123`);
-  console.log(`✓ Customer User: customer@zelleroa.com / customer123`);
+  console.log(`✓ Admin User: admin@zellora.com / admin123`);
+  console.log(`✓ Customer User: customer@zellora.com / customer123`);
   console.log(`✓ Demo Orders: 3 (Delivered, Shipped, Confirmed)`);
   console.log(`✓ Verified Reviews: 4`);
   console.log("=========================================\n");

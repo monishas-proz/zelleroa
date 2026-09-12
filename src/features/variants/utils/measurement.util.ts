@@ -1,4 +1,4 @@
-export type MeasurementType = "weight" | "volume" | "count";
+export type MeasurementType = "weight" | "volume" | "count" | "size";
 
 export interface VariantMeasurement {
   type: MeasurementType;
@@ -23,7 +23,7 @@ export function formatVariantMeasurement(
 ): VariantMeasurement {
   const rawType = unit?.type ? String(unit.type).toLowerCase() : "count";
   const type: MeasurementType =
-    rawType === "weight" || rawType === "volume" || rawType === "count"
+    rawType === "weight" || rawType === "volume" || rawType === "count" || rawType === "size"
       ? (rawType as MeasurementType)
       : "count";
 
@@ -80,7 +80,7 @@ export function getMeasurementFieldConfig(
 
   const rawType = unit.type ? String(unit.type).toLowerCase() : "";
   const type: MeasurementType =
-    rawType === "weight" || rawType === "volume" || rawType === "count"
+    rawType === "weight" || rawType === "volume" || rawType === "count" || rawType === "size"
       ? (rawType as MeasurementType)
       : "weight";
 
@@ -88,6 +88,15 @@ export function getMeasurementFieldConfig(
   const unitName = unit.name || "";
 
   switch (type) {
+    case "size":
+      return {
+        type: "size",
+        label: "Size value",
+        placeholder: "1",
+        helperText: `Leave as 1 — the size itself (${unitName || unitCode || "e.g. S, M, L"}) is set by the unit you picked above.`,
+        unitBadge: unitCode || unitName,
+        validationMessage: "Size value is required and must be greater than 0",
+      };
     case "weight":
       return {
         type: "weight",

@@ -90,7 +90,11 @@ function ProductDetails({ product }: ProductDetailsProps) {
     const next = variants.find((v) => v.id === variantId);
     const nextUnitPrices = next?.unitPrices ?? [];
     setSelectedUnitPriceId(
-      nextUnitPrices.find((u) => u.isDefault)?.id ?? nextUnitPrices[0]?.id ?? null
+      nextUnitPrices.find((u) => u.isDefault && u.inStock)?.id ??
+        nextUnitPrices.find((u) => u.inStock)?.id ??
+        nextUnitPrices.find((u) => u.isDefault)?.id ??
+        nextUnitPrices[0]?.id ??
+        null
     );
     setQuantity(1);
     if (typeof window !== "undefined") {
@@ -98,7 +102,8 @@ function ProductDetails({ product }: ProductDetailsProps) {
     }
   };
 
-  const isInStock = !selectedVariant?.outOfStock;
+  const isInStock =
+    !selectedVariant?.outOfStock && (!selectedUnitPrice || selectedUnitPrice.inStock);
   const sellingPrice = selectedUnitPrice?.sellingPrice ?? 0;
   const basePrice = selectedUnitPrice?.basePrice ?? 0;
   const hasDiscount = sellingPrice < basePrice;
@@ -111,17 +116,24 @@ function ProductDetails({ product }: ProductDetailsProps) {
     !!selectedUnitPrice &&
     !!wishlist?.items.some((i) => i.variantUnitPriceId === selectedUnitPrice.id);
 
-  const galleryImages = selectedVariant?.primaryImage
-    ? [
-        {
-          id: selectedVariant.id,
-          url: getImageUrl(selectedVariant.primaryImage),
+  const galleryImages =
+    selectedVariant?.images && selectedVariant.images.length > 0
+      ? selectedVariant.images.map((img) => ({
+          id: img.id,
+          url: getImageUrl(img.imageUrl),
           altText: selectedVariant.variantName || product.name,
-        },
-      ]
-    : product.image
-      ? [{ id: product.id, url: getImageUrl(product.image), altText: product.name }]
-      : [];
+        }))
+      : selectedVariant?.primaryImage
+        ? [
+            {
+              id: selectedVariant.id,
+              url: getImageUrl(selectedVariant.primaryImage),
+              altText: selectedVariant.variantName || product.name,
+            },
+          ]
+        : product.image
+          ? [{ id: product.id, url: getImageUrl(product.image), altText: product.name }]
+          : [];
 
   const handleAddToCart = () => {
     if (!session) {
@@ -307,13 +319,19 @@ function ProductDetails({ product }: ProductDetailsProps) {
                       key={v.id}
                       type="button"
                       onClick={() => handleSelectVariant(v.id)}
-                      className={`px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all cursor-pointer select-none ${
+                      className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all cursor-pointer select-none ${
                         isSelected
                           ? "border-[#7D1D20] bg-[#7D1D20] text-white shadow-xs"
                           : "border-stone-200 bg-white text-stone-800 hover:border-stone-400 hover:bg-stone-50"
                       }`}
                     >
-                      {v.variantName}
+                      {v.colorHex && (
+                        <span
+                          className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0"
+                          style={{ backgroundColor: v.colorHex }}
+                        />
+                      )}
+                      {v.colorName || v.variantName}
                     </button>
                   );
                 })}
@@ -337,6 +355,7 @@ function ProductDetails({ product }: ProductDetailsProps) {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {unitPrices.map((unitPrice) => {
                   const isSelected = selectedUnitPriceId === unitPrice.id;
+                  const isUnitOutOfStock = !unitPrice.inStock;
                   const measurementLabel = formatMeasurementLabel(unitPrice.measurement);
                   const price = unitPrice.sellingPrice;
                   const compare = unitPrice.basePrice;
@@ -347,29 +366,41 @@ function ProductDetails({ product }: ProductDetailsProps) {
                     <button
                       key={unitPrice.id}
                       type="button"
-                      onClick={() => setSelectedUnitPriceId(unitPrice.id)}
-                      className={`relative flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border transition-all cursor-pointer select-none ${
-                        isSelected
-                          ? "border-[#7D1D20] bg-[#7D1D20] text-white shadow-sm"
-                          : "border-stone-200 bg-white text-stone-800 hover:border-stone-400 hover:bg-stone-50"
+                      disabled={isUnitOutOfStock}
+                      onClick={() => {
+                        if (isUnitOutOfStock) return;
+                        setSelectedUnitPriceId(unitPrice.id);
+                      }}
+                      className={`relative flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border transition-all select-none ${
+                        isUnitOutOfStock
+                          ? "border-stone-100 bg-stone-50 text-stone-350 cursor-not-allowed opacity-60"
+                          : isSelected
+                            ? "border-[#7D1D20] bg-[#7D1D20] text-white shadow-sm cursor-pointer"
+                            : "border-stone-200 bg-white text-stone-800 hover:border-stone-400 hover:bg-stone-50 cursor-pointer"
                       }`}
                     >
-                      {discount > 0 && (
+                      {discount > 0 && !isUnitOutOfStock && (
                         <span className="absolute -top-2.5 right-2 bg-[#D99A46] text-white text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded shadow-2xs">
                           SAVE {discount}%
                         </span>
                       )}
                       <div className="flex items-center gap-1 text-xs sm:text-sm font-bold">
-                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                        {isSelected && !isUnitOutOfStock && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                         <span>{measurementLabel}</span>
                       </div>
-                      <span
-                        className={`text-xs sm:text-sm mt-0.5 ${
-                          isSelected ? "text-stone-200 font-normal" : "text-stone-500 font-medium"
-                        }`}
-                      >
-                        ₹{price.toFixed(0)}
-                      </span>
+                      {isUnitOutOfStock ? (
+                        <span className="text-[10px] sm:text-xs mt-0.5 text-stone-400 font-semibold uppercase">
+                          Out of stock
+                        </span>
+                      ) : (
+                        <span
+                          className={`text-xs sm:text-sm mt-0.5 ${
+                            isSelected ? "text-stone-200 font-normal" : "text-stone-500 font-medium"
+                          }`}
+                        >
+                          ₹{price.toFixed(0)}
+                        </span>
+                      )}
                     </button>
                   );
                 })}

@@ -36,7 +36,7 @@ function PartyAddress({
 }
 
 /** Used until a logo is uploaded in Company Settings. */
-const FALLBACK_LOGO = "/logo.svg";
+const FALLBACK_LOGO = "/logo.png";
 
 export function TaxInvoice({ invoice }: { invoice: InvoiceDto }) {
   const { seller, buyer, sameState } = invoice;

@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Pencil, Trash2, Star, Loader2, Tag } from "lucide-react";
+import { Plus, Pencil, Trash2, Star, Loader2, Tag, PackagePlus, PackageMinus, Boxes } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useUnits } from "@/features/units/hooks";
 import type { AdminUnitResponse } from "@/features/units/types";
+import { getMeasurementFieldConfig } from "../utils/measurement.util";
 import {
   useVariantUnitPrices,
   useCreateVariantUnitPrice,
@@ -19,6 +20,7 @@ interface UnitPriceRowFormState {
   unitValue: string;
   sku: string;
   basePrice: string;
+  stock: string;
   isDefault: boolean;
   isActive: boolean;
 }
@@ -28,6 +30,7 @@ const emptyRow: UnitPriceRowFormState = {
   unitValue: "",
   sku: "",
   basePrice: "",
+  stock: "0",
   isDefault: false,
   isActive: true,
 };
@@ -58,6 +61,15 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VariantUnitPriceResponse | null>(null);
 
+  // Quick stock in/out adjustment (separate from the add/edit form)
+  const [stockAdjustId, setStockAdjustId] = useState<string | null>(null);
+  const [stockAdjustMode, setStockAdjustMode] = useState<"in" | "out">("in");
+  const [stockAdjustQty, setStockAdjustQty] = useState("");
+  const [stockAdjustError, setStockAdjustError] = useState<string | null>(null);
+
+  const selectedUnit = units.find((u: AdminUnitResponse) => u.id === form.unitId);
+  const fieldConfig = getMeasurementFieldConfig(selectedUnit ?? null);
+
   const resetForm = () => {
     setForm(emptyRow);
     setFormError(null);
@@ -78,12 +90,55 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
       unitValue: String(item.unitValue ?? ""),
       sku: item.sku,
       basePrice: String(item.basePrice ?? ""),
+      stock: String(item.stock ?? 0),
       isDefault: item.isDefault,
       isActive: item.isActive,
     });
     setFormError(null);
     setIsAdding(false);
     setEditingId(item.id);
+  };
+
+  const startStockAdjust = (item: VariantUnitPriceResponse, mode: "in" | "out") => {
+    setStockAdjustId(item.id);
+    setStockAdjustMode(mode);
+    setStockAdjustQty("");
+    setStockAdjustError(null);
+  };
+
+  const cancelStockAdjust = () => {
+    setStockAdjustId(null);
+    setStockAdjustQty("");
+    setStockAdjustError(null);
+  };
+
+  const handleStockAdjustSave = async (item: VariantUnitPriceResponse) => {
+    const qty = Number(stockAdjustQty);
+    if (!qty || qty <= 0 || !Number.isInteger(qty)) {
+      setStockAdjustError("Enter a whole number greater than 0");
+      return;
+    }
+
+    const currentStock = item.stock ?? 0;
+    const delta = stockAdjustMode === "in" ? qty : -qty;
+    const nextStock = currentStock + delta;
+
+    if (nextStock < 0) {
+      setStockAdjustError(`Only ${currentStock} in stock — cannot remove ${qty}`);
+      return;
+    }
+
+    try {
+      await updateMutation.mutateAsync({
+        productUuid,
+        variantUuid,
+        unitPriceUuid: item.id,
+        data: { stock: nextStock },
+      });
+      cancelStockAdjust();
+    } catch (err: unknown) {
+      setStockAdjustError(err instanceof Error ? err.message : "Failed to update stock");
+    }
   };
 
   const isBusy = createMutation.isPending || updateMutation.isPending;
@@ -97,7 +152,7 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
     }
     const unitValue = Number(form.unitValue);
     if (!unitValue || unitValue <= 0) {
-      setFormError("Pack size must be greater than 0");
+      setFormError(fieldConfig.validationMessage);
       return;
     }
     if (!form.sku.trim()) {
@@ -109,12 +164,18 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
       setFormError("Base price must be a non-negative number");
       return;
     }
+    const stock = Number(form.stock);
+    if (Number.isNaN(stock) || stock < 0 || !Number.isInteger(stock)) {
+      setFormError("Stock must be a non-negative whole number");
+      return;
+    }
 
     const payload = {
       unitId: form.unitId,
       unitValue,
       sku: form.sku.trim(),
       basePrice,
+      stock,
       isDefault: form.isDefault,
       isActive: form.isActive,
     };
@@ -232,7 +293,40 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
                 <span className="text-sm font-bold text-secondary-900 font-mono">
                   ₹{item.basePrice.toLocaleString("en-IN")}
                 </span>
+
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold border ${
+                    (item.stock ?? 0) > 0
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : "bg-red-50 text-red-700 border-red-200"
+                  }`}
+                  title="Current stock"
+                >
+                  <Boxes className="w-3 h-3" />
+                  {item.stock ?? 0}
+                </span>
+
                 <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => startStockAdjust(item, "in")}
+                    disabled={isBusy}
+                    className="h-8 w-8 text-neutral-500 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-40"
+                    title="Stock in (add stock)"
+                  >
+                    <PackagePlus className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => startStockAdjust(item, "out")}
+                    disabled={isBusy}
+                    className="h-8 w-8 text-neutral-500 hover:text-amber-700 hover:bg-amber-50 disabled:opacity-40"
+                    title="Stock out (remove stock)"
+                  >
+                    <PackageMinus className="w-3.5 h-3.5" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -258,11 +352,77 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
             </div>
           ))}
 
+          {unitPrices.map(
+            (item) =>
+              stockAdjustId === item.id && (
+                <div
+                  key={`stock-adjust-${item.id}`}
+                  className="px-6 py-4 bg-cream-50/60 border-t border-cream-border-subtle space-y-3"
+                >
+                  <p className="text-xs font-semibold text-neutral-800 flex items-center gap-1.5">
+                    {stockAdjustMode === "in" ? (
+                      <>
+                        <PackagePlus className="w-3.5 h-3.5 text-emerald-600" /> Stock in for{" "}
+                        {item.measurement?.value} {item.unitCode || item.measurement?.unit} — currently{" "}
+                        {item.stock ?? 0}
+                      </>
+                    ) : (
+                      <>
+                        <PackageMinus className="w-3.5 h-3.5 text-amber-600" /> Stock out for{" "}
+                        {item.measurement?.value} {item.unitCode || item.measurement?.unit} — currently{" "}
+                        {item.stock ?? 0}
+                      </>
+                    )}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      autoFocus
+                      value={stockAdjustQty}
+                      onChange={(e) => setStockAdjustQty(e.target.value)}
+                      placeholder="Quantity"
+                      disabled={updateMutation.isPending}
+                      className="w-32 h-9 px-3 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 disabled:opacity-60"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => handleStockAdjustSave(item)}
+                      disabled={updateMutation.isPending}
+                      className={
+                        stockAdjustMode === "in"
+                          ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                          : "bg-amber-600 text-white hover:bg-amber-700"
+                      }
+                    >
+                      {updateMutation.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                      ) : null}
+                      {stockAdjustMode === "in" ? "Add Stock" : "Remove Stock"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={cancelStockAdjust}
+                      disabled={updateMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                  {stockAdjustError && (
+                    <p className="text-xs text-red-500 font-medium">{stockAdjustError}</p>
+                  )}
+                </div>
+              )
+          )}
+
           {showForm && (
             <div className="p-6 bg-cream-50/60 space-y-4">
               <p className="text-xs text-neutral-500 -mt-1">
-                Add one row for every pack size you sell this item in — e.g. 250 Grams, 500
-                Grams and 1 Kilogram can each have their own price.
+                Add one row for every option you sell this item in — e.g. 250 Grams, 500 Grams
+                and 1 Kilogram, or S, M and L for clothing — each with its own price, SKU and
+                stock.
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -272,7 +432,16 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
                   </label>
                   <select
                     value={form.unitId}
-                    onChange={(e) => setForm((f) => ({ ...f, unitId: e.target.value }))}
+                    onChange={(e) => {
+                      const nextUnitId = e.target.value;
+                      const nextUnit = units.find((u: AdminUnitResponse) => u.id === nextUnitId);
+                      setForm((f) => ({
+                        ...f,
+                        unitId: nextUnitId,
+                        unitValue:
+                          nextUnit?.type === "size" && !f.unitValue ? "1" : f.unitValue,
+                      }));
+                    }}
                     disabled={isBusy}
                     className="w-full h-10 px-3 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 disabled:opacity-60 disabled:bg-neutral-100"
                   >
@@ -290,7 +459,8 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
 
                 <div>
                   <label className="block text-xs font-semibold text-neutral-800 mb-1.5">
-                    Pack Size <span className="text-red-500">*</span>
+                    {fieldConfig.type === "size" ? "Size value" : "Pack Size"}{" "}
+                    <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -299,11 +469,13 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
                     value={form.unitValue}
                     onChange={(e) => setForm((f) => ({ ...f, unitValue: e.target.value }))}
                     disabled={isBusy}
-                    placeholder="e.g. 500"
+                    placeholder={fieldConfig.type === "size" ? "1" : "e.g. 500"}
                     className="w-full h-10 px-3 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 disabled:opacity-60 disabled:bg-neutral-100"
                   />
                   <p className="text-[11px] text-neutral-400 mt-1">
-                    How much is in one pack — e.g. 500 for a 500 Gram pack.
+                    {fieldConfig.type === "size"
+                      ? fieldConfig.helperText
+                      : "How much is in one pack — e.g. 500 for a 500 Gram pack."}
                   </p>
                 </div>
               </div>
@@ -342,6 +514,29 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
                   />
                   <p className="text-[11px] text-neutral-400 mt-1">
                     What customer pays for this pack.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-800 mb-1.5">
+                    Stock {editingId ? "" : <span className="text-red-500">*</span>}
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={form.stock}
+                    onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
+                    disabled={isBusy}
+                    placeholder="e.g. 50"
+                    className="w-full h-10 px-3 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 disabled:opacity-60 disabled:bg-neutral-100"
+                  />
+                  <p className="text-[11px] text-neutral-400 mt-1">
+                    {editingId
+                      ? "Sets the stock quantity directly. Use the stock in/out buttons on the row for quick adjustments instead."
+                      : "How many units of this pack are available right now."}
                   </p>
                 </div>
               </div>

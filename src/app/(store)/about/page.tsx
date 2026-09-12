@@ -6,9 +6,9 @@ import {
 } from "@/components/storefront/about";
 
 export const metadata: Metadata = {
-  title: "About Us - Zelleroa | Elegance in Every Stitch",
+  title: "About Us - Zellora | Elegance in Every Stitch",
   description:
-    "Learn about Zelleroa, delivering bespoke fashion, contemporary craftsmanship, and timeless designer clothing crafted with care.",
+    "Learn about Zellora, delivering bespoke fashion, contemporary craftsmanship, and timeless designer clothing crafted with care.",
 };
 
 export default function AboutPage() {

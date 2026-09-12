@@ -173,7 +173,7 @@ function RegisterForm() {
     <AuthFormLayout
       showLogo
       title="Create Account"
-      subtitle="Welcome to Zelleroa"
+      subtitle="Welcome to Zellora"
       bottomContent={
         <div className="text-sm text-neutral-600">
           Already have an account?{" "}

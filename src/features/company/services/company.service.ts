@@ -90,7 +90,7 @@ export const companyService = {
     } else {
       updatedCompany = await companyRepository.createCompany(
         {
-          companyName: "Zelleroa",
+          companyName: "Zellora",
           logo: newLogoPath,
         },
         adminId

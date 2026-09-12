@@ -61,7 +61,7 @@ function LoginForm() {
       subtitle="Sign in to access your curated couture & lifestyle collections."
       bottomContent={
         <div className="text-sm text-neutral-600">
-          New to Zelleroa?{" "}
+          New to Zellora?{" "}
           <Link
             href={
               callbackUrl !== "/"

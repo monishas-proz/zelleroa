@@ -707,7 +707,7 @@ function CreateCampaignContent() {
                 rows={8}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder={`Namaste {{customer_name}}! ✨\n\nCelebrate this festive season with curated designer fashion & luxury timepieces from Zelleroa! Use coupon *FESTIVE20* for 20% OFF today.`}
+                placeholder={`Namaste {{customer_name}}! ✨\n\nCelebrate this festive season with curated designer fashion & luxury timepieces from Zellora! Use coupon *FESTIVE20* for 20% OFF today.`}
               />
             </div>
 
@@ -803,7 +803,7 @@ function CreateCampaignContent() {
                   Z
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-semibold truncate leading-tight">Zelleroa</h4>
+                  <h4 className="text-sm font-semibold truncate leading-tight">Zellora</h4>
                   <p className="text-[11px] text-emerald-200 truncate">Official Admin Account</p>
                 </div>
                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -833,7 +833,7 @@ function CreateCampaignContent() {
                     {message
                       ? message
                           .replace(/{{customer_name}}/g, "Priya")
-                          .replace(/{{store_name}}/g, "Zelleroa")
+                          .replace(/{{store_name}}/g, "Zellora")
                       : "Start typing your message to preview how customers will see it on their phones..."}
                   </p>
 

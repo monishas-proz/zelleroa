@@ -8,9 +8,10 @@ export const createAdminProductSchema = z
     categoryId: z
       .string({ message: "Category ID is required" })
       .uuid("Invalid Category UUID format"),
-    brandId: z
-      .string({ message: "Brand ID is required" })
-      .uuid("Invalid Brand UUID format"),
+    brandId: z.preprocess(
+      (val) => (val === "" || val === null ? undefined : val),
+      z.string().uuid("Invalid Brand UUID format").optional()
+    ),
     hsnCodeId: z
       .string({ message: "HSN Code ID is required" })
       .uuid("Invalid HSN Code UUID format"),

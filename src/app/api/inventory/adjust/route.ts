@@ -9,4 +9,4 @@ export const POST = createApiHandler({
     const result = await inventoryService.adjustStock(input);
     return apiSuccess(result);
   },
-}, { requireAuth: true, requiredRole: ["ADMIN", "STAFF"] });
+}, { requireAuth: true, requiredRole: ["ADMIN", "STAFF"], bodySchema: adjustStockSchema });

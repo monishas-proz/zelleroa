@@ -13,6 +13,8 @@ export async function getInventory(params: GetInventoryParams) {
   if (params.page) searchParams.set("page", String(params.page));
   if (params.limit) searchParams.set("limit", String(params.limit));
   if (params.search) searchParams.set("search", params.search);
+  if (params.productUuid) searchParams.set("productUuid", params.productUuid);
+  if (params.color) searchParams.set("color", params.color);
   if (params.lowStock) searchParams.set("lowStock", "true");
   if (params.outOfStock) searchParams.set("outOfStock", "true");
 

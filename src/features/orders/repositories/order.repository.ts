@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { db } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma";
+import { ApiError } from "@/lib/api/api-error";
 import { formatVariantMeasurement } from "@/features/variants/utils/measurement.util";
 import type {
   OrderDetailResponse,
@@ -489,6 +490,39 @@ export const orderRepository = {
         })),
       });
 
+      // 3.5. Decrement stock for the exact variant+unit purchased, and log it.
+      // A conditional updateMany (quantity_available >= requested) makes this
+      // race-safe: if another order beat us to the last units, count is 0 and
+      // we throw, rolling back the whole order transaction.
+      for (const item of params.items) {
+        const decremented = await tx.inventory.updateMany({
+          where: {
+            variantUnitPriceId: item.variantUnitPriceId,
+            quantity_available: { gte: item.quantity },
+          },
+          data: { quantity_available: { decrement: item.quantity } },
+        });
+
+        if (decremented.count === 0) {
+          throw ApiError.badRequest(
+            `Insufficient stock for "${item.variantName}" (SKU: ${item.sku})`
+          );
+        }
+
+        await tx.inventoryTransaction.create({
+          data: {
+            variant_unit_price_id: item.variantUnitPriceId,
+            type: "out",
+            quantity: item.quantity,
+            referenceType: "order",
+            referenceId: createdOrder.id,
+            note: `Order ${orderNumber}`,
+            created_by: params.userId,
+            updated_by: params.userId,
+          },
+        });
+      }
+
       // 4. Create Status History
       await tx.order_status_history.create({
         data: {
@@ -897,6 +931,32 @@ export const orderRepository = {
     return db.$transaction(async (tx) => {
       const now = new Date();
 
+      const items = await tx.orderItem.findMany({
+        where: { orderId: params.orderId, is_active: true, variantUnitPriceId: { not: null } },
+        select: { variantUnitPriceId: true, quantity: true },
+      });
+
+      for (const item of items) {
+        const variantUnitPriceId = item.variantUnitPriceId!;
+        await tx.inventory.update({
+          where: { variantUnitPriceId },
+          data: { quantity_available: { increment: item.quantity } },
+        });
+
+        await tx.inventoryTransaction.create({
+          data: {
+            variant_unit_price_id: variantUnitPriceId,
+            type: "in",
+            quantity: item.quantity,
+            referenceType: "order_cancel",
+            referenceId: params.orderId,
+            note: params.note || "Order cancelled",
+            created_by: params.changedBy,
+            updated_by: params.changedBy,
+          },
+        });
+      }
+
       await tx.order.update({
         where: { id: params.orderId },
         data: {
@@ -934,6 +994,32 @@ export const orderRepository = {
   }): Promise<OrderDetailResponse> {
     return db.$transaction(async (tx) => {
       const now = new Date();
+
+      const items = await tx.orderItem.findMany({
+        where: { orderId: params.orderId, is_active: true, variantUnitPriceId: { not: null } },
+        select: { variantUnitPriceId: true, quantity: true },
+      });
+
+      for (const item of items) {
+        const variantUnitPriceId = item.variantUnitPriceId!;
+        await tx.inventory.update({
+          where: { variantUnitPriceId },
+          data: { quantity_available: { increment: item.quantity } },
+        });
+
+        await tx.inventoryTransaction.create({
+          data: {
+            variant_unit_price_id: variantUnitPriceId,
+            type: "in",
+            quantity: item.quantity,
+            referenceType: "order_return",
+            referenceId: params.orderId,
+            note: params.note || "Order returned",
+            created_by: params.changedBy,
+            updated_by: params.changedBy,
+          },
+        });
+      }
 
       await tx.order.update({
         where: { id: params.orderId },

@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { SearchInput } from "@/components/ui/search-input";
+import { ClearFiltersButton } from "@/components/common/clear-filters-button";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -23,27 +26,16 @@ import {
   useAdjustStock,
   useCreateInventory,
 } from "@/features/inventory/hooks";
-import { formatDate } from "@/lib/utils";
+import { useProducts } from "@/features/products/hooks";
 import type {
   InventoryListItem,
-  InventoryTransactionType,
   GetInventoryParams,
 } from "@/features/inventory/types";
 
 const adjustStockFormSchema = z.object({
   inventoryId: z.number().min(1, "Select an inventory item"),
-  type: z.enum([
-    "PURCHASE",
-    "SALE",
-    "RETURN",
-    "ADJUSTMENT",
-    "DAMAGE",
-    "TRANSFER",
-  ]),
-  quantity: z
-    .number()
-    .int()
-    .refine((val) => val !== 0, "Quantity cannot be zero"),
+  direction: z.enum(["in", "out"]),
+  quantity: z.number().int().min(1, "Quantity must be at least 1"),
   notes: z.string().optional(),
 });
 
@@ -60,16 +52,6 @@ const createInventoryFormSchema = z.object({
 
 type AdjustStockForm = z.infer<typeof adjustStockFormSchema>;
 type CreateInventoryForm = z.infer<typeof createInventoryFormSchema>;
-
-const transactionTypes: { value: InventoryTransactionType; label: string }[] =
-  [
-    { value: "PURCHASE", label: "Purchase" },
-    { value: "SALE", label: "Sale" },
-    { value: "RETURN", label: "Return" },
-    { value: "ADJUSTMENT", label: "Adjustment" },
-    { value: "DAMAGE", label: "Damage" },
-    { value: "TRANSFER", label: "Transfer" },
-  ];
 
 function getStatusBadge(item: InventoryListItem) {
   if (item.quantity === 0) {
@@ -90,26 +72,57 @@ function getStatusBadge(item: InventoryListItem) {
 }
 
 export default function InventoryStockPage() {
-  const [params, setParams] = useState<GetInventoryParams>({
-    page: 1,
-    limit: 10,
-  });
+  const [search, setSearch] = useState("");
+  const [productFilter, setProductFilter] = useState("");
+  const [colorFilter, setColorFilter] = useState("");
+  const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [outOfStockOnly, setOutOfStockOnly] = useState(false);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, productFilter, colorFilter, lowStockOnly, outOfStockOnly]);
+
+  const params: GetInventoryParams = {
+    page,
+    limit,
+    search: search || undefined,
+    productUuid: productFilter || undefined,
+    color: colorFilter || undefined,
+    lowStock: lowStockOnly || undefined,
+    outOfStock: outOfStockOnly || undefined,
+  };
+
   const { data, isLoading, error } = useInventory(params);
+  const { data: productsData } = useProducts({ pageSize: 100 });
   const adjustMutation = useAdjustStock();
   const createMutation = useCreateInventory();
+
+  const products = productsData?.data ?? [];
+  const productFilterOptions = useMemo(
+    () => [
+      { value: "", label: "All Products" },
+      ...products.map((p: any) => ({ value: p.id, label: p.name })),
+    ],
+    [products]
+  );
 
   const adjustForm = useForm<AdjustStockForm>({
     resolver: zodResolver(adjustStockFormSchema),
     defaultValues: {
       inventoryId: 0,
-      type: "ADJUSTMENT",
-      quantity: 0,
+      direction: "in",
+      quantity: 1,
       notes: "",
     },
   });
+
+  const inventoryData = data?.data?.data ?? [];
+  const meta = data?.data?.meta;
 
   const columns: ColumnDef<InventoryListItem>[] = [
     {
@@ -117,17 +130,28 @@ export default function InventoryStockPage() {
       header: "Product Name",
     },
     {
-      accessorKey: "variantName",
-      header: "Variant",
-      cell: ({ row }) => row.original.variantName ?? "—",
+      accessorKey: "colorName",
+      header: "Color",
+      cell: ({ row }) => row.original.colorName ?? "—",
     },
     {
-      accessorKey: "quantity",
-      header: "Quantity",
+      accessorKey: "unitName",
+      header: "Unit",
+      cell: ({ row }) => row.original.unitName ?? "—",
     },
     {
-      accessorKey: "reservedQuantity",
-      header: "Reserved",
+      accessorKey: "stockIn",
+      header: "Stock In",
+      cell: ({ row }) => (
+        <span className="text-emerald-700 font-semibold">{row.original.stockIn}</span>
+      ),
+    },
+    {
+      accessorKey: "stockOut",
+      header: "Stock Out",
+      cell: ({ row }) => (
+        <span className="text-amber-700 font-semibold">{row.original.stockOut}</span>
+      ),
     },
     {
       accessorKey: "availableQuantity",
@@ -152,8 +176,8 @@ export default function InventoryStockPage() {
           onClick={() => {
             adjustForm.reset({
               inventoryId: row.original.id,
-              type: "ADJUSTMENT",
-              quantity: 0,
+              direction: "in",
+              quantity: 1,
               notes: "",
             });
             setAdjustOpen(true);
@@ -176,12 +200,21 @@ export default function InventoryStockPage() {
   });
 
   const handleAdjustSubmit = (values: AdjustStockForm) => {
-    adjustMutation.mutate(values, {
-      onSuccess: () => {
-        setAdjustOpen(false);
-        adjustForm.reset();
+    const signedQuantity = values.direction === "in" ? values.quantity : -values.quantity;
+    adjustMutation.mutate(
+      {
+        inventoryId: values.inventoryId,
+        type: "ADJUSTMENT",
+        quantity: signedQuantity,
+        notes: values.notes,
       },
-    });
+      {
+        onSuccess: () => {
+          setAdjustOpen(false);
+          adjustForm.reset();
+        },
+      }
+    );
   };
 
   const handleCreateSubmit = (values: CreateInventoryForm) => {
@@ -193,10 +226,23 @@ export default function InventoryStockPage() {
     });
   };
 
+  const handleClearFilters = () => {
+    setSearch("");
+    setProductFilter("");
+    setColorFilter("");
+    setLowStockOnly(false);
+    setOutOfStockOnly(false);
+  };
+
+  const hasActiveFilters =
+    search.trim() !== "" ||
+    productFilter !== "" ||
+    colorFilter.trim() !== "" ||
+    lowStockOnly ||
+    outOfStockOnly;
+
   if (isLoading) return <AdminTableSkeleton />;
   if (error) return <ErrorState message={error.message} />;
-
-  const inventoryData = data?.data?.data ?? [];
 
   return (
     <div className="flex flex-1 min-h-0 flex-col">
@@ -209,18 +255,95 @@ export default function InventoryStockPage() {
       />
       <AdminPageHeader
         title="Inventory Stock"
-        description="Manage your inventory stock levels"
+        description="Stock In / Stock Out / Available stock per color + unit combination"
         actions={
           <Button onClick={() => setCreateOpen(true)}>Add Inventory</Button>
         }
       />
       <AdminContent className="flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-          <DataTable
-            columns={columns}
-            data={inventoryData}
-            className="bg-white border border-neutral-200"
-          />
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col gap-4">
+          <div className="flex-shrink-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
+            <SearchInput
+              placeholder="Search by product name..."
+              value={search}
+              onSearch={setSearch}
+              className="w-full max-w-xs"
+            />
+            <div className="w-full sm:w-56">
+              <Select
+                value={productFilter}
+                onChange={(e) => setProductFilter(e.target.value)}
+                options={productFilterOptions}
+                placeholder="All Products"
+              />
+            </div>
+            <input
+              type="text"
+              placeholder="Filter by color..."
+              value={colorFilter}
+              onChange={(e) => setColorFilter(e.target.value)}
+              className="h-10 px-3 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 w-full sm:w-44"
+            />
+            <label className="inline-flex items-center gap-2 text-xs font-semibold text-neutral-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={lowStockOnly}
+                onChange={(e) => {
+                  setLowStockOnly(e.target.checked);
+                  if (e.target.checked) setOutOfStockOnly(false);
+                }}
+                className="rounded border-neutral-300"
+              />
+              Low stock only
+            </label>
+            <label className="inline-flex items-center gap-2 text-xs font-semibold text-neutral-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={outOfStockOnly}
+                onChange={(e) => {
+                  setOutOfStockOnly(e.target.checked);
+                  if (e.target.checked) setLowStockOnly(false);
+                }}
+                className="rounded border-neutral-300"
+              />
+              Out of stock only
+            </label>
+            {hasActiveFilters && <ClearFiltersButton onClick={handleClearFilters} />}
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <DataTable
+              columns={columns}
+              data={inventoryData}
+              className="bg-white border border-neutral-200"
+            />
+          </div>
+
+          {meta && meta.totalPages > 1 && (
+            <div className="flex-shrink-0 flex items-center justify-between text-xs text-neutral-600">
+              <span>
+                Page {meta.page} of {meta.totalPages} ({meta.total} items)
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= meta.totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </AdminContent>
 
@@ -228,7 +351,7 @@ export default function InventoryStockPage() {
         open={adjustOpen}
         onClose={() => setAdjustOpen(false)}
         title="Adjust Stock"
-        description="Adjust inventory stock levels"
+        description="Add or remove stock for this color + unit combination"
         footer={
           <>
             <Button variant="outline" onClick={() => setAdjustOpen(false)}>Cancel</Button>
@@ -251,30 +374,32 @@ export default function InventoryStockPage() {
               {inventoryData?.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.productName}
-                  {item.variantName ? ` - ${item.variantName}` : ""}
+                  {item.colorName ? ` - ${item.colorName}` : ""}
+                  {item.unitName ? ` (${item.unitName})` : ""}
                 </option>
               ))}
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium">Type <span className="text-red-500">*</span></label>
-            <select
-              className="w-full border rounded-md p-2"
-              {...adjustForm.register("type")}
-            >
-              {transactionTypes.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+            <label className="text-sm font-medium">Direction <span className="text-red-500">*</span></label>
+            <div className="flex gap-2 mt-1">
+              <label className="flex-1 flex items-center justify-center gap-1.5 border rounded-md p-2 text-sm font-semibold cursor-pointer has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50 has-[:checked]:text-emerald-700">
+                <input type="radio" value="in" className="hidden" {...adjustForm.register("direction")} />
+                Stock In
+              </label>
+              <label className="flex-1 flex items-center justify-center gap-1.5 border rounded-md p-2 text-sm font-semibold cursor-pointer has-[:checked]:border-amber-600 has-[:checked]:bg-amber-50 has-[:checked]:text-amber-700">
+                <input type="radio" value="out" className="hidden" {...adjustForm.register("direction")} />
+                Stock Out
+              </label>
+            </div>
           </div>
           <div>
             <label className="text-sm font-medium">
-              Quantity (negative for out) <span className="text-red-500">*</span>
+              Quantity <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
+              min={1}
               className="w-full border rounded-md p-2"
               {...adjustForm.register("quantity", { valueAsNumber: true })}
             />

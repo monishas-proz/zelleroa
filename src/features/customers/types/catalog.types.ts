@@ -10,6 +10,8 @@ export interface CustomerBrandDto {
 export interface CustomerCategoryDto {
   id: string; // Category UUID
   name: string;
+  slug: string;
+  parentId: string | null;
   image: string | null;
 }
 
@@ -57,6 +59,16 @@ export interface CustomerVariantUnitPriceDto {
   offer?: OfferBreakdown | null;
   discountAmount?: number;
   discountPercent?: number;
+  /** Current available quantity for this exact color+unit combination. */
+  stock: number;
+  inStock: boolean;
+}
+
+export interface CustomerVariantImageDto {
+  id: string;
+  imageUrl: string;
+  sortOrder: number;
+  isPrimary: boolean;
 }
 
 export interface CustomerVariantListItemDto {
@@ -70,6 +82,11 @@ export interface CustomerVariantListItemDto {
   /** Default pack size's price after offers; mirrors `unitPrices`. */
   salePrice: number;
   primaryImage: string | null;
+  /** This variant's color, when the product distinguishes variants by color. */
+  colorName: string | null;
+  colorHex: string | null;
+  /** Full set of images for this color - the gallery to show when this variant/color is selected. */
+  images: CustomerVariantImageDto[];
   outOfStock?: boolean;
   ingredients: string | null;
   isReadyToMix: boolean;
@@ -80,13 +97,6 @@ export interface CustomerVariantListItemDto {
   // `salePrice`/`measurement` above mirror the default (or first) entry here
   // for backward compatibility with callers that expect a single price/sku.
   unitPrices: CustomerVariantUnitPriceDto[];
-}
-
-export interface CustomerVariantImageDto {
-  id: string;
-  imageUrl: string;
-  sortOrder: number;
-  isPrimary: boolean;
 }
 
 export interface CustomerVariantDetailDto extends CustomerVariantListItemDto {

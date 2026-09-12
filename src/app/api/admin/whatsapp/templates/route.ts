@@ -7,13 +7,13 @@ const INITIAL_TEMPLATES = [
     name: "Festive Season 20% Special Offer",
     category: "FESTIVAL",
     message:
-      "Namaste {{customer_name}}! ✨\n\nCelebrate this season with exquisite designer wear and luxury timepieces from *Zelleroa*! ❤️\n\nEnjoy an exclusive *20% OFF* on all evening dresses and watches using coupon code *ZELLEROA20* at checkout.\n\nShop the collection today: zelleroa.com 👗⌚",
+      "Namaste {{customer_name}}! ✨\n\nCelebrate this season with exquisite designer wear and luxury timepieces from *Zellora*! ❤️\n\nEnjoy an exclusive *20% OFF* on all evening dresses and watches using coupon code *ZELLORA20* at checkout.\n\nShop the collection today: zellora.com 👗⌚",
   },
   {
     name: "Festive Luxe Gift Box",
     category: "FESTIVAL",
     message:
-      "Hello {{customer_name}}! 🎁\n\nTreat someone special to Zelleroa bespoke ethnic wear and handcrafted leather bags.\n\nComplimentary luxury gift wrapping on orders above ₹1999! ✨",
+      "Hello {{customer_name}}! 🎁\n\nTreat someone special to Zellora bespoke ethnic wear and handcrafted leather bags.\n\nComplimentary luxury gift wrapping on orders above ₹1999! ✨",
   },
   {
     name: "Weekend Flash Sale",

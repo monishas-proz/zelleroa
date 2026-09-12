@@ -52,6 +52,9 @@ const unitPriceListArgs = {
     product_units: {
       select: { id: true, uuid: true, name: true, code: true, type: true },
     },
+    inventories: {
+      select: { quantity_available: true },
+    },
   },
   orderBy: [{ is_default: "desc" as const }, { createdAt: "asc" as const }],
 };
@@ -63,6 +66,7 @@ type VariantUnitPriceForDto = {
   unit_value: Prisma.Decimal | number;
   is_default: boolean;
   product_units: { id: bigint; uuid: string | null; name: string; code: string; type: string } | null;
+  inventories?: { quantity_available: number } | null;
 };
 
 function pickDefaultUnitPrice(
@@ -77,13 +81,21 @@ function toVariantListItemDto(
     id: bigint;
     uuid: string;
     variant_name: string | null;
+    color_name?: string | null;
+    color_hex?: string | null;
     out_of_stock?: boolean;
     ingredients?: string | null;
     is_ready_to_mix?: boolean;
     cooking_recipe?: string | null;
     shelf_life?: string | null;
     variant_unit_prices?: VariantUnitPriceForDto[] | null;
-    product_variant_images?: Array<{ image_url: string }> | null;
+    product_variant_images?: Array<{
+      id?: bigint;
+      uuid?: string | null;
+      image_url: string;
+      sort_order?: number;
+      is_primary?: boolean;
+    }> | null;
   },
   productUuid: string,
   productName: string
@@ -94,6 +106,7 @@ function toVariantListItemDto(
     variant.variant_unit_prices || []
   ).map((up) => {
     const basePrice = Number(up.base_price);
+    const stock = up.inventories?.quantity_available ?? 0;
     return {
       id: up.uuid,
       sku: up.sku,
@@ -101,8 +114,17 @@ function toVariantListItemDto(
       basePrice,
       sellingPrice: computeSellingPrice(basePrice),
       isDefault: Boolean(up.is_default),
+      stock,
+      inStock: stock > 0,
     };
   });
+
+  const images = (variant.product_variant_images || []).map((img, idx) => ({
+    id: img.uuid || (img.id !== undefined ? String(img.id) : String(idx)),
+    imageUrl: img.image_url,
+    sortOrder: img.sort_order ?? idx,
+    isPrimary: Boolean(img.is_primary),
+  }));
 
   return {
     id: variant.uuid || String(variant.id),
@@ -121,7 +143,10 @@ function toVariantListItemDto(
     salePrice: defaultUnitPrice
       ? computeSellingPrice(Number(defaultUnitPrice.base_price))
       : 0,
-    primaryImage: variant.product_variant_images?.[0]?.image_url ?? null,
+    primaryImage: images[0]?.imageUrl ?? variant.product_variant_images?.[0]?.image_url ?? null,
+    colorName: variant.color_name ?? null,
+    colorHex: variant.color_hex ?? null,
+    images,
     outOfStock: Boolean(variant.out_of_stock),
     ingredients: variant.ingredients ?? null,
     isReadyToMix: Boolean(variant.is_ready_to_mix),
@@ -252,6 +277,7 @@ export const catalogRepository = {
             where: { is_active: true },
             take: 1,
           },
+          parent: { select: { uuid: true } },
         },
       }),
       db.productCategory.count({ where }),
@@ -260,6 +286,8 @@ export const catalogRepository = {
     const data: CustomerCategoryDto[] = categories.map((c) => ({
       id: c.uuid || String(c.id),
       name: c.name,
+      slug: c.slug,
+      parentId: c.parent?.uuid ?? null,
       image: c.icon || c.product_category_images[0]?.image_url || null,
     }));
 
@@ -288,6 +316,7 @@ export const catalogRepository = {
           where: { is_active: true },
           take: 1,
         },
+        parent: { select: { uuid: true } },
       },
     });
 
@@ -296,6 +325,8 @@ export const catalogRepository = {
     return {
       id: category.uuid || String(category.id),
       name: category.name,
+      slug: category.slug,
+      parentId: category.parent?.uuid ?? null,
       image: category.icon || category.product_category_images[0]?.image_url || null,
     };
   },

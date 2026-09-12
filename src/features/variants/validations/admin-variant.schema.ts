@@ -44,6 +44,18 @@ export const createAdminVariantSchema = z
       .optional()
       .nullable(),
     vegType: vegTypeEnum.optional(),
+    colorName: z
+      .string()
+      .trim()
+      .max(50, "Color name cannot exceed 50 characters")
+      .optional()
+      .nullable(),
+    colorHex: z
+      .string()
+      .trim()
+      .regex(/^#[0-9A-Fa-f]{6}$/, "Enter a valid hex color, e.g. #FF5733")
+      .optional()
+      .nullable(),
     isFeatured: z.boolean().optional().default(false),
     isActive: z.boolean().optional().default(false),
     outOfStock: z.boolean().optional().default(false),
@@ -95,6 +107,18 @@ export const updateAdminVariantSchema = z
       .optional()
       .nullable(),
     vegType: vegTypeEnum.optional(),
+    colorName: z
+      .string()
+      .trim()
+      .max(50, "Color name cannot exceed 50 characters")
+      .optional()
+      .nullable(),
+    colorHex: z
+      .string()
+      .trim()
+      .regex(/^#[0-9A-Fa-f]{6}$/, "Enter a valid hex color, e.g. #FF5733")
+      .optional()
+      .nullable(),
     isFeatured: z.boolean().optional(),
     isActive: z.boolean().optional(),
     outOfStock: z.boolean().optional(),
@@ -181,7 +205,7 @@ export const adminVariantListSchema = z
       .optional()
       .default([]),
     measurementTypes: z
-      .array(z.enum(["weight", "volume", "count"]))
+      .array(z.enum(["weight", "volume", "count", "size"]))
       .optional()
       .default([]),
     unitIds: z

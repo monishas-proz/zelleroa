@@ -7,11 +7,20 @@ import {
   getCategory,
   getCustomerCategories,
   getCustomerCategory,
+  getCategoryTree,
 } from "../api/get-categories";
 import type {
   GetCategoriesParams,
   CustomerCategoryListParams,
 } from "../types";
+
+export function useCategoryTree() {
+  return useQuery({
+    queryKey: [...categoryKeys.all, "tree"],
+    queryFn: getCategoryTree,
+    staleTime: 10 * 60 * 1000, // near-static reference data
+  });
+}
 
 export function useCustomerCategories(params?: CustomerCategoryListParams) {
   const queryParams: Record<string, string | number | boolean | undefined> = {

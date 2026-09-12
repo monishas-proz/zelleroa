@@ -33,7 +33,7 @@ export const companyRepository = {
     return db.company.create({
       data: {
         uuid,
-        companyName: data.companyName || "Zelleroa",
+        companyName: data.companyName || "Zellora",
         logo: data.logo ?? null,
         email: data.email ?? null,
         phone: data.phone ?? null,

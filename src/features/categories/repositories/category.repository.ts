@@ -65,6 +65,23 @@ function buildAdminCategoryWhere(params: GetAdminCategoriesParams = {}): Prisma.
 export const categoryRepository = {
   buildAdminCategoryWhere,
 
+  /** All active categories, minimal fields — used to build the in-memory category tree for nav/routing. */
+  async findAllActiveFlat() {
+    return db.productCategory.findMany({
+      where: { isActive: true, deleted_at: null },
+      select: {
+        id: true,
+        uuid: true,
+        slug: true,
+        name: true,
+        icon: true,
+        parentId: true,
+        sortOrder: true,
+      },
+      orderBy: { sortOrder: "asc" },
+    });
+  },
+
   async findAll(params: GetCategoriesParams = {}) {
     const where = buildCategoryWhere(params);
     return db.productCategory.findMany({

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { db } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma";
+import { ApiError } from "@/lib/api/api-error";
 
 export const cartItemInclude = Prisma.validator<Prisma.CartItemInclude>()({
   product: {
@@ -152,6 +153,19 @@ export const cartRepository = {
           ? existingItem.quantity + params.quantity
           : params.quantity;
 
+        if (params.variantUnitPriceId) {
+          const inventory = await tx.inventory.findUnique({
+            where: { variantUnitPriceId: params.variantUnitPriceId },
+            select: { quantity_available: true },
+          });
+          const available = inventory?.quantity_available ?? 0;
+          if (newQuantity > available) {
+            throw ApiError.badRequest(
+              `Only ${available} left in stock for this item`
+            );
+          }
+        }
+
         await tx.cartItem.update({
           where: { id: existingItem.id },
           data: {
@@ -163,6 +177,19 @@ export const cartRepository = {
           },
         });
       } else {
+        if (params.variantUnitPriceId) {
+          const inventory = await tx.inventory.findUnique({
+            where: { variantUnitPriceId: params.variantUnitPriceId },
+            select: { quantity_available: true },
+          });
+          const available = inventory?.quantity_available ?? 0;
+          if (params.quantity > available) {
+            throw ApiError.badRequest(
+              `Only ${available} left in stock for this item`
+            );
+          }
+        }
+
         // Create new item
         await tx.cartItem.create({
           data: {
@@ -252,11 +279,20 @@ export const cartRepository = {
           ],
         },
         include: {
-          variant_unit_price: true,
+          variant_unit_price: {
+            include: { inventories: { select: { quantity_available: true } } },
+          },
         },
       });
 
       if (!item) return null;
+
+      if (item.variant_unit_price) {
+        const available = item.variant_unit_price.inventories?.quantity_available ?? 0;
+        if (params.quantity > available) {
+          throw ApiError.badRequest(`Only ${available} left in stock for this item`);
+        }
+      }
 
       const price =
         params.currentPrice ??

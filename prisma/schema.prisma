@@ -159,8 +159,8 @@ model User {
   notifications_notifications_updated_byTousers                       Notification[]             @relation("notifications_updated_byTousers")
   offer_products_offer_products_created_byTousers                     offer_products[]           @relation("offer_products_created_byTousers")
   offer_products_offer_products_updated_byTousers                     offer_products[]           @relation("offer_products_updated_byTousers")
-  offer_items_offer_items_created_byTousers                            offer_items[]              @relation("offer_items_created_byTousers")
-  offer_items_offer_items_updated_byTousers                            offer_items[]              @relation("offer_items_updated_byTousers")
+  offer_items_offer_items_created_byTousers                           offer_items[]              @relation("offer_items_created_byTousers")
+  offer_items_offer_items_updated_byTousers                           offer_items[]              @relation("offer_items_updated_byTousers")
   offers_offers_created_byTousers                                     Offer[]                    @relation("offers_created_byTousers")
   offers_offers_updated_byTousers                                     Offer[]                    @relation("offers_updated_byTousers")
   order_addresses_order_addresses_created_byTousers                   OrderAddress[]             @relation("order_addresses_created_byTousers")
@@ -325,6 +325,7 @@ model ProductCategory {
   users_product_categories_created_byTousers User?                     @relation("product_categories_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_categories_created_by")
   users_product_categories_updated_byTousers User?                     @relation("product_categories_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_categories_updated_by")
   product_category_images                    product_category_images[]
+  category_attributes                        category_attributes[]
 
   @@index([parentId], map: "fk_cat_parent")
   @@index([created_by], map: "fk_categories_created_by")
@@ -414,6 +415,8 @@ model ProductVariant {
   cooking_recipe                           String?                  @map("cooking_recipe") @db.Text
   shelf_life                               String?                  @map("shelf_life") @db.VarChar(100)
   veg_type                                 products_veg_type        @default(na)
+  color_name                               String?                  @map("color_name") @db.VarChar(50)
+  color_hex                                String?                  @map("color_hex") @db.VarChar(7)
   is_featured                              Boolean                  @default(false)
   is_default                               Boolean                  @default(false)
   isActive                                 Boolean                  @default(true) @map("is_active")
@@ -500,6 +503,7 @@ model ProductImage {
 
 model ProductAttribute {
   id                                         BigInt                     @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                                       String?                    @default("UUID()") @db.VarChar(255)
   name                                       String                     @db.VarChar(100)
   slug                                       String                     @unique(map: "slug") @db.VarChar(120)
   createdAt                                  DateTime                   @default(now()) @map("created_at") @db.Timestamp(0)
@@ -509,6 +513,7 @@ model ProductAttribute {
   updated_by                                 BigInt?                    @db.UnsignedBigInt
   values                                     AttributeValue[]
   product_attribute_values                   product_attribute_values[]
+  category_attributes                        category_attributes[]
   users_product_attributes_created_byTousers User?                      @relation("product_attributes_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_product_attributes_created_by")
   users_product_attributes_updated_byTousers User?                      @relation("product_attributes_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_product_attributes_updated_by")
 
@@ -519,6 +524,7 @@ model ProductAttribute {
 
 model AttributeValue {
   id                                       BigInt                     @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                                     String?                    @default("UUID()") @db.VarChar(255)
   attributeId                              BigInt                     @map("attribute_id") @db.UnsignedBigInt
   value                                    String                     @db.VarChar(150)
   createdAt                                DateTime                   @default(now()) @map("created_at") @db.Timestamp(0)
@@ -535,6 +541,25 @@ model AttributeValue {
   @@index([updated_by], map: "fk_attribute_values_updated_by")
   @@index([attributeId], map: "fk_attrval_attr")
   @@map("attribute_values")
+}
+
+/// Links a ProductAttribute to the categories it applies to (e.g. "Fabric" -> Dresses,
+/// "Movement" -> Watches), so the admin product form only prompts for attributes that
+/// are relevant to the product's category instead of one fixed field set for everything.
+model category_attributes {
+  id                 BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  category_id        BigInt           @db.UnsignedBigInt
+  attribute_id       BigInt           @db.UnsignedBigInt
+  is_required        Boolean          @default(false)
+  sort_order         Int              @default(0)
+  created_at         DateTime         @default(now()) @db.Timestamp(0)
+  updated_at         DateTime         @default(now()) @db.Timestamp(0)
+  product_categories ProductCategory  @relation(fields: [category_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_catattr_category")
+  product_attributes ProductAttribute @relation(fields: [attribute_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_catattr_attribute")
+
+  @@unique([category_id, attribute_id], map: "uniq_category_attribute")
+  @@index([category_id], map: "fk_catattr_category")
+  @@index([attribute_id], map: "fk_catattr_attribute")
 }
 
 model Cart {
@@ -587,6 +612,7 @@ model CartItem {
   variant                            ProductVariant    @relation(fields: [variantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_cartitem_variant")
   variant_unit_price                 VariantUnitPrice? @relation(fields: [variantUnitPriceId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_cartitem_variant_unit_price")
 
+  @@unique([cartId, variantId, variantUnitPriceId], map: "uq_cartitem_cart_variant_unitprice")
   @@index([created_by], map: "fk_cart_items_created_by")
   @@index([updated_by], map: "fk_cart_items_updated_by")
   @@index([cartId], map: "fk_cartitem_cart")
@@ -1020,26 +1046,26 @@ model Blog {
 }
 
 model Banner {
-  id                              BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid                            String?          @default("UUID()") @db.VarChar(255)
-  banner_position_id              BigInt           @db.UnsignedBigInt
-  title                           String?          @db.VarChar(150)
-  image_url                       String           @db.VarChar(500)
-  link_url                        String?          @db.VarChar(500)
+  id                              BigInt             @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                            String?            @default("UUID()") @db.VarChar(255)
+  banner_position_id              BigInt             @db.UnsignedBigInt
+  title                           String?            @db.VarChar(150)
+  image_url                       String             @db.VarChar(500)
+  link_url                        String?            @db.VarChar(500)
   media_type                      banners_media_type @default(image)
-  video_url                       String?          @db.VarChar(500)
-  thumbnail_url                   String?          @db.VarChar(500)
-  sortOrder                       Int              @default(0) @map("sort_order")
-  isActive                        Boolean          @default(true) @map("is_active")
-  startsAt                        DateTime?        @map("starts_at") @db.Timestamp(0)
-  ends_at                         DateTime?        @db.Timestamp(0)
-  createdAt                       DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt                       DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-  created_by                      BigInt?          @db.UnsignedBigInt
-  updated_by                      BigInt?          @db.UnsignedBigInt
-  banner_positions                banner_positions @relation(fields: [banner_position_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_banner_position")
-  users_banners_created_byTousers User?            @relation("banners_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_banners_created_by")
-  users_banners_updated_byTousers User?            @relation("banners_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_banners_updated_by")
+  video_url                       String?            @db.VarChar(500)
+  thumbnail_url                   String?            @db.VarChar(500)
+  sortOrder                       Int                @default(0) @map("sort_order")
+  isActive                        Boolean            @default(true) @map("is_active")
+  startsAt                        DateTime?          @map("starts_at") @db.Timestamp(0)
+  ends_at                         DateTime?          @db.Timestamp(0)
+  createdAt                       DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                       DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  created_by                      BigInt?            @db.UnsignedBigInt
+  updated_by                      BigInt?            @db.UnsignedBigInt
+  banner_positions                banner_positions   @relation(fields: [banner_position_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_banner_position")
+  users_banners_created_byTousers User?              @relation("banners_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_banners_created_by")
+  users_banners_updated_byTousers User?              @relation("banners_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_banners_updated_by")
 
   @@index([banner_position_id], map: "fk_banner_position")
   @@index([created_by], map: "fk_banners_created_by")
@@ -1272,24 +1298,24 @@ model Company {
 }
 
 model bulk_order_enquiries {
-  id                                             BigInt                       @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid                                           String                       @unique(map: "idx_bulk_order_enquiries_uuid") @default("UUID()") @db.VarChar(255)
-  name                                           String                       @db.VarChar(150)
-  email                                          String                       @db.VarChar(150)
-  phone                                          String                       @db.VarChar(20)
-  company_name                                   String?                     @db.VarChar(150)
-  product_interest                               String?                     @db.VarChar(255)
-  quantity                                       Int
-  message                                        String?                     @db.Text
-  admin_comment                                  String?                     @db.Text
-  status                                         bulk_order_enquiries_status @default(new)
-  created_at                                     DateTime                     @default(now()) @db.Timestamp(0)
-  updated_at                                     DateTime                     @default(now()) @updatedAt @db.Timestamp(0)
-  is_active                                      Boolean                      @default(true)
-  created_by                                     BigInt?                      @db.UnsignedBigInt
-  updated_by                                     BigInt?                      @db.UnsignedBigInt
-  users_bulk_order_enquiries_created_byTousers   User?                        @relation("bulk_order_enquiries_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_bulk_order_enquiries_created_by")
-  users_bulk_order_enquiries_updated_byTousers   User?                        @relation("bulk_order_enquiries_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_bulk_order_enquiries_updated_by")
+  id                                           BigInt                      @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                                         String                      @unique(map: "idx_bulk_order_enquiries_uuid") @default("UUID()") @db.VarChar(255)
+  name                                         String                      @db.VarChar(150)
+  email                                        String                      @db.VarChar(150)
+  phone                                        String                      @db.VarChar(20)
+  company_name                                 String?                     @db.VarChar(150)
+  product_interest                             String?                     @db.VarChar(255)
+  quantity                                     Int
+  message                                      String?                     @db.Text
+  admin_comment                                String?                     @db.Text
+  status                                       bulk_order_enquiries_status @default(new)
+  created_at                                   DateTime                    @default(now()) @db.Timestamp(0)
+  updated_at                                   DateTime                    @default(now()) @updatedAt @db.Timestamp(0)
+  is_active                                    Boolean                     @default(true)
+  created_by                                   BigInt?                     @db.UnsignedBigInt
+  updated_by                                   BigInt?                     @db.UnsignedBigInt
+  users_bulk_order_enquiries_created_byTousers User?                       @relation("bulk_order_enquiries_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_bulk_order_enquiries_created_by")
+  users_bulk_order_enquiries_updated_byTousers User?                       @relation("bulk_order_enquiries_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_bulk_order_enquiries_updated_by")
 
   @@index([created_by], map: "fk_bulk_order_enquiries_created_by")
   @@index([updated_by], map: "fk_bulk_order_enquiries_updated_by")
@@ -2432,6 +2458,7 @@ enum product_units_type {
   weight
   volume
   count
+  size
 }
 
 enum return_requests_status {

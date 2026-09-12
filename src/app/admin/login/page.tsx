@@ -81,7 +81,7 @@ function AdminLoginForm() {
       showLogo
       showFooter
       title="Welcome back"
-      subtitle="Enter your credentials to access the Zelleroa admin portal."
+      subtitle="Enter your credentials to access the Zellora admin portal."
     >
       <FormProvider {...methods}>
         <form
@@ -100,7 +100,7 @@ function AdminLoginForm() {
             name="email"
             label="Email Address"
             type="email"
-            placeholder="admin@zelleroa.com"
+            placeholder="admin@zellora.com"
             autoComplete="email"
             leftIcon={<Mail size={18} />}
             required
@@ -150,7 +150,7 @@ function AdminLoginForm() {
 
 export default function AdminLoginPage() {
   return (
-    <div className="grid h-screen w-full overflow-hidden bg-background lg:grid-cols-2">
+    <div className="grid h-screen w-full overflow-hidden bg-background lg:grid-cols-[45%_55%]">
       {/* Left Banner */}
       <div className="hidden h-screen min-h-0 w-full overflow-hidden lg:block">
         <AuthBanner />

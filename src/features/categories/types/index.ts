@@ -57,7 +57,7 @@ export interface CreateCategoryInput {
   slug: string;
   description?: string;
   image?: string;
-  parentId?: number | null;
+  parentId?: string | null;
   isActive?: boolean;
   sortOrder?: number;
   metaTitle?: string;
@@ -75,8 +75,17 @@ export interface AdminCategoryResponse {
   status: boolean;
   isActive: boolean;
   sortOrder: number;
+  parentId: string | null; // Public UUID of the parent category, if any
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface CategoryTreeNode {
+  id: string; // Public UUID
+  name: string;
+  slug: string;
+  icon: string | null;
+  children: CategoryTreeNode[];
 }
 
 export interface GetAdminCategoriesParams {

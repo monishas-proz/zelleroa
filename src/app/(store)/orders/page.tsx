@@ -140,7 +140,7 @@ function OrdersContent() {
                   )}
                 </div>
                 <p className="mt-1 text-xs text-emerald-700 max-w-xl leading-relaxed">
-                  Thank you for ordering with Zelleroa. We have received your payment and our team has started preparing your order.
+                  Thank you for ordering with Zellora. We have received your payment and our team has started preparing your order.
                 </p>
               </div>
             </div>
@@ -176,7 +176,7 @@ function OrdersContent() {
             </span>
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-theme-text-subtle">
-            Track and manage your Zelleroa fashion and dress orders.
+            Track and manage your Zellora fashion and dress orders.
           </p>
         </div>
 

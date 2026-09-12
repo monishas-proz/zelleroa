@@ -89,10 +89,10 @@ export function Footer() {
     // 3. Mail
     const companyEmail = company?.email?.trim();
     const mailValue =
-      companyEmail || defaultContacts[2]?.value || "support@zelleroa.com";
+      companyEmail || defaultContacts[2]?.value || "support@zellora.com";
     const mailLink = companyEmail
       ? `mailto:${companyEmail}`
-      : defaultContacts[2]?.link || "mailto:support@zelleroa.com";
+      : defaultContacts[2]?.link || "mailto:support@zellora.com";
 
     return [
       {
@@ -121,7 +121,7 @@ export function Footer() {
 
   // Company Name
   const companyName =
-    company?.companyName?.trim() || "Zelleroa";
+    company?.companyName?.trim() || "Zellora";
 
   // Company Logo
   const companyLogo = company?.logo ? getImageUrl(company.logo) : LOGOS.logo;
@@ -129,7 +129,7 @@ export function Footer() {
   // Formatted Location Address
   const formattedLocation = React.useMemo(() => {
     if (!company) {
-      return "Zelleroa Fashion Studio, Namakkal - 637 002.";
+      return "Zellora Fashion Studio, Namakkal - 637 002.";
     }
 
     const parts: string[] = [];
@@ -145,7 +145,7 @@ export function Footer() {
     }
 
     if (parts.length === 0) {
-      return "Zelleroa Fashion Studio, Namakkal - 637 002.";
+      return "Zellora Fashion Studio, Namakkal - 637 002.";
     }
 
     return parts.join(", ");
@@ -153,7 +153,7 @@ export function Footer() {
 
   const mapsUrl = React.useMemo(() => {
     if (!company?.address && !company?.city) {
-      return "https://www.google.com/maps/search/?api=1&query=Zelleroa";
+      return "https://www.google.com/maps/search/?api=1&query=Zellora";
     }
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formattedLocation)}`;
   }, [company, formattedLocation]);

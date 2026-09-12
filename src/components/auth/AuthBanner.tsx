@@ -6,7 +6,7 @@ const features = [
   {
     icon: "/icons/fresh_icon.svg",
     title: "100%",
-    subtitle: "Fresh",
+    subtitle: "Authentic",
   },
   {
     icon: "/icons/checkout_icon.svg",
@@ -25,7 +25,7 @@ export default function AuthBanner() {
     <div
       className="relative hidden h-screen overflow-hidden lg:flex"
       style={{
-        backgroundImage: 'url("/images/login_banner.jpg")',
+        backgroundImage: 'url("/images/login_banner.png")',
         backgroundSize: "cover",
         backgroundPosition: "30% center",
         backgroundRepeat: "no-repeat",
@@ -45,15 +45,15 @@ export default function AuthBanner() {
               className="text-[40px] font-bold leading-[60px]"
               style={{ fontFamily: "var(--font-hanken)" }}
             >
-              Indulge in Heritage
+              Elevate Your Style
             </h1>
 
             <p
               className="mt-5 text-[18px] leading-8 text-white/90"
               style={{ fontFamily: "var(--font-outfit)" }}
             >
-              Premium snacks for the modern palate, crafted with
-              traditional recipes and the finest ingredients.
+              Premium dresses, ethnic wear, and modern fashion pieces
+              crafted for every occasion, delivered to your doorstep.
             </p>
 
             {/* Feature Cards */}

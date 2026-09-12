@@ -124,9 +124,9 @@ export const productService = {
       throw ApiError.badRequest("Invalid or inactive category");
     }
 
-    // 2. Resolve & Validate Brand UUID
-    const brand = await brandRepository.findByUuid(data.brandId);
-    if (!brand || !brand.isActive) {
+    // 2. Resolve & Validate Brand UUID (brand is optional)
+    const brand = data.brandId ? await brandRepository.findByUuid(data.brandId) : null;
+    if (data.brandId && (!brand || !brand.isActive)) {
       throw ApiError.badRequest("Invalid or inactive brand");
     }
 
@@ -151,7 +151,7 @@ export const productService = {
     const created = await productRepository.create({
       uuid: crypto.randomUUID(),
       categoryId: category.id,
-      brandId: brand.id,
+      brandId: brand?.id ?? null,
       hsn_code_id: hsnCode.id,
       name: data.name,
       slug: data.slug, // Frontend-supplied slug preserved without modification

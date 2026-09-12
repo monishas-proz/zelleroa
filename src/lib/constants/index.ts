@@ -1,5 +1,5 @@
-export const APP_NAME = "Zelleroa";
-export const APP_DESCRIPTION = "Zelleroa - Modern Couture & Premium Lifestyle";
+export const APP_NAME = "Zellora";
+export const APP_DESCRIPTION = "Zellora - Modern Couture & Premium Lifestyle";
 export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 export const ROLES = {
@@ -65,7 +65,7 @@ export const UPLOAD_PATHS = {
   COMPANY: "uploads/company",
 } as const;
 
-export const COOKIE_NAME = "zelleroa.session-token";
+export const COOKIE_NAME = "zellora.session-token";
 
 export const API_SUCCESS_MESSAGES = {
   CREATED: "Created successfully",

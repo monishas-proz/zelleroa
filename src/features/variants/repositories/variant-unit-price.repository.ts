@@ -142,6 +142,13 @@ export const variantUnitPriceRepository = {
       }
 
       if (stock !== undefined) {
+        const existingInventory = await tx.inventory.findUnique({
+          where: { variantUnitPriceId: existing.id },
+          select: { quantity_available: true },
+        });
+        const previousStock = existingInventory?.quantity_available ?? 0;
+        const delta = stock - previousStock;
+
         await tx.inventory.upsert({
           where: { variantUnitPriceId: existing.id },
           create: {
@@ -157,6 +164,19 @@ export const variantUnitPriceRepository = {
             updated_by: adminId ?? null,
           },
         });
+
+        if (delta !== 0) {
+          await tx.inventoryTransaction.create({
+            data: {
+              variant_unit_price_id: existing.id,
+              type: delta > 0 ? "in" : "out",
+              quantity: Math.abs(delta),
+              note: "Set via product/variant form",
+              created_by: adminId ?? null,
+              updated_by: adminId ?? null,
+            },
+          });
+        }
       }
 
       return tx.variantUnitPrice.update({
@@ -226,6 +246,13 @@ export const variantUnitPriceRepository = {
         }
 
         if (item.stock !== undefined) {
+          const existingInventory = await tx.inventory.findUnique({
+            where: { variantUnitPriceId: existing.id },
+            select: { quantity_available: true },
+          });
+          const previousStock = existingInventory?.quantity_available ?? 0;
+          const delta = item.stock - previousStock;
+
           await tx.inventory.upsert({
             where: { variantUnitPriceId: existing.id },
             create: {
@@ -241,6 +268,19 @@ export const variantUnitPriceRepository = {
               updated_by: adminId ?? null,
             },
           });
+
+          if (delta !== 0) {
+            await tx.inventoryTransaction.create({
+              data: {
+                variant_unit_price_id: existing.id,
+                type: delta > 0 ? "in" : "out",
+                quantity: Math.abs(delta),
+                note: "Set via bulk edit",
+                created_by: adminId ?? null,
+                updated_by: adminId ?? null,
+              },
+            });
+          }
         }
 
         const result = await tx.variantUnitPrice.update({

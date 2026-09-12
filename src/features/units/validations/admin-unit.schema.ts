@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const unitTypeEnum = z.enum(["weight", "volume", "count"]);
+export const unitTypeEnum = z.enum(["weight", "volume", "count", "size"]);
 export type UnitType = z.infer<typeof unitTypeEnum>;
 
 export const createAdminUnitSchema = z

@@ -165,7 +165,7 @@ export function FaqSection() {
             Frequently Asked Questions
           </h1>
           <p className="mt-4 text-sm leading-relaxed text-[var(--neutral-600)] sm:text-base">
-            Everything you need to know about Zelleroa — orders and shipping,
+            Everything you need to know about Zellora — orders and shipping,
             sizing and fabrics, returns and exchanges, custom styling, and more.
           </p>
 
@@ -313,7 +313,7 @@ export function FaqSection() {
                   <div className="relative h-32 w-full">
                     <Image
                       src="/images/Aboutus_ourstory_img1.jpg"
-                      alt="Artisanal craftsmanship at Zelleroa studio"
+                      alt="Artisanal craftsmanship at Zellora studio"
                       fill
                       sizes="260px"
                       className="object-cover"

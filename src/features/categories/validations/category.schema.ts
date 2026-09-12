@@ -23,7 +23,7 @@ export const createCategorySchema = z.object({
     .string({ message: "Category image is required" })
     .min(1, "Category image is required")
     .max(500),
-  parentId: z.number().int().positive().nullable().optional(),
+  parentId: z.string().trim().nullable().optional(),
   isActive: z.boolean().default(true),
   sortOrder: z.coerce
     .number()

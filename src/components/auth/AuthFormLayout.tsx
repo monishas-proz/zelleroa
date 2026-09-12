@@ -29,14 +29,16 @@ export default function AuthFormLayout({
       {/* Logo */}
       {showLogo && (
         <div className="mb-3 flex justify-center">
-          <Image
-            src="/logo.svg"
-            alt="Zelleroa"
-            width={56}
-            height={56}
-            className="h-10 w-10 md:h-12 md:w-12 lg:h-14 lg:w-14"
-            priority
-          />
+          <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-secondary-900 p-2 shadow-sm md:h-16 md:w-16 lg:h-[4.5rem] lg:w-[4.5rem]">
+            <Image
+              src="/logo-mark.png"
+              alt="Zellora"
+              width={64}
+              height={64}
+              className="h-full w-full object-contain"
+              priority
+            />
+          </span>
         </div>
       )}
 

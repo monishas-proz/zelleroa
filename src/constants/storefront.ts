@@ -1,5 +1,5 @@
 export const LOGOS = {
-  logo: "/logos/logo.svg",
+  logo: "/logo-mark.png",
   title: "/logos/title.svg",
   mobileTitle: "/logos/mobile_title.svg",
   hero_banner: "/logos/hero_banner.svg",
@@ -168,8 +168,8 @@ export const contacts = [
     id: 3,
     icon: ICONS.mail,
     title: "Mail",
-    value: "support@zelleroa.com",
-    link: "mailto:support@zelleroa.com",
+    value: "support@zellora.com",
+    link: "mailto:support@zellora.com",
   },
 ];
 
@@ -253,7 +253,7 @@ export const reviews = [
     name: "Priya S.,",
     location: "Bangalore, Karnataka",
     feedback:
-      "Zelleroa dresses are absolutely stunning! The fabric quality and stitching are exceptionally premium. Fits true to size and feels wonderfully soft all day long.",
+      "Zellora dresses are absolutely stunning! The fabric quality and stitching are exceptionally premium. Fits true to size and feels wonderfully soft all day long.",
     bg: "--red-50",
   },
   {

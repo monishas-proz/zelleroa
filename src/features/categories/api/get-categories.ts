@@ -4,7 +4,13 @@ import type {
   CategoryDetail,
   CustomerCategoryDto,
   CustomerCategoryListParams,
+  CategoryTreeNode,
 } from "../types";
+
+export async function getCategoryTree() {
+  const response = await apiClient.get<CategoryTreeNode[]>("/api/customer/categories/tree");
+  return response.data ?? [];
+}
 
 export async function getCustomerCategories(params?: CustomerCategoryListParams) {
   const response = await apiClient.post<CustomerCategoryDto[]>(

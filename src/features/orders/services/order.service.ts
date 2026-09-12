@@ -53,6 +53,9 @@ export const orderService = {
             variant_unit_price: {
               include: {
                 variant: true,
+                inventories: {
+                  select: { quantity_available: true },
+                },
               },
             },
           },
@@ -99,6 +102,13 @@ export const orderService = {
       ) {
         throw ApiError.badRequest(
           `Product variant "${variant?.variant_name || item.product?.name || "item"}" is no longer available`
+        );
+      }
+
+      const availableStock = unitPriceRow.inventories?.quantity_available ?? 0;
+      if (item.quantity > availableStock) {
+        throw ApiError.badRequest(
+          `Only ${availableStock} left in stock for "${variant.variant_name}" (SKU: ${unitPriceRow.sku})`
         );
       }
 

@@ -92,6 +92,8 @@ function formatAdminVariantResponse(
     cooking_recipe?: string | null;
     shelf_life?: string | null;
     veg_type?: string | null;
+    color_name?: string | null;
+    color_hex?: string | null;
     is_featured?: boolean;
     isActive: boolean;
     out_of_stock?: boolean;
@@ -141,6 +143,8 @@ function formatAdminVariantResponse(
     cookingRecipe: variant.cooking_recipe ?? null,
     shelfLife: variant.shelf_life ?? null,
     vegType: (variant.veg_type as AdminVariantResponse["vegType"]) || "na",
+    colorName: variant.color_name ?? null,
+    colorHex: variant.color_hex ?? null,
     isFeatured: Boolean(variant.is_featured),
     primaryImage,
     isActive: Boolean(variant.isActive),
@@ -203,6 +207,8 @@ export const variantService = {
       cooking_recipe: data.cookingRecipe ?? null,
       shelf_life: data.shelfLife ?? null,
       veg_type: (data.vegType as Prisma.ProductVariantUncheckedCreateInput["veg_type"]) ?? "na",
+      color_name: data.colorName ?? null,
+      color_hex: data.colorHex ?? null,
       is_featured: data.isFeatured ?? false,
       isActive: data.isActive !== undefined ? data.isActive : false,
       out_of_stock: data.outOfStock !== undefined ? data.outOfStock : false,
@@ -432,6 +438,12 @@ function buildVariantUpdateData(
   }
   if (data.vegType !== undefined) {
     updateData.veg_type = data.vegType as Prisma.ProductVariantUncheckedUpdateInput["veg_type"];
+  }
+  if (data.colorName !== undefined) {
+    updateData.color_name = data.colorName;
+  }
+  if (data.colorHex !== undefined) {
+    updateData.color_hex = data.colorHex;
   }
   if (data.isFeatured !== undefined) {
     updateData.is_featured = data.isFeatured;

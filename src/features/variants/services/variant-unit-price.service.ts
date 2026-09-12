@@ -135,6 +135,19 @@ export const variantUnitPriceService = {
           updated_by: adminId,
         },
       });
+
+      if (data.stock !== 0) {
+        await db.inventoryTransaction.create({
+          data: {
+            variant_unit_price_id: created.id,
+            type: "in",
+            quantity: data.stock,
+            note: "Initial stock on create",
+            created_by: adminId,
+            updated_by: adminId,
+          },
+        });
+      }
     }
 
     const withDetails = await variantUnitPriceRepository.findByUuid(created.uuid);

@@ -4,9 +4,9 @@ import { PolicyLayout } from "@/components/storefront/policy/PolicyLayout";
 import { FileText } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Terms & Conditions | Zelleroa",
+  title: "Terms & Conditions | Zellora",
   description:
-    "Read the Terms & Conditions governing the use of the Zelleroa website, orders, payments, delivery, cancellations, and services.",
+    "Read the Terms & Conditions governing the use of the Zellora website, orders, payments, delivery, cancellations, and services.",
 };
 
 export default function TermsAndConditionsPage() {
@@ -19,23 +19,23 @@ export default function TermsAndConditionsPage() {
       {/* Intro */}
       <section className="space-y-4">
         <p className="text-base sm:text-lg text-neutral-800 leading-relaxed font-medium">
-          Welcome to <strong className="text-neutral-900 font-semibold">Zelleroa</strong>. These Terms &amp; Conditions govern your access to and use of the Zelleroa website, mobile application, products, and services. By accessing or using our website or placing an order, you agree to be bound by these Terms &amp; Conditions.
+          Welcome to <strong className="text-neutral-900 font-semibold">Zellora</strong>. These Terms &amp; Conditions govern your access to and use of the Zellora website, mobile application, products, and services. By accessing or using our website or placing an order, you agree to be bound by these Terms &amp; Conditions.
         </p>
         <p className="text-neutral-700 leading-relaxed">
           If you do not agree with any part of these terms, please do not use our website or services.
         </p>
       </section>
 
-      {/* 1. About Zelleroa */}
+      {/* 1. About Zellora */}
       <section className="space-y-3 pt-6 border-t border-[var(--theme-border-subtle,#F0E6D6)]">
         <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 font-serif">
-          1. About Zelleroa
+          1. About Zellora
         </h2>
         <p className="text-neutral-700 leading-relaxed">
-          Zelleroa is an online platform through which customers can browse, select, and purchase premium handcrafted clothing, dresses, and fashion apparel.
+          Zellora is an online platform through which customers can browse, select, and purchase premium handcrafted clothing, dresses, and fashion apparel.
         </p>
         <p className="text-neutral-700 leading-relaxed">
-          The terms &quot;Zelleroa&quot;, &quot;we&quot;, &quot;us&quot;, and &quot;our&quot; refer to Zelleroa. The terms &quot;you&quot;, &quot;your&quot;, and &quot;customer&quot; refer to the person accessing the website or placing an order.
+          The terms &quot;Zellora&quot;, &quot;we&quot;, &quot;us&quot;, and &quot;our&quot; refer to Zellora. The terms &quot;you&quot;, &quot;your&quot;, and &quot;customer&quot; refer to the person accessing the website or placing an order.
         </p>
       </section>
 
@@ -122,7 +122,7 @@ export default function TermsAndConditionsPage() {
           <li>You submit the order.</li>
         </ol>
         <p className="text-neutral-700 leading-relaxed">
-          Submitting an order constitutes a request to purchase the selected products. An order is considered accepted only when Zelleroa confirms the order.
+          Submitting an order constitutes a request to purchase the selected products. An order is considered accepted only when Zellora confirms the order.
         </p>
         <p className="text-neutral-700 leading-relaxed">
           We reserve the right to refuse, cancel, or limit an order where reasonably necessary, including situations involving product unavailability, pricing errors, suspected fraudulent activity, payment issues, or other operational reasons.
@@ -157,7 +157,7 @@ export default function TermsAndConditionsPage() {
           You agree to provide valid payment information and authorize the applicable payment provider to process the transaction.
         </p>
         <p className="text-neutral-700 leading-relaxed">
-          Zelleroa does not store sensitive payment information such as complete card numbers or payment passwords unless specifically stated otherwise in our Privacy Policy.
+          Zellora does not store sensitive payment information such as complete card numbers or payment passwords unless specifically stated otherwise in our Privacy Policy.
         </p>
       </section>
 
@@ -241,7 +241,7 @@ export default function TermsAndConditionsPage() {
           11. Promotional Offers
         </h2>
         <p className="text-neutral-700 leading-relaxed">
-          Zelleroa may provide discounts, coupons, promotional offers, or other benefits from time to time.
+          Zellora may provide discounts, coupons, promotional offers, or other benefits from time to time.
         </p>
         <p className="text-neutral-700 leading-relaxed">
           Promotional offers may:
@@ -254,7 +254,7 @@ export default function TermsAndConditionsPage() {
           <li>Not be combined with other offers unless expressly permitted.</li>
         </ul>
         <p className="text-neutral-700 leading-relaxed">
-          Zelleroa reserves the right to modify, suspend, or withdraw promotional offers where reasonably necessary.
+          Zellora reserves the right to modify, suspend, or withdraw promotional offers where reasonably necessary.
         </p>
       </section>
 
@@ -264,7 +264,7 @@ export default function TermsAndConditionsPage() {
           12. Intellectual Property
         </h2>
         <p className="text-neutral-700 leading-relaxed">
-          All content available on the Zelleroa website, including but not limited to:
+          All content available on the Zellora website, including but not limited to:
         </p>
         <ul className="list-disc pl-6 space-y-2 text-neutral-700">
           <li>Logos</li>
@@ -279,7 +279,7 @@ export default function TermsAndConditionsPage() {
           <li>Other original materials</li>
         </ul>
         <p className="text-neutral-700 leading-relaxed">
-          is owned by or licensed to Zelleroa unless otherwise stated.
+          is owned by or licensed to Zellora unless otherwise stated.
         </p>
         <p className="text-neutral-700 leading-relaxed">
           You may not copy, reproduce, modify, distribute, publish, sell, or commercially exploit our content without prior written permission.
@@ -325,7 +325,7 @@ export default function TermsAndConditionsPage() {
           15. Limitation of Liability
         </h2>
         <p className="text-neutral-700 leading-relaxed">
-          To the extent permitted by applicable law, Zelleroa will not be responsible for losses resulting from circumstances beyond our reasonable control, including delivery delays caused by third parties, technical interruptions, natural events, or other unforeseen circumstances.
+          To the extent permitted by applicable law, Zellora will not be responsible for losses resulting from circumstances beyond our reasonable control, including delivery delays caused by third parties, technical interruptions, natural events, or other unforeseen circumstances.
         </p>
         <p className="text-neutral-700 leading-relaxed">
           Nothing in these Terms &amp; Conditions is intended to exclude or limit any liability that cannot legally be excluded or limited under applicable law.
@@ -357,7 +357,7 @@ export default function TermsAndConditionsPage() {
           These Terms &amp; Conditions shall be governed by and interpreted in accordance with the laws applicable in India.
         </p>
         <p className="text-neutral-700 leading-relaxed">
-          Any disputes shall be subject to the jurisdiction of the courts having appropriate jurisdiction over Zelleroa, subject to applicable law.
+          Any disputes shall be subject to the jurisdiction of the courts having appropriate jurisdiction over Zellora, subject to applicable law.
         </p>
       </section>
 
@@ -367,10 +367,10 @@ export default function TermsAndConditionsPage() {
           18. Contact Us
         </h2>
         <p className="text-neutral-700 leading-relaxed">
-          If you have questions regarding these Terms &amp; Conditions, please contact us through the contact details provided on the Zelleroa website.
+          If you have questions regarding these Terms &amp; Conditions, please contact us through the contact details provided on the Zellora website.
         </p>
         <div className="rounded-xl border border-[var(--theme-border,#EBE0D0)] bg-[var(--theme-surface-alt,#FCF7EE)] p-5 mt-4 space-y-2">
-          <p className="font-semibold text-neutral-900">Zelleroa</p>
+          <p className="font-semibold text-neutral-900">Zellora</p>
           <p className="text-sm text-neutral-700">
             <strong>Email:</strong> [Insert official email address]
           </p>

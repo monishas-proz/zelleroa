@@ -68,6 +68,7 @@ const sidebarItems: SidebarItem[] = [
     icon: Package,
     children: [
       { label: "Categories", href: "/admin/dashboard/categories", icon: FolderTree },
+      { label: "Subcategories", href: "/admin/dashboard/subcategories", icon: FolderTree },
       { label: "Products", href: "/admin/dashboard/products", icon: Package },
       { label: "Items", href: "/admin/dashboard/variants", icon: Layers },
       { label: "Brands", href: "/admin/dashboard/brands", icon: Crown },
@@ -272,13 +273,15 @@ function SidebarItemComponent({
 function SidebarBrand({ collapsed }: { collapsed?: boolean }) {
   return (
     <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
-      <Image
-        src="/logo.svg"
-        alt=""
-        width={32}
-        height={32}
-        className="h-8 w-8 flex-shrink-0 rounded-lg object-cover"
-      />
+      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-secondary-900 p-1 shadow-sm ring-1 ring-black/[0.06]">
+        <Image
+          src="/logo-mark.png"
+          alt="Zellora"
+          width={64}
+          height={64}
+          className="h-full w-full object-contain"
+        />
+      </span>
       {!collapsed && (
         <span className="flex flex-col">
           <span className="font-hanken text-secondary-600 text-base font-bold">

@@ -24,7 +24,7 @@ export function AboutFounderSection() {
             {/* Paragraphs */}
             <div className="space-y-4 text-about-body text-sm sm:text-base leading-relaxed mb-8 max-w-xl">
               <p>
-                With a deep love for textiles, tailoring, and contemporary silhouettes, Zelleroa was founded to bring together timeless elegance, artisan detailing, and accessible luxury.
+                With a deep love for textiles, tailoring, and contemporary silhouettes, Zellora was founded to bring together timeless elegance, artisan detailing, and accessible luxury.
               </p>
               <p>
                 Every collection is born from an uncompromising commitment to premium breathable fabrics, flattering fits, and styles that empower everyday confidence.
@@ -38,7 +38,7 @@ export function AboutFounderSection() {
                   Creative Direction
                 </h4>
                 <p className="text-[10px] sm:text-[11px] tracking-wider uppercase font-semibold text-neutral-500 mt-0.5">
-                  FOUNDER & DESIGN HEAD — ZELLEROA
+                  FOUNDER & DESIGN HEAD — ZELLORA
                 </p>
               </div>
             </div>

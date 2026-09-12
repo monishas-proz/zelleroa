@@ -6,7 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Info } from "lucide-react";
 import type { UnitOption } from "../types";
-import { vegTypeEnum } from "@/features/products/validations/admin-product.schema";
 import { FormInput } from "@/components/forms/form-input";
 import { FormTextarea } from "@/components/forms/form-textarea";
 import { FormRichText } from "@/components/forms/form-rich-text";
@@ -14,16 +13,9 @@ import { FormSelect } from "@/components/forms/form-select";
 import { FormCheckbox } from "@/components/forms/form-checkbox";
 import { FormSubmitButton } from "@/components/forms/form-submit-button";
 
-const vegTypeOptions = [
-  { label: "Vegetarian (Veg)", value: "veg" },
-  { label: "Non-Vegetarian (Non-Veg)", value: "nonveg" },
-  { label: "Vegan", value: "vegan" },
-  { label: "Not Applicable (N/A)", value: "na" },
-];
-
 // Item-level fields only. Unit + price combinations (sku, unit, base price)
 // are managed separately per (unit) via VariantUnitPriceList, since one item
-// can now be sold in multiple pack sizes at different prices.
+// can now be sold in multiple sizes at different prices.
 const variantFormSchema = z.object({
   productId: z
     .string()
@@ -45,15 +37,17 @@ const variantFormSchema = z.object({
     .max(500, "Short description cannot exceed 500 characters")
     .optional(),
   description: z.string().trim().optional(),
-  ingredients: z.string().trim().optional(),
-  isReadyToMix: z.boolean(),
-  cookingRecipe: z.string().trim().optional(),
-  shelfLife: z
+  colorName: z
     .string()
     .trim()
-    .max(100, "Best before cannot exceed 100 characters")
+    .max(50, "Color name cannot exceed 50 characters")
     .optional(),
-  vegType: vegTypeEnum,
+  colorHex: z
+    .string()
+    .trim()
+    .regex(/^#[0-9A-Fa-f]{6}$/, "Enter a valid hex color, e.g. #FF5733")
+    .optional()
+    .or(z.literal("")),
   isFeatured: z.boolean(),
 });
 
@@ -150,18 +144,15 @@ function VariantForm({
       slug: initialData?.slug || "",
       shortDescription: initialData?.shortDescription || "",
       description: initialData?.description || "",
-      ingredients: initialData?.ingredients || "",
-      isReadyToMix: initialData?.isReadyToMix ?? false,
-      cookingRecipe: initialData?.cookingRecipe || "",
-      shelfLife: initialData?.shelfLife || "",
-      vegType: initialData?.vegType || "na",
+      colorName: initialData?.colorName || "",
+      colorHex: initialData?.colorHex || "",
       isFeatured: initialData?.isFeatured ?? false,
     },
   });
 
   const selectedProductId = methods.watch("productId");
   const watchedVariantName = methods.watch("variantName");
-  const watchedIsReadyToMix = methods.watch("isReadyToMix");
+  const watchedColorHex = methods.watch("colorHex");
 
   // Dynamic non-editable prefix based on currently selected Product
   const slugPrefix = useMemo(
@@ -197,11 +188,8 @@ function VariantForm({
         slug: initialData.slug || "",
         shortDescription: initialData.shortDescription || "",
         description: initialData.description || "",
-        ingredients: initialData.ingredients || "",
-        isReadyToMix: initialData.isReadyToMix ?? false,
-        cookingRecipe: initialData.cookingRecipe || "",
-        shelfLife: initialData.shelfLife || "",
-        vegType: initialData.vegType || "na",
+        colorName: initialData.colorName || "",
+        colorHex: initialData.colorHex || "",
         isFeatured: initialData.isFeatured ?? false,
       });
 
@@ -272,27 +260,17 @@ function VariantForm({
             <FormInput
               name="variantName"
               label="Item Name"
-              placeholder="e.g. Classic Mixture, Butter Cookies"
+              placeholder="e.g. Floral Maxi Dress, Classic Analog Watch"
               required
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormInput
-              name="variantName"
-              label="Item Name"
-              placeholder="e.g. Classic Mixture, Butter Cookies"
-              required
-            />
-
-            <FormSelect
-              name="vegType"
-              label="Dietary Type"
-              placeholder="Select dietary type"
-              options={vegTypeOptions}
-              required
-            />
-          </div>
+          <FormInput
+            name="variantName"
+            label="Item Name"
+            placeholder="e.g. Floral Maxi Dress, Classic Analog Watch"
+            required
+          />
         )}
 
         {/* Row 2: Item Code (Full Width) with Category + Product Code Prefix & Floating Info Pop-Up */}
@@ -399,30 +377,37 @@ function VariantForm({
           </div>
         </div>
 
-        {/* Dietary Type & Featured Item (Dietary Type already shown above when product is fixed) */}
-        {!fixedProductId ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-            <FormSelect
-              name="vegType"
-              label="Dietary Type"
-              placeholder="Select dietary type"
-              options={vegTypeOptions}
-              required
-            />
-
-            <FormCheckbox
-              name="isFeatured"
-              label="Featured Item"
-              description="Display this item prominently in featured sections"
-            />
+        {/* Color & Featured Item */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+          <div>
+            <label className="block text-xs font-semibold text-[var(--color-neutral-800)] mb-1.5">
+              Color
+            </label>
+            <div className="flex items-stretch gap-2">
+              <input
+                type="color"
+                value={/^#[0-9A-Fa-f]{6}$/.test(watchedColorHex || "") ? watchedColorHex : "#000000"}
+                onChange={(e) => methods.setValue("colorHex", e.target.value, { shouldValidate: true })}
+                className="h-11 w-11 shrink-0 cursor-pointer rounded-lg border border-neutral-200 p-1"
+                aria-label="Pick swatch color"
+              />
+              <div className="flex-1">
+                <FormInput name="colorName" placeholder="e.g. Maroon Red" />
+              </div>
+            </div>
+            {methods.formState.errors.colorHex && (
+              <p className="mt-1 text-xs text-red-500 font-medium">
+                {methods.formState.errors.colorHex.message}
+              </p>
+            )}
           </div>
-        ) : (
+
           <FormCheckbox
             name="isFeatured"
             label="Featured Item"
             description="Display this item prominently in featured sections"
           />
-        )}
+        </div>
 
         {/* Short Description */}
         <FormTextarea
@@ -437,38 +422,6 @@ function VariantForm({
           name="description"
           label="Description"
           placeholder="Detailed item information and description"
-        />
-
-        {/* Ingredients */}
-        <FormTextarea
-          name="ingredients"
-          label="Ingredients"
-          placeholder="e.g. Rice flour, Bengal gram, Groundnut oil, Salt, Spices"
-          rows={3}
-        />
-
-        {/* Ready to Mix */}
-        <FormCheckbox
-          name="isReadyToMix"
-          label="Ready to Mix"
-          description="Enable if this item needs to be mixed/prepared before eating (e.g. instant mixes)"
-        />
-
-        {/* Cooking Recipe - only relevant for Ready to Mix items */}
-        {watchedIsReadyToMix && (
-          <FormTextarea
-            name="cookingRecipe"
-            label="Cooking Recipe"
-            placeholder="Preparation / cooking instructions for this item (e.g. mix ingredients before serving)"
-            rows={4}
-          />
-        )}
-
-        {/* Best Before / Shelf Life */}
-        <FormInput
-          name="shelfLife"
-          label="Best Before"
-          placeholder="e.g. 6 months from packing"
         />
 
         <div className="flex justify-end pt-2">

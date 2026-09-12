@@ -76,36 +76,22 @@ function formatMeasurement(m: any): string {
   return "—";
 }
 
-function renderDietaryBadge(vegType?: string | null) {
-  const type = (vegType || "na").toLowerCase();
-  let label = "Vegetarian";
-  let markBorder = "border-success-600";
-  let markBg = "bg-success-600";
-
-  if (type === "nonveg" || type === "non-veg") {
-    label = "Non-vegetarian";
-    markBorder = "border-error-600";
-    markBg = "bg-error-600";
-  } else if (type === "vegan") {
-    label = "Vegan";
-    markBorder = "border-success-700";
-    markBg = "bg-success-700";
-  } else if (type === "egg" || type === "contains egg") {
-    label = "Contains egg";
-    markBorder = "border-amber-600";
-    markBg = "bg-amber-600";
-  } else if (type === "na" || !vegType) {
-    label = "Not Assigned";
-    markBorder = "border-neutral-400";
-    markBg = "bg-neutral-400";
+function renderColorBadge(colorName?: string | null, colorHex?: string | null) {
+  if (!colorName && !colorHex) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cream-200 text-neutral-500 text-xs font-bold border border-cream-border-subtle">
+        No Color
+      </span>
+    );
   }
 
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cream-200 text-neutral-700 text-xs font-bold border border-cream-border-subtle">
-      <span className={`w-3 h-3 rounded-[2px] border-[1.5px] ${markBorder} flex items-center justify-center`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${markBg}`} />
-      </span>
-      <span>{label}</span>
+      <span
+        className="w-3 h-3 rounded-full border border-cream-border-subtle"
+        style={{ backgroundColor: colorHex || "#d4d4d4" }}
+      />
+      <span>{colorName || colorHex}</span>
     </span>
   );
 }
@@ -831,8 +817,8 @@ export default function AdminProductDetailsPage() {
 
                     <th className="px-4 py-2.5 min-w-[200px] border-b border-cream-border">Item</th>
                     <th className="px-4 py-2.5 min-w-[120px] border-b border-cream-border">SKU</th>
-                    <th className="px-4 py-2.5 min-w-[150px] border-b border-cream-border">Pack Sizes</th>
-                    <th className="px-4 py-2.5 min-w-[140px] border-b border-cream-border">Type</th>
+                    <th className="px-4 py-2.5 min-w-[150px] border-b border-cream-border">Sizes</th>
+                    <th className="px-4 py-2.5 min-w-[140px] border-b border-cream-border">Color</th>
                     <th className="px-4 py-2.5 min-w-[120px] text-right border-b border-cream-border">Price</th>
                     <th className="px-3 py-2.5 min-w-[95px] text-center border-b border-cream-border">Status</th>
 
@@ -924,10 +910,10 @@ export default function AdminProductDetailsPage() {
                           )}
                         </td>
 
-                        {/* Dietary Type & Featured */}
+                        {/* Color & Featured */}
                         <td className="px-4 py-2.5 min-w-[140px] whitespace-nowrap">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            {renderDietaryBadge(variant.vegType)}
+                            {renderColorBadge(variant.colorName, variant.colorHex)}
                             {variant.isFeatured && (
                               <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10.5px] font-bold border border-amber-200">
                                 Featured
@@ -1256,11 +1242,8 @@ export default function AdminProductDetailsPage() {
                     slug: formData.slug,
                     shortDescription: formData.shortDescription || null,
                     description: formData.description || null,
-                    ingredients: formData.ingredients || null,
-                    isReadyToMix: formData.isReadyToMix,
-                    cookingRecipe: formData.cookingRecipe || null,
-                    shelfLife: formData.shelfLife || null,
-                    vegType: formData.vegType,
+                    colorName: formData.colorName || null,
+                    colorHex: formData.colorHex || null,
                     isFeatured: formData.isFeatured,
                   },
                 });
@@ -1366,11 +1349,8 @@ export default function AdminProductDetailsPage() {
                   slug: editingVariant.slug || "",
                   shortDescription: editingVariant.shortDescription || "",
                   description: editingVariant.description || "",
-                  ingredients: editingVariant.ingredients || "",
-                  isReadyToMix: editingVariant.isReadyToMix ?? false,
-                  cookingRecipe: editingVariant.cookingRecipe || "",
-                  shelfLife: editingVariant.shelfLife || "",
-                  vegType: editingVariant.vegType || "na",
+                  colorName: editingVariant.colorName || "",
+                  colorHex: editingVariant.colorHex || "",
                   isFeatured: editingVariant.isFeatured ?? false,
                 }}
                 isEditing
@@ -1388,11 +1368,8 @@ export default function AdminProductDetailsPage() {
                         slug: formData.slug,
                         shortDescription: formData.shortDescription || null,
                         description: formData.description || null,
-                        ingredients: formData.ingredients || null,
-                        isReadyToMix: formData.isReadyToMix,
-                        cookingRecipe: formData.cookingRecipe || null,
-                        shelfLife: formData.shelfLife || null,
-                        vegType: formData.vegType,
+                        colorName: formData.colorName || null,
+                        colorHex: formData.colorHex || null,
                         isFeatured: formData.isFeatured,
                       },
                     });

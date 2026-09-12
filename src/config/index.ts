@@ -1,6 +1,6 @@
 export const siteConfig = {
-  name: "Zelleroa",
-  description: "Elevate your style with Zelleroa - Premium dresses, ethnic wear, and modern fashion delivered to your doorstep.",
+  name: "Zellora",
+  description: "Elevate your style with Zellora - Premium dresses, ethnic wear, and modern fashion delivered to your doorstep.",
   url: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
 };
 

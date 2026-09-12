@@ -17,6 +17,10 @@ export interface InventoryListItem {
   productName: string;
   productSlug: string;
   variantName?: string;
+  colorName?: string | null;
+  unitName?: string | null;
+  stockIn: number;
+  stockOut: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,6 +41,8 @@ export interface GetInventoryParams {
   page?: number;
   limit?: number;
   search?: string;
+  productUuid?: string;
+  color?: string;
   lowStock?: boolean;
   outOfStock?: boolean;
 }

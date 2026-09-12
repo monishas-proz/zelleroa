@@ -25,4 +25,4 @@ export const POST = createApiHandler({
     const result = await inventoryService.createInventory(input);
     return apiCreated(result);
   },
-}, { requireAuth: true, requiredRole: ["ADMIN", "STAFF"] });
+}, { requireAuth: true, requiredRole: ["ADMIN", "STAFF"], bodySchema: createInventorySchema });

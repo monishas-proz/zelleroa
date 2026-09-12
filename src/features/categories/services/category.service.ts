@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { ApiError } from "@/lib/api/api-error";
+import { db } from "@/lib/db/prisma";
 import { categoryRepository } from "../repositories/category.repository";
 import { userRepository } from "@/features/users/repositories/user.repository";
 import type { Prisma } from "@/generated/prisma";
@@ -10,6 +11,7 @@ import type {
   GetAdminCategoriesParams,
   AdminCategoryResponse,
   AdminCategoriesCountResponse,
+  CategoryTreeNode,
 } from "../types";
 import type {
   CreateAdminCategoryInput,
@@ -26,6 +28,8 @@ function formatAdminCategoryResponse(category: {
   status: boolean | null;
   isActive: boolean;
   sortOrder: number;
+  parentId?: bigint | null;
+  parentUuid?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): AdminCategoryResponse {
@@ -39,9 +43,85 @@ function formatAdminCategoryResponse(category: {
     status: category.status === null || category.status === undefined ? true : Boolean(category.status),
     isActive: Boolean(category.isActive),
     sortOrder: category.sortOrder ?? 0,
+    parentId: category.parentUuid ?? (category.parentId ? String(category.parentId) : null),
     createdAt: category.createdAt,
     updatedAt: category.updatedAt,
   };
+}
+
+/** Resolves a category's public UUID (or numeric id string) to its internal bigint id. */
+async function resolveCategoryInternalId(publicId: string): Promise<bigint | null> {
+  const numericId = Number(publicId);
+  const found = await db.productCategory.findFirst({
+    where: {
+      OR: [
+        { uuid: publicId },
+        ...(Number.isFinite(numericId) ? [{ id: BigInt(numericId) }] : []),
+      ],
+    },
+    select: { id: true },
+  });
+  return found?.id ?? null;
+}
+
+/** Builds a nested tree from the flat active-category list, sorted by sortOrder. */
+function buildCategoryTree(
+  flat: { id: bigint; uuid: string | null; slug: string; name: string; icon: string | null; parentId: bigint | null; sortOrder: number }[]
+): CategoryTreeNode[] {
+  const byParent = new Map<string, typeof flat>();
+  for (const cat of flat) {
+    const key = cat.parentId === null ? "root" : String(cat.parentId);
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key)!.push(cat);
+  }
+
+  function build(parentKey: string): CategoryTreeNode[] {
+    const children = byParent.get(parentKey) ?? [];
+    return children
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((c) => ({
+        id: c.uuid || String(c.id),
+        name: c.name,
+        slug: c.slug,
+        icon: c.icon,
+        children: build(String(c.id)),
+      }));
+  }
+
+  return build("root");
+}
+
+function flattenTree(nodes: CategoryTreeNode[]): CategoryTreeNode[] {
+  return nodes.flatMap((n) => [n, ...flattenTree(n.children)]);
+}
+
+async function buildParentUuidMap(): Promise<Map<string, string | null>> {
+  const flat = await categoryRepository.findAllActiveFlat();
+  return new Map(flat.map((c) => [String(c.id), c.uuid]));
+}
+
+/** Internal-id (not uuid) descendant set, used to block moving a category under its own subtree. */
+async function getDescendantInternalIds(rootId: bigint): Promise<Set<string>> {
+  const flat = await categoryRepository.findAllActiveFlat();
+  const byParent = new Map<string, typeof flat>();
+  for (const cat of flat) {
+    const key = cat.parentId === null ? "root" : String(cat.parentId);
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key)!.push(cat);
+  }
+
+  const result = new Set<string>();
+  const stack = [String(rootId)];
+  while (stack.length) {
+    const current = stack.pop()!;
+    const children = byParent.get(current) ?? [];
+    for (const child of children) {
+      result.add(String(child.id));
+      stack.push(String(child.id));
+    }
+  }
+  return result;
 }
 
 async function getAdminInternalId(email?: string): Promise<bigint | null> {
@@ -148,6 +228,15 @@ export const categoryService = {
       throw ApiError.conflict(`A category with name '${data.name}' already exists`);
     }
 
+    // 3. Resolve parent (if any)
+    let parentInternalId: bigint | null = null;
+    if (data.parentId) {
+      parentInternalId = await resolveCategoryInternalId(data.parentId);
+      if (!parentInternalId) {
+        throw ApiError.badRequest("Parent category not found");
+      }
+    }
+
     const created = await categoryRepository.create({
       uuid: crypto.randomUUID(),
       name: data.name,
@@ -155,19 +244,30 @@ export const categoryService = {
       description: data.description ?? null,
       icon: data.icon ?? null,
       sortOrder: data.sortOrder ?? 0,
+      parentId: parentInternalId ?? undefined,
       status: true, // Reserved field - always set to true
       isActive: true, // Active status
       created_by: adminId,
       updated_by: adminId,
     });
 
-    return formatAdminCategoryResponse(created);
+    const parentUuidMap = await buildParentUuidMap();
+    return formatAdminCategoryResponse({
+      ...created,
+      parentUuid: created.parentId ? parentUuidMap.get(String(created.parentId)) ?? null : null,
+    });
   },
 
   async getAdminCategories(params: GetAdminCategoriesParams = {}) {
     const result = await categoryRepository.findAdminAll(params);
+    const parentUuidMap = await buildParentUuidMap();
     return {
-      data: result.data.map((cat) => formatAdminCategoryResponse(cat)),
+      data: result.data.map((cat) =>
+        formatAdminCategoryResponse({
+          ...cat,
+          parentUuid: cat.parentId ? parentUuidMap.get(String(cat.parentId)) ?? null : null,
+        })
+      ),
       meta: result.meta,
     };
   },
@@ -183,7 +283,11 @@ export const categoryService = {
     if (!category) {
       throw ApiError.notFound("Category not found");
     }
-    return formatAdminCategoryResponse(category);
+    const parentUuidMap = await buildParentUuidMap();
+    return formatAdminCategoryResponse({
+      ...category,
+      parentUuid: category.parentId ? parentUuidMap.get(String(category.parentId)) ?? null : null,
+    });
   },
 
   async updateAdminCategory(
@@ -233,12 +337,67 @@ export const categoryService = {
       updateData.sortOrder = data.sortOrder;
     }
 
+    if (data.parentId !== undefined) {
+      if (data.parentId === null) {
+        updateData.parentId = null;
+      } else {
+        const parentInternalId = await resolveCategoryInternalId(data.parentId);
+        if (!parentInternalId) {
+          throw ApiError.badRequest("Parent category not found");
+        }
+        if (parentInternalId === existing.id) {
+          throw ApiError.badRequest("A category cannot be its own parent");
+        }
+        const descendantIds = await getDescendantInternalIds(existing.id);
+        if (descendantIds.has(String(parentInternalId))) {
+          throw ApiError.badRequest("Cannot move a category under its own subcategory");
+        }
+        updateData.parentId = parentInternalId;
+      }
+    }
+
     const updated = await categoryRepository.updateByUuid(uuid, updateData);
     if (!updated) {
       throw ApiError.notFound("Category not found");
     }
 
-    return formatAdminCategoryResponse(updated);
+    const parentUuidMap = await buildParentUuidMap();
+    return formatAdminCategoryResponse({
+      ...updated,
+      parentUuid: updated.parentId ? parentUuidMap.get(String(updated.parentId)) ?? null : null,
+    });
+  },
+
+  /** Builds the nested category tree (id/uuid/name/slug/icon/children[]) for nav/routing. */
+  async getCategoryTree(): Promise<CategoryTreeNode[]> {
+    const flat = await categoryRepository.findAllActiveFlat();
+    return buildCategoryTree(flat);
+  },
+
+  /** Walks the tree following each slug segment; returns the matched chain, or null if any segment doesn't match. */
+  async resolveCategoryPath(slugs: string[]): Promise<CategoryTreeNode[] | null> {
+    if (slugs.length === 0) return null;
+    const tree = await this.getCategoryTree();
+    const chain: CategoryTreeNode[] = [];
+    let currentLevel = tree;
+
+    for (const slug of slugs) {
+      const match = currentLevel.find((c) => c.slug === slug);
+      if (!match) return null;
+      chain.push(match);
+      currentLevel = match.children;
+    }
+
+    return chain;
+  },
+
+  /** Returns the category's own uuid plus every descendant's uuid. */
+  async getDescendantCategoryUuids(categoryUuid: string): Promise<string[]> {
+    const tree = await this.getCategoryTree();
+    const flatAll = flattenTree(tree);
+    const root = flatAll.find((c) => c.id === categoryUuid);
+    if (!root) return [categoryUuid];
+    return [root.id, ...flattenTree(root.children).map((c) => c.id)];
   },
 
   async deleteAdminCategory(uuid: string, adminEmail?: string) {

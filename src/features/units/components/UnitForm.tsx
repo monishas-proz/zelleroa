@@ -88,6 +88,7 @@ const filteredBaseUnits = baseUnits.filter(
     { label: "Weight", value: "weight" },
     { label: "Volume", value: "volume" },
     { label: "Count", value: "count" },
+    { label: "Size", value: "size" },
   ];
 
   const baseUnitOptions = [

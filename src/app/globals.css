@@ -1,89 +1,101 @@
 @import "tailwindcss";
 
 :root {
-  /* Existing variables (DO NOT CHANGE) */
-  --background: #fffcf8;
-  --foreground: #1c1917;
+  /* Vibrant Commerce theme (see DESIGN.md) */
+  --background: #f8fafc;
+  --foreground: #0f172a;
 
   /* Fonts */
   --font-inter: var(--font-inter);
   --font-hanken: var(--font-hanken);
 
-  /* Primary (Gold/Yellow) - Existing */
-  --primary-base: #f8be15;
-  --primary-shade-200: #c69811;
-  --primary-shade-400: #95720d;
-  --primary-shade-600: #634c08;
-  --primary-shade-800: #322604;
-  --primary-tint-200: #f9cb44;
-  --primary-tint-400: #fbd873;
-  --primary-tint-600: #fce5a1;
-  --primary-tint-800: #fef2d0;
+  /* Primary (Royal Cobalt) */
+  --primary-base: #2563eb;
+  --primary-shade-200: #1d4ed8;
+  --primary-shade-400: #1e40af;
+  --primary-shade-600: #1e3a8a;
+  --primary-shade-800: #172554;
+  --primary-tint-200: #60a5fa;
+  --primary-tint-400: #93c5fd;
+  --primary-tint-600: #bfdbfe;
+  --primary-tint-800: #dbeafe;
 
-  /* Secondary (Deep Maroon) - Existing */
-  --secondary-base: #5a1911;
-  --secondary-shade-200: #4a140d;
-  --secondary-shade-400: #3a0f0a;
-  --secondary-shade-600: #2a0b07;
-  --secondary-shade-800: #1a0604;
-  --secondary-tint-200: #7b4740;
-  --secondary-tint-400: #9c7570;
-  --secondary-tint-600: #bda3a0;
-  --secondary-tint-800: #ded1cf;
+  /* Secondary (Deep Slate Navy) */
+  --secondary-base: #0f172a;
+  --secondary-shade-200: #0c1322;
+  --secondary-shade-400: #090e1a;
+  --secondary-shade-600: #060a12;
+  --secondary-shade-800: #03050a;
+  --secondary-tint-200: #334155;
+  --secondary-tint-400: #64748b;
+  --secondary-tint-600: #94a3b8;
+  --secondary-tint-800: #cbd5e1;
 
-  /* Danger - Existing */
-  --danger-base: #fb0000;
+  /* Danger */
+  --danger-base: #ba1a1a;
 
   /* ------------------------------------------------------------------ */
   /* New Semantic Color Scale (50–900)                                  */
   /* ------------------------------------------------------------------ */
 
-  /* Primary */
-  --primary-50: #fffaf0;
-  --primary-100: #fef2d0;
-  --primary-200: #fce5a1;
-  --primary-300: #fbd873;
-  --primary-400: #f9cb44;
-  --primary-500: #f8be15;
-  --primary-600: #c69811;
-  --primary-700: #95720d;
-  --primary-800: #634c08;
-  --primary-900: #322604;
+  /* Primary (Royal Cobalt) */
+  --primary-50: #eff6ff;
+  --primary-100: #dbeafe;
+  --primary-200: #bfdbfe;
+  --primary-300: #93c5fd;
+  --primary-400: #60a5fa;
+  --primary-500: #2563eb;
+  --primary-600: #1d4ed8;
+  --primary-700: #1e40af;
+  --primary-800: #1e3a8a;
+  --primary-900: #172554;
 
-  /* Secondary (Brand Maroon) */
-  --secondary-base: #7a2224;
-  --secondary-50: #fbf3f2;
-  --secondary-100: #f0e7e5;
-  --secondary-200: #e3c8c4;
-  --secondary-300: #d0a7a2;
-  --secondary-400: #b0706a;
-  --secondary-500: #94433e;
-  --secondary-600: #7a2224;
-  --secondary-700: #5a1911;
-  --secondary-800: #40100f;
-  --secondary-900: #260706;
+  /* Secondary (Deep Slate Navy) */
+  --secondary-base: #0f172a;
+  --secondary-50: #f8fafc;
+  --secondary-100: #f1f5f9;
+  --secondary-200: #e2e8f0;
+  --secondary-300: #cbd5e1;
+  --secondary-400: #94a3b8;
+  --secondary-500: #64748b;
+  --secondary-600: #475569;
+  --secondary-700: #334155;
+  --secondary-800: #1e293b;
+  --secondary-900: #0f172a;
 
-  /* Cream & Warm Neutral (Surfaces & Borders) */
-  --cream-50: #fcfaf7;
-  --cream-100: #faf6f0;
-  --cream-200: #f7f2ec;
-  --cream-300: #f3ede6;
-  --cream-border: #ede4d9;
-  --cream-border-subtle: #ebe1d6;
-  --cream-border-hover: #d8cbbc;
-  --cream-white: #fff6ec;
+  /* Tertiary (Energetic Saffron) */
+  --tertiary-50: #fffbeb;
+  --tertiary-100: #fef3c7;
+  --tertiary-200: #fde68a;
+  --tertiary-300: #fcd34d;
+  --tertiary-400: #fbbf24;
+  --tertiary-500: #f59e0b;
+  --tertiary-600: #d97706;
+  --tertiary-700: #b45309;
+  --tertiary-800: #92400e;
+  --tertiary-900: #78350f;
 
-  /* Neutral */
-  --neutral-50: #fafaf9;
-  --neutral-100: #f5f5f4;
-  --neutral-200: #e7e5e4;
-  --neutral-300: #d6d3d1;
-  --neutral-400: #a2968c;
-  --neutral-500: #7c7169;
-  --neutral-600: #57534e;
-  --neutral-700: #4a423d;
-  --neutral-800: #292524;
-  --neutral-900: #211c1a;
+  /* Cool Neutral (Surfaces & Borders) */
+  --cream-50: #f8fafc;
+  --cream-100: #f1f5f9;
+  --cream-200: #e2e8f0;
+  --cream-300: #cbd5e1;
+  --cream-border: #e2e8f0;
+  --cream-border-subtle: #f1f5f9;
+  --cream-border-hover: #cbd5e1;
+  --cream-white: #ffffff;
+
+  /* Neutral (Balanced Slate) */
+  --neutral-50: #f8fafc;
+  --neutral-100: #f1f5f9;
+  --neutral-200: #e2e8f0;
+  --neutral-300: #cbd5e1;
+  --neutral-400: #94a3b8;
+  --neutral-500: #64748b;
+  --neutral-600: #475569;
+  --neutral-700: #334155;
+  --neutral-800: #1e293b;
+  --neutral-900: #0f172a;
 
   /* Success */
   --success-50: #ecfdf5;
@@ -109,18 +121,18 @@
   --error-800: #991b1b;
   --error-900: #7f1d1d;
 
-  /* Primary Brown Colors (Storefront) */
-  --brown-50: #F8F5F4;
-  --brown-100: #EEE7E5;
-  --brown-200: #DDD0CC;
-  --brown-300: #C5AEA8;
-  --brown-400: #A4847C;
-  --brown-500: #86655D;
-  --brown-600: #684944;
-  --brown-700: #4A322F;
-  --brown-800: #392624;
-  --brown-900: #281B1A;
-  --brown-950: #160F0F;
+  /* Primary Storefront Text/Border Scale (Deep Slate Navy) */
+  --brown-50: #F8FAFC;
+  --brown-100: #F1F5F9;
+  --brown-200: #E2E8F0;
+  --brown-300: #CBD5E1;
+  --brown-400: #94A3B8;
+  --brown-500: #64748B;
+  --brown-600: #475569;
+  --brown-700: #334155;
+  --brown-800: #1E293B;
+  --brown-900: #0F172A;
+  --brown-950: #020617;
 
   /* Pastels & Accents for Reviews & Cards */
   --red-50: #fef2f2;
@@ -129,55 +141,55 @@
   --green-100: #dcfce7;
   --blue-50: #eff6ff;
   --blue-100: #dbeafe;
-  --yellow-50: #fefce8;
-  --yellow-100: #fef9c3;
-  --yellow-200: #fef08a;
-  --yellow-300: #fde047;
-  --yellow-400: #facc15;
-  --yellow-500: #eab308;
-  --yellow-600: #ca8a04;
-  --yellow-700: #a16207;
-  --yellow-800: #854d0e;
-  --yellow-900: #713f12;
-  --yellow-950: #422006;
+  --yellow-50: #fffbeb;
+  --yellow-100: #fef3c7;
+  --yellow-200: #fde68a;
+  --yellow-300: #fcd34d;
+  --yellow-400: #fbbf24;
+  --yellow-500: #f59e0b;
+  --yellow-600: #d97706;
+  --yellow-700: #b45309;
+  --yellow-800: #92400e;
+  --yellow-900: #78350f;
+  --yellow-950: #451a03;
 
   /* ================================================================== */
   /* Multi-Company / Centralized Customer & Account Theme System        */
   /* ================================================================== */
-  --theme-primary: #5C1512;               /* Brand primary maroon / deep header */
-  --theme-primary-hover: #7A211B;
-  --theme-primary-light: #FCF7EE;
+  --theme-primary: #2563EB;               /* Royal Cobalt / deep header */
+  --theme-primary-hover: #1D4ED8;
+  --theme-primary-light: #EFF6FF;
   --theme-primary-fg: #FFFFFF;
 
-  --theme-secondary: #E8A020;             /* Brand accent / Gold / CTA */
-  --theme-secondary-hover: #F0A81E;
-  --theme-secondary-fg: #3A1B08;
-  --theme-secondary-light: #FFF1D6;
+  --theme-secondary: #F59E0B;             /* Energetic Saffron / CTA */
+  --theme-secondary-hover: #D97706;
+  --theme-secondary-fg: #0F172A;
+  --theme-secondary-light: #FFFBEB;
 
-  --theme-bg: #F3EDE4;                    /* Customer shell warm cream background */
+  --theme-bg: #F8FAFC;                    /* Customer shell background */
   --theme-surface: #FFFFFF;               /* Card / container surface */
-  --theme-surface-warm: #FFFDF9;          /* Sub-card surface */
-  --theme-surface-alt: #FCF7EE;           /* Card header warm background */
+  --theme-surface-warm: #FFFFFF;          /* Sub-card surface */
+  --theme-surface-alt: #F8FAFC;           /* Card header background */
 
-  --theme-text-primary: #2C2420;          /* Primary body / title text */
-  --theme-text-secondary: #3A302A;        /* Secondary headings */
-  --theme-text-muted: #9A8B79;            /* Muted / labels / captions */
-  --theme-text-subtle: #7A6A58;           /* Subtle text */
-  --theme-text-gold: #D9B98F;             /* Header breadcrumb accent */
+  --theme-text-primary: #0F172A;          /* Primary body / title text */
+  --theme-text-secondary: #1E293B;        /* Secondary headings */
+  --theme-text-muted: #64748B;            /* Muted / labels / captions */
+  --theme-text-subtle: #475569;           /* Subtle text */
+  --theme-text-gold: #93C5FD;             /* Header breadcrumb accent */
 
-  --theme-border: #EBE0D0;                /* Card & section borders */
-  --theme-border-subtle: #F0E6D6;         /* Table / divider borders */
-  --theme-border-input: #E3D7C4;          /* Form input borders */
-  --theme-border-accent: #E8D6BC;         /* Highlighted borders */
+  --theme-border: #E2E8F0;                /* Card & section borders */
+  --theme-border-subtle: #F1F5F9;         /* Table / divider borders */
+  --theme-border-input: #CBD5E1;          /* Form input borders */
+  --theme-border-accent: #BFDBFE;         /* Highlighted borders */
 
-  --theme-status-out-bg: #FFF1D6;
-  --theme-status-out-fg: #9A6208;
-  --theme-status-del-bg: #E4F2E8;
-  --theme-status-del-fg: #2F6E48;
-  --theme-status-can-bg: #F7E6E4;
-  --theme-status-can-fg: #A9433A;
-  --theme-tag-work-bg: #EDE7F6;
-  --theme-tag-work-fg: #5B4B8A;
+  --theme-status-out-bg: #FFFBEB;
+  --theme-status-out-fg: #92400E;
+  --theme-status-del-bg: #ECFDF5;
+  --theme-status-del-fg: #166534;
+  --theme-status-can-bg: #FEF2F2;
+  --theme-status-can-fg: #991B1B;
+  --theme-tag-work-bg: #EFF6FF;
+  --theme-tag-work-fg: #1D4ED8;
 
   /* ================================================================== */
   /* About Us Page Design Tokens (Figma Design System)                  */
@@ -254,6 +266,18 @@
   --color-secondary-700: var(--secondary-700);
   --color-secondary-800: var(--secondary-800);
   --color-secondary-900: var(--secondary-900);
+
+  /* Tertiary */
+  --color-tertiary-50: var(--tertiary-50);
+  --color-tertiary-100: var(--tertiary-100);
+  --color-tertiary-200: var(--tertiary-200);
+  --color-tertiary-300: var(--tertiary-300);
+  --color-tertiary-400: var(--tertiary-400);
+  --color-tertiary-500: var(--tertiary-500);
+  --color-tertiary-600: var(--tertiary-600);
+  --color-tertiary-700: var(--tertiary-700);
+  --color-tertiary-800: var(--tertiary-800);
+  --color-tertiary-900: var(--tertiary-900);
 
   /* Cream & Warm Neutrals */
   --color-cream-50: var(--cream-50);
@@ -442,8 +466,8 @@ input:not([type="checkbox"]):not([type="radio"]):focus-visible,
 textarea:focus,
 textarea:focus-visible {
   outline: none !important;
-  border-color: var(--color-secondary-600) !important;
-  box-shadow: 0 0 0 2px rgba(90, 25, 17, 0.15) !important;
+  border-color: var(--color-primary-500) !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15) !important;
 }
 
 /* Custom Scrollbar for Popups & Dropdowns */
@@ -482,25 +506,25 @@ textarea:focus-visible {
 
 /* Storefront Button & Utility Styles */
 .btn-yellow {
-  background-color: var(--yellow-500);
+  background-color: var(--tertiary-500);
 }
 .btn-yellow:hover {
-  background-color: var(--yellow-400);
+  background-color: var(--tertiary-400);
 }
 .btn-brown {
-  background-color: var(--brown-600);
+  background-color: var(--secondary-900);
 }
 .btn-brown:hover {
-  background-color: var(--brown-700);
+  background-color: var(--secondary-800);
 }
 .drawer-active {
-  background-color: var(--brown-700);
+  background-color: var(--secondary-800);
 }
 .header-font {
   font-family: var(--font-inter), sans-serif;
 }
 .text-hover-primary:hover {
-  color: var(--brown-700);
+  color: var(--primary-500);
 }
 
 /* ================================================================== */

@@ -13,6 +13,8 @@ export const getInventoryQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   search: z.string().optional(),
+  productUuid: z.string().optional(),
+  color: z.string().optional(),
   lowStock: z.coerce.boolean().optional(),
   outOfStock: z.coerce.boolean().optional(),
 });

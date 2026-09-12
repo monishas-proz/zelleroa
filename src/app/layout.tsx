@@ -1,21 +1,21 @@
 import type { Metadata } from "next";
-import { Inter, Hanken_Grotesk } from "next/font/google";
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/providers";
 
-const inter = Inter({ 
+const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
 });
 
-const hanken = Hanken_Grotesk({
+const hanken = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-hanken",
 });
 
 export const metadata: Metadata = {
-  title: "Zelleroa — Luxury Fashion, Watches & Lifestyle",
-  description: "Discover designer dresses, luxury timepieces, handcrafted leather bags, and contemporary fashion at Zelleroa. Timeless elegance delivered to your doorstep.",
+  title: "Zellora — Luxury Fashion, Watches & Lifestyle",
+  description: "Discover designer dresses, luxury timepieces, handcrafted leather bags, and contemporary fashion at Zellora. Timeless elegance delivered to your doorstep.",
 };
 
 export default function RootLayout({

@@ -83,7 +83,7 @@ function SuccessContent() {
           Order Placed Successfully!
         </h1>
         <p className="mt-1.5 text-xs sm:text-sm text-theme-text-subtle max-w-md mx-auto">
-          Thank you for choosing Zelleroa. Your order has been confirmed and
+          Thank you for choosing Zellora. Your order has been confirmed and
           our team is carefully packing your curated selections.
         </p>
       </div>

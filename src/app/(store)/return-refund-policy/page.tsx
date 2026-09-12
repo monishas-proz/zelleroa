@@ -3,9 +3,9 @@ import { PolicyLayout } from "@/components/storefront/policy/PolicyLayout";
 import { RotateCcw } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Return & Refund Policy | Zelleroa",
+  title: "Return & Refund Policy | Zellora",
   description:
-    "Learn about Zelleroa return, replacement, cancellation, and refund policies for clothing and apparel orders.",
+    "Learn about Zellora return, replacement, cancellation, and refund policies for clothing and apparel orders.",
 };
 
 export default function ReturnRefundPolicyPage() {
@@ -18,7 +18,7 @@ export default function ReturnRefundPolicyPage() {
       {/* Intro */}
       <section className="space-y-4">
         <p className="text-base sm:text-lg text-neutral-800 leading-relaxed font-medium">
-          At <strong className="text-neutral-900 font-semibold">Zelleroa</strong>, we want you to be completely delighted with your purchase. We offer hassle-free returns and size exchanges within 7 days of delivery for items in their original, unused condition with tags attached.
+          At <strong className="text-neutral-900 font-semibold">Zellora</strong>, we want you to be completely delighted with your purchase. We offer hassle-free returns and size exchanges within 7 days of delivery for items in their original, unused condition with tags attached.
         </p>
         <p className="text-neutral-700 leading-relaxed">
           Please read this policy carefully before placing an order.
@@ -155,7 +155,7 @@ export default function ReturnRefundPolicyPage() {
           To request a return, replacement, or refund:
         </p>
         <ol className="list-decimal pl-6 space-y-2 text-neutral-700">
-          <li>Contact Zelleroa customer support.</li>
+          <li>Contact Zellora customer support.</li>
           <li>Provide your order number.</li>
           <li>Explain the issue clearly.</li>
           <li>Provide photographs or other supporting information when requested.</li>
@@ -184,7 +184,7 @@ export default function ReturnRefundPolicyPage() {
           <li>Processing timelines.</li>
         </ul>
         <p className="text-neutral-700 leading-relaxed">
-          Zelleroa cannot guarantee the exact time taken by a third-party payment provider or bank after the refund has been initiated.
+          Zellora cannot guarantee the exact time taken by a third-party payment provider or bank after the refund has been initiated.
         </p>
       </section>
 
@@ -292,7 +292,7 @@ export default function ReturnRefundPolicyPage() {
           For return, replacement, or refund-related questions, please contact:
         </p>
         <div className="rounded-xl border border-[var(--theme-border,#EBE0D0)] bg-[var(--theme-surface-alt,#FCF7EE)] p-5 mt-4 space-y-2">
-          <p className="font-semibold text-neutral-900">Zelleroa</p>
+          <p className="font-semibold text-neutral-900">Zellora</p>
           <p className="text-sm text-neutral-700">
             <strong>Email:</strong> [Insert customer support email]
           </p>

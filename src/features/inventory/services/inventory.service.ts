@@ -9,9 +9,13 @@ import type {
   InventoryTransactionItem,
 } from "../types";
 
-function mapToInventoryListItem(item: any): InventoryListItem {
+function mapToInventoryListItem(
+  item: any,
+  stockSums?: { stockIn: number; stockOut: number }
+): InventoryListItem {
   const v = item.variant_unit_price?.variant;
   const prod = v?.product;
+  const unit = item.variant_unit_price?.product_units;
   const available = Number(item.quantity_available ?? 0);
   const reserved = Number(item.quantity_reserved ?? 0);
 
@@ -26,6 +30,10 @@ function mapToInventoryListItem(item: any): InventoryListItem {
     productName: prod?.name ?? "Unknown Product",
     productSlug: prod?.slug ?? "",
     variantName: v?.variant_name ?? undefined,
+    colorName: v?.color_name ?? null,
+    unitName: unit?.name ?? unit?.code ?? null,
+    stockIn: stockSums?.stockIn ?? 0,
+    stockOut: stockSums?.stockOut ?? 0,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   };
@@ -35,8 +43,27 @@ export const inventoryService = {
   async getInventory(params: GetInventoryParams) {
     const { data, total } = await inventoryRepository.findAll(params);
 
+    const variantUnitPriceIds = data
+      .map((item) => item.variantUnitPriceId)
+      .filter((id): id is bigint => id != null);
+    const sums = await inventoryRepository.sumTransactionsByType(variantUnitPriceIds);
+
+    const sumsByVariantUnitPriceId = new Map<string, { stockIn: number; stockOut: number }>();
+    for (const row of sums) {
+      const key = String(row.variant_unit_price_id);
+      const entry = sumsByVariantUnitPriceId.get(key) ?? { stockIn: 0, stockOut: 0 };
+      if (row.type === "in") entry.stockIn += row._sum.quantity ?? 0;
+      if (row.type === "out") entry.stockOut += row._sum.quantity ?? 0;
+      sumsByVariantUnitPriceId.set(key, entry);
+    }
+
     return {
-      data: data.map(mapToInventoryListItem),
+      data: data.map((item) =>
+        mapToInventoryListItem(
+          item,
+          sumsByVariantUnitPriceId.get(String(item.variantUnitPriceId))
+        )
+      ),
       meta: {
         page: params.page || 1,
         limit: params.limit || 10,
@@ -135,7 +162,7 @@ export const inventoryService = {
       (item) => item.quantity_available <= item.reorderLevel
     );
 
-    return lowStockItems.map(mapToInventoryListItem);
+    return lowStockItems.map((item) => mapToInventoryListItem(item));
   },
 
   async getOutOfStock() {
@@ -156,7 +183,7 @@ export const inventoryService = {
       },
     });
 
-    return items.map(mapToInventoryListItem);
+    return items.map((item) => mapToInventoryListItem(item));
   },
 
   async getTransactions(

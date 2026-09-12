@@ -52,32 +52,22 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-function renderDietaryBadge(vegType?: string | null) {
-  const type = (vegType || "na").toLowerCase();
-  let label = "Vegetarian";
-  let markBorder = "border-success-600";
-  let markBg = "bg-success-600";
-
-  if (type === "nonveg" || type === "non-veg") {
-    label = "Non-vegetarian";
-    markBorder = "border-error-600";
-    markBg = "bg-error-600";
-  } else if (type === "vegan") {
-    label = "Vegan";
-    markBorder = "border-success-700";
-    markBg = "bg-success-700";
-  } else if (type === "na" || !vegType) {
-    label = "Not Assigned";
-    markBorder = "border-neutral-400";
-    markBg = "bg-neutral-400";
+function renderColorBadge(colorName?: string | null, colorHex?: string | null) {
+  if (!colorName && !colorHex) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cream-200 text-neutral-500 text-xs font-bold border border-cream-border-subtle">
+        No Color
+      </span>
+    );
   }
 
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cream-200 text-neutral-700 text-xs font-bold border border-cream-border-subtle">
-      <span className={`w-3 h-3 rounded-[2px] border-[1.5px] ${markBorder} flex items-center justify-center`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${markBg}`} />
-      </span>
-      <span>{label}</span>
+      <span
+        className="w-3 h-3 rounded-full border border-cream-border-subtle"
+        style={{ backgroundColor: colorHex || "#d4d4d4" }}
+      />
+      <span>{colorName || colorHex}</span>
     </span>
   );
 }
@@ -446,8 +436,8 @@ export default function AdminVariantDetailsPage() {
                 </span>
               )}
 
-              {/* Dietary Badge */}
-              {renderDietaryBadge(variant.vegType)}
+              {/* Color Badge */}
+              {renderColorBadge(variant.colorName, variant.colorHex)}
             </div>
 
             <div className="flex items-center gap-2 flex-wrap text-xs text-neutral-500">
@@ -795,62 +785,40 @@ export default function AdminVariantDetailsPage() {
             </div>
           </div>
 
-          {/* Ingredients / Recipe / Best Before Card */}
+          {/* Color & Style Card */}
           <div className="bg-white border border-cream-border rounded-2xl overflow-hidden shadow-xs">
             <div className="px-6 py-4.5 border-b border-cream-border flex items-center justify-between">
               <h2 className="text-[15px] font-bold text-neutral-900 tracking-tight">
-                Ingredients &amp; Recipe
+                Color &amp; Style
               </h2>
             </div>
             <div className="p-6">
-              {variant.ingredients ||
-              (variant.isReadyToMix && variant.cookingRecipe) ||
-              variant.shelfLife ? (
-                <div className="space-y-4">
-                  {variant.ingredients && (
-                    <div>
-                      <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">
-                        Ingredients
-                      </div>
-                      <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed whitespace-pre-line">
-                        {variant.ingredients}
-                      </p>
+              {variant.colorName || variant.colorHex ? (
+                <div className="flex items-center gap-3">
+                  <span
+                    className="w-8 h-8 rounded-full border border-cream-border-subtle shrink-0"
+                    style={{ backgroundColor: variant.colorHex || "#d4d4d4" }}
+                  />
+                  <div>
+                    <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-0.5">
+                      Color
                     </div>
-                  )}
-
-                  {variant.isReadyToMix && variant.cookingRecipe && (
-                    <div>
-                      <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">
-                        Cooking Recipe
-                      </div>
-                      <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed whitespace-pre-line">
-                        {variant.cookingRecipe}
-                      </p>
-                    </div>
-                  )}
-
-                  {variant.shelfLife && (
-                    <div>
-                      <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">
-                        Best Before
-                      </div>
-                      <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed">
-                        {variant.shelfLife}
-                      </p>
-                    </div>
-                  )}
+                    <p className="text-xs sm:text-sm text-neutral-700 font-semibold">
+                      {variant.colorName || variant.colorHex}
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="py-6 px-4 text-center flex flex-col items-center gap-2">
                   <p className="text-xs sm:text-sm font-semibold text-neutral-700">
-                    No ingredients or recipe added yet
+                    No color added yet
                   </p>
                   <button
                     type="button"
                     onClick={() => setIsEditModalOpen(true)}
                     className="mt-1 border border-cream-border-subtle bg-white text-secondary-600 hover:bg-secondary-50 hover:border-secondary-200 text-xs font-bold px-3.5 py-1.5 rounded-lg cursor-pointer transition-colors"
                   >
-                    Add ingredients / recipe
+                    Add color
                   </button>
                 </div>
               )}
@@ -878,11 +846,8 @@ export default function AdminVariantDetailsPage() {
             slug: variant.slug || "",
             shortDescription: variant.shortDescription || "",
             description: variant.description || "",
-            ingredients: variant.ingredients || "",
-            isReadyToMix: variant.isReadyToMix ?? false,
-            cookingRecipe: variant.cookingRecipe || "",
-            shelfLife: variant.shelfLife || "",
-            vegType: variant.vegType || "na",
+            colorName: variant.colorName || "",
+            colorHex: variant.colorHex || "",
             isFeatured: variant.isFeatured ?? false,
           }}
           isEditing
@@ -900,11 +865,8 @@ export default function AdminVariantDetailsPage() {
                   slug: formData.slug,
                   shortDescription: formData.shortDescription || null,
                   description: formData.description || null,
-                  ingredients: formData.ingredients || null,
-                  isReadyToMix: formData.isReadyToMix,
-                  cookingRecipe: formData.cookingRecipe || null,
-                  shelfLife: formData.shelfLife || null,
-                  vegType: formData.vegType,
+                  colorName: formData.colorName || null,
+                  colorHex: formData.colorHex || null,
                   isFeatured: formData.isFeatured,
                 },
               });

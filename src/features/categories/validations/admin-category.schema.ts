@@ -35,6 +35,12 @@ export const createAdminCategorySchema = z
       .max(100, "Sort order cannot exceed 100")
       .default(0)
       .optional(),
+    parentId: z
+      .string()
+      .trim()
+      .min(1, "Invalid parent category")
+      .optional()
+      .nullable(),
   })
   .strict();
 
@@ -52,8 +58,8 @@ export type UpdateAdminCategoryInput = z.infer<
 
 export const adminCategoriesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1).optional(),
-  pageSize: z.coerce.number().int().min(1).max(100).default(10).optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional(),
+  pageSize: z.coerce.number().int().min(1).max(500).default(10).optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
   search: z.string().trim().optional(),
   isActive: z.boolean().optional(),
 });

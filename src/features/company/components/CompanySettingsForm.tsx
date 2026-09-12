@@ -248,7 +248,7 @@ export function CompanySettingsForm() {
               type="email"
               value={formData.email || ""}
               onChange={(e) => handleInputChange("email", e.target.value)}
-              placeholder="e.g. contact@zelleroa.com"
+              placeholder="e.g. contact@zellora.com"
             />
           </div>
 
@@ -273,7 +273,7 @@ export function CompanySettingsForm() {
               type="url"
               value={formData.website || ""}
               onChange={(e) => handleInputChange("website", e.target.value)}
-              placeholder="https://zelleroa.com"
+              placeholder="https://zellora.com"
             />
           </div>
         </div>
