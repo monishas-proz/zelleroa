@@ -5,6 +5,7 @@ import {
   customerOrdersApi,
   type CustomerOrdersQueryParams,
   type CreateCustomerOrderPayload,
+  type CreateGuestOrderPayload,
   type CancelCustomerOrderPayload,
 } from "../api/customer-orders.api";
 
@@ -39,6 +40,20 @@ export function useCreateCustomerOrder() {
   return useMutation({
     mutationFn: (payload: CreateCustomerOrderPayload) =>
       customerOrdersApi.createOrder(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: CUSTOMER_ORDERS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ["customer", "cart"] });
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
+    },
+  });
+}
+
+export function useCreateGuestOrder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateGuestOrderPayload) =>
+      customerOrdersApi.createGuestOrder(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CUSTOMER_ORDERS_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ["customer", "cart"] });

@@ -72,6 +72,22 @@ export interface OrderDeliveryDto {
   assignedAt: Date | string | null;
 }
 
+export interface OrderCourierTrackingEventDto {
+  status: string;
+  location: string | null;
+  note: string | null;
+  trackedAt: Date;
+}
+
+export interface OrderCourierShipmentDto {
+  id: string; // shipment.uuid
+  carrier: string;
+  trackingNumber: string;
+  trackingUrl: string;
+  status: string;
+  timeline: OrderCourierTrackingEventDto[];
+}
+
 export interface OrderListItemResponse {
   id: string; // order.uuid
   orderNumber: string;
@@ -85,6 +101,7 @@ export interface OrderListItemResponse {
   totalAmount: number;
   totalItems: number;
   delivery?: OrderDeliveryDto;
+  courierShipment?: OrderCourierShipmentDto | null;
   notes: string | null;
   placedAt: Date | null;
   createdAt: Date;

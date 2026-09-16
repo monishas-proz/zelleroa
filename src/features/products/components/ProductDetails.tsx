@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ProductGallery } from "./ProductGallery";
 import { ProductVariantSelector } from "./ProductVariantSelector";
+import { useSizeChart } from "@/features/size-charts/hooks/use-size-chart";
 import { getImageUrl } from "@/lib/utils";
 import { formatMeasurementLabel } from "@/features/variants/utils/measurement.util";
 import { useAddToCart } from "@/features/cart/hooks/use-cart";
@@ -100,6 +101,28 @@ function ProductDetails({ product }: ProductDetailsProps) {
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 120, behavior: "smooth" });
     }
+  };
+
+  // Clothing Size (e.g. S/M/L) - a separate concept from the pack-size/measurement
+  // selector below. Hidden entirely when the category+gender has no size chart.
+  const { data: sizeChart = [] } = useSizeChart(product.category?.id ?? null, product.gender);
+  const selectedSizeValueId = useMemo(
+    () =>
+      selectedVariant?.attributeValues.find(
+        (av) => av.attributeName.trim().toLowerCase() === "size"
+      )?.valueId ?? null,
+    [selectedVariant]
+  );
+  const handleSelectSize = (sizeValueId: string) => {
+    // Prefer a variant that also matches the currently selected color; fall
+    // back to the first variant with this size otherwise.
+    const match =
+      variants.find(
+        (v) =>
+          v.attributeValues.some((av) => av.valueId === sizeValueId) &&
+          v.colorName === selectedVariant?.colorName
+      ) ?? variants.find((v) => v.attributeValues.some((av) => av.valueId === sizeValueId));
+    if (match) handleSelectVariant(match.id);
   };
 
   const isInStock =
@@ -296,6 +319,36 @@ function ProductDetails({ product }: ProductDetailsProps) {
               className="rich-text-content text-sm text-stone-600 leading-relaxed max-w-none border-b border-stone-100 pb-4"
               dangerouslySetInnerHTML={{ __html: sanitizeRichText(product.description) }}
             />
+          )}
+
+          {/* Clothing Size (S/M/L, etc.) - only shown when the category+gender has a size chart */}
+          {sizeChart.length > 0 && (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs sm:text-sm font-bold tracking-wider text-stone-900 uppercase font-sans">
+                  SIZE
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {sizeChart.map((size) => {
+                  const isSelected = selectedSizeValueId === size.id;
+                  return (
+                    <button
+                      key={size.id}
+                      type="button"
+                      onClick={() => handleSelectSize(size.id)}
+                      className={`inline-flex items-center justify-center min-w-10 px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all cursor-pointer select-none ${
+                        isSelected
+                          ? "border-[#7D1D20] bg-[#7D1D20] text-white shadow-xs"
+                          : "border-stone-200 bg-white text-stone-800 hover:border-stone-400 hover:bg-stone-50"
+                      }`}
+                    >
+                      {size.value}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           {/* Color / Variant Selection (if multiple styles/colors exist) */}

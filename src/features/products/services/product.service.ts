@@ -27,6 +27,7 @@ async function formatAdminProductResponse(
     hsn_code_id: bigint | null;
     name: string;
     slug: string;
+    gender?: string | null;
     status: boolean | null;
     isActive: boolean;
     createdAt: Date;
@@ -68,6 +69,7 @@ async function formatAdminProductResponse(
     hsnCodeName,
     name: product.name,
     slug: product.slug,
+    gender: (product.gender as AdminProductResponse["gender"]) ?? null,
     status: Boolean(product.status),
     isActive: Boolean(product.isActive),
     createdAt: product.createdAt,
@@ -155,6 +157,7 @@ export const productService = {
       hsn_code_id: hsnCode.id,
       name: data.name,
       slug: data.slug, // Frontend-supplied slug preserved without modification
+      gender: data.gender ?? null,
       status: true, // Static reserved field - always true
       isActive: true, // Active status
       created_by: adminId,
@@ -366,6 +369,10 @@ export const productService = {
         throw ApiError.conflict(`An active product with name '${data.name}' already exists`);
       }
       updateData.name = data.name;
+    }
+
+    if (data.gender !== undefined) {
+      updateData.gender = data.gender;
     }
 
     const updated = await productRepository.updateByUuid(uuid, updateData);

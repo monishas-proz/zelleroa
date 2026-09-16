@@ -56,9 +56,15 @@ export const createAdminVariantSchema = z
       .regex(/^#[0-9A-Fa-f]{6}$/, "Enter a valid hex color, e.g. #FF5733")
       .optional()
       .nullable(),
+    /** Amount added to the product base price whenever this color is picked. */
+    priceAdjustment: z.coerce.number().optional().default(0),
     isFeatured: z.boolean().optional().default(false),
     isActive: z.boolean().optional().default(false),
     outOfStock: z.boolean().optional().default(false),
+    /** Attribute value UUIDs (e.g. Color=Red, Size=M) identifying this exact variant. */
+    attributeValueIds: z
+      .array(z.string().trim().uuid("Invalid attribute value UUID format"))
+      .optional(),
   })
   .strict();
 
@@ -119,9 +125,15 @@ export const updateAdminVariantSchema = z
       .regex(/^#[0-9A-Fa-f]{6}$/, "Enter a valid hex color, e.g. #FF5733")
       .optional()
       .nullable(),
+    /** Amount added to the product base price whenever this color is picked. */
+    priceAdjustment: z.coerce.number().optional(),
     isFeatured: z.boolean().optional(),
     isActive: z.boolean().optional(),
     outOfStock: z.boolean().optional(),
+    /** Attribute value UUIDs (e.g. Color=Red, Size=M) identifying this exact variant. */
+    attributeValueIds: z
+      .array(z.string().trim().uuid("Invalid attribute value UUID format"))
+      .optional(),
   })
   .strict();
 

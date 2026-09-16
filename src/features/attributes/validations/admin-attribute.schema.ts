@@ -71,6 +71,7 @@ export const createAttributeValueSchema = z
       .trim()
       .min(1, "Value is required")
       .max(150, "Value cannot exceed 150 characters"),
+    priceAdjustment: z.coerce.number().min(0).optional().default(0),
   })
   .strict();
 

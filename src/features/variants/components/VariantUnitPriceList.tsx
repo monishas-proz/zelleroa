@@ -8,12 +8,13 @@ import { useUnits } from "@/features/units/hooks";
 import type { AdminUnitResponse } from "@/features/units/types";
 import { getMeasurementFieldConfig } from "../utils/measurement.util";
 import {
+  useVariant,
   useVariantUnitPrices,
   useCreateVariantUnitPrice,
   useUpdateVariantUnitPrice,
   useDeleteVariantUnitPrice,
 } from "../hooks";
-import type { VariantUnitPriceResponse } from "../types";
+import type { VariantUnitPriceResponse, AdminVariantResponse } from "../types";
 
 interface UnitPriceRowFormState {
   unitId: string;
@@ -50,6 +51,19 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
   const { data: unitPrices = [], isLoading } = useVariantUnitPrices(productUuid, variantUuid);
   const { data: unitsData } = useUnits({ pageSize: 100 });
   const units = unitsData?.data ?? [];
+  const { data: variantResponse } = useVariant(productUuid, variantUuid);
+  const variant: AdminVariantResponse | null =
+    (variantResponse as { data?: AdminVariantResponse } | undefined)?.data ??
+    (variantResponse as unknown as AdminVariantResponse) ??
+    null;
+
+  const colorAdjustment = Number(variant?.priceAdjustment ?? 0);
+  const sizeAttributeValue = variant?.attributeValues?.find(
+    (av) => av.attributeName.toLowerCase() === "size"
+  );
+  const sizeAdjustment = Number(sizeAttributeValue?.priceAdjustment ?? 0);
+  const autoCalcTotal = colorAdjustment + sizeAdjustment;
+  const hasAutoCalcInputs = colorAdjustment !== 0 || sizeAdjustment !== 0;
 
   const createMutation = useCreateVariantUnitPrice();
   const updateMutation = useUpdateVariantUnitPrice();
@@ -159,9 +173,18 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
       setFormError("SKU is required");
       return;
     }
-    const basePrice = Number(form.basePrice);
-    if (Number.isNaN(basePrice) || basePrice < 0) {
-      setFormError("Base price must be a non-negative number");
+    const trimmedBasePrice = form.basePrice.trim();
+    let basePrice: number | undefined;
+    if (trimmedBasePrice !== "") {
+      basePrice = Number(trimmedBasePrice);
+      if (Number.isNaN(basePrice) || basePrice < 0) {
+        setFormError("Base price must be a non-negative number");
+        return;
+      }
+    } else if (!editingId && !hasAutoCalcInputs) {
+      setFormError(
+        "Enter a price, or set a color/size price add-on first so it can be auto-calculated"
+      );
       return;
     }
     const stock = Number(form.stock);
@@ -174,7 +197,7 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
       unitId: form.unitId,
       unitValue,
       sku: form.sku.trim(),
-      basePrice,
+      ...(basePrice !== undefined ? { basePrice } : {}),
       stock,
       isDefault: form.isDefault,
       isActive: form.isActive,
@@ -500,20 +523,41 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
 
                 <div>
                   <label className="block text-xs font-semibold text-neutral-800 mb-1.5">
-                    Price per pack (₹) <span className="text-red-500">*</span>
+                    Price per pack (₹)
                   </label>
-                  <input
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={form.basePrice}
-                    onChange={(e) => setForm((f) => ({ ...f, basePrice: e.target.value }))}
-                    disabled={isBusy}
-                    placeholder="e.g. 260"
-                    className="w-full h-10 px-3 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 disabled:opacity-60 disabled:bg-neutral-100"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={form.basePrice}
+                      onChange={(e) => setForm((f) => ({ ...f, basePrice: e.target.value }))}
+                      disabled={isBusy}
+                      placeholder={
+                        hasAutoCalcInputs ? `auto = ₹${autoCalcTotal}` : "e.g. 260"
+                      }
+                      className="w-full h-10 px-3 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 disabled:opacity-60 disabled:bg-neutral-100"
+                    />
+                    {hasAutoCalcInputs && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isBusy}
+                        onClick={() =>
+                          setForm((f) => ({ ...f, basePrice: String(autoCalcTotal) }))
+                        }
+                        className="h-10 shrink-0 text-xs font-semibold whitespace-nowrap"
+                        title="Fill from this item's color + size price add-ons"
+                      >
+                        Auto-fill ₹{autoCalcTotal}
+                      </Button>
+                    )}
+                  </div>
                   <p className="text-[11px] text-neutral-400 mt-1">
-                    What customer pays for this pack.
+                    {hasAutoCalcInputs
+                      ? `Leave blank to auto-calculate from this item's price add-ons (color +₹${colorAdjustment}, size +₹${sizeAdjustment}, plus the product's base price).`
+                      : "What customer pays for this pack. Leave blank to use the product's base price as-is."}
                   </p>
                 </div>
               </div>

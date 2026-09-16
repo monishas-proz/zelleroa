@@ -15,6 +15,7 @@ import {
   useDeleteVariantImage,
 } from "@/features/variants/hooks";
 import { toast } from "@/components/ui/Toast";
+import { useAdminProduct } from "@/features/products/hooks/use-products";
 import { useUnits } from "@/features/units/hooks";
 import { AdminDetailSkeleton } from "@/components/admin/AdminDetailSkeleton";
 import { ErrorState } from "@/components/ui/error-state";
@@ -93,6 +94,10 @@ export default function AdminVariantDetailsPage() {
 
   const canonicalProductUuid =
     productIdParam || foundVariant?.productId || "";
+
+  const { data: variantProductResponse } = useAdminProduct(canonicalProductUuid || null);
+  const variantProduct: any =
+    (variantProductResponse as any)?.data ?? variantProductResponse;
 
   // 2. Main Variant Query
   const {
@@ -848,11 +853,15 @@ export default function AdminVariantDetailsPage() {
             description: variant.description || "",
             colorName: variant.colorName || "",
             colorHex: variant.colorHex || "",
+            priceAdjustment: variant.priceAdjustment ?? 0,
             isFeatured: variant.isFeatured ?? false,
+            attributeValueIds: (variant.attributeValues || []).map((av) => av.valueId),
           }}
           isEditing
           fixedProductId={canonicalProductUuid}
           fixedProductSlug={variant.productSlug}
+          categoryUuid={variantProduct?.categoryId}
+          productGender={variantProduct?.gender}
           isLoading={updateVariantMutation.isPending}
           submitLabel="Save Changes"
           onSubmit={async (formData) => {
@@ -867,7 +876,9 @@ export default function AdminVariantDetailsPage() {
                   description: formData.description || null,
                   colorName: formData.colorName || null,
                   colorHex: formData.colorHex || null,
+                  priceAdjustment: formData.priceAdjustment ?? 0,
                   isFeatured: formData.isFeatured,
+                  attributeValueIds: formData.attributeValueIds || [],
                 },
               });
               setIsEditModalOpen(false);

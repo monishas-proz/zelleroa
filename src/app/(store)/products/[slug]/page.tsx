@@ -1,117 +1,99 @@
-"use client";
-
-import { use } from "react";
-import { useCustomerProduct } from "@/features/customers/hooks/use-customer-catalog";
-import { ProductDetails } from "@/features/products/components/ProductDetails";
-import { LoadingState } from "@/components/ui/loading-state";
-import { ErrorState } from "@/components/ui/error-state";
-import { PageContainer } from "@/components/layout/PageContainer";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
-
+import type { Metadata } from "next";
+import { catalogService } from "@/features/customers/services/catalog.service";
+import { ProductDetailClient } from "./ProductDetailClient";
 
 interface ProductDetailPageProps {
   params: Promise<{ slug: string }>;
 }
 
-function ProductDetailSkeleton() {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start animate-pulse">
-      {/* Gallery Skeleton */}
-      <div className="lg:col-span-6 space-y-4">
-        <div className="aspect-square w-full rounded-2xl border border-theme-border overflow-hidden skeleton-shimmer" />
-        <div className="flex gap-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="w-16 h-16 rounded-xl border border-theme-border overflow-hidden skeleton-shimmer shrink-0"
-            />
-          ))}
-        </div>
-      </div>
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const SITE_NAME = "Zellora";
 
-      {/* Details Skeleton */}
-      <div className="lg:col-span-6 space-y-6">
-        <div className="space-y-2.5">
-          <div className="h-4 w-28 rounded-md skeleton-shimmer" />
-          <div className="h-8 w-3/4 rounded-xl skeleton-shimmer" />
-          <div className="h-6 w-36 rounded-lg skeleton-shimmer" />
-        </div>
-
-        <div className="space-y-2 pt-2 border-t border-theme-border-subtle">
-          <div className="h-4 w-full rounded-md skeleton-shimmer" />
-          <div className="h-4 w-5/6 rounded-md skeleton-shimmer" />
-          <div className="h-4 w-2/3 rounded-md skeleton-shimmer" />
-        </div>
-
-        <div className="space-y-3 pt-2">
-          <div className="h-4 w-32 rounded-md skeleton-shimmer" />
-          <div className="flex gap-3">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-10 w-24 rounded-xl skeleton-shimmer"
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="pt-4 flex gap-4">
-          <div className="h-12 w-28 rounded-xl skeleton-shimmer" />
-          <div className="h-12 flex-1 rounded-xl skeleton-shimmer" />
-          <div className="h-12 w-12 rounded-xl skeleton-shimmer shrink-0" />
-        </div>
-      </div>
-    </div>
-  );
+async function getProductForSeo(slug: string) {
+  try {
+    return await catalogService.getProductByUuid(slug);
+  } catch {
+    return null;
+  }
 }
 
-export default function ProductDetailPage({ params }: ProductDetailPageProps) {
-  const { slug } = use(params);
-  const { data: product, isLoading, error, refetch } = useCustomerProduct(slug);
-
-  if (isLoading) {
-    return (
-      <PageContainer>
-        <div className="mt-6">
-          <ProductDetailSkeleton />
-        </div>
-      </PageContainer>
-    );
-  }
-
-  if (error) {
-    return (
-      <PageContainer>
-        <ErrorState
-          message="Failed to load product"
-          onRetry={() => refetch()}
-        />
-      </PageContainer>
-    );
-  }
+export async function generateMetadata({
+  params,
+}: ProductDetailPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const product = await getProductForSeo(slug);
 
   if (!product) {
-    return (
-      <PageContainer>
-        <ErrorState message="Product not found" />
-      </PageContainer>
-    );
+    return { title: `Product Not Found | ${SITE_NAME}` };
   }
 
+  const title = `${product.name}${product.brand ? ` by ${product.brand.name}` : ""} | ${SITE_NAME}`;
+  const description =
+    product.description?.slice(0, 160) ||
+    `Shop ${product.name} at ${SITE_NAME}. ${product.category ? `Explore our ${product.category.name} collection.` : ""}`;
+  const canonicalUrl = `${SITE_URL}/products/${slug}`;
+  const image = product.image || undefined;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: canonicalUrl },
+    openGraph: {
+      title,
+      description,
+      url: canonicalUrl,
+      siteName: SITE_NAME,
+      type: "website",
+      images: image ? [{ url: image }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
+  };
+}
+
+export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
+  const { slug } = await params;
+  const product = await getProductForSeo(slug);
+
+  const jsonLd = product
+    ? {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: product.name,
+        description: product.description || undefined,
+        image: product.image ? [product.image] : undefined,
+        brand: product.brand ? { "@type": "Brand", name: product.brand.name } : undefined,
+        sku: product.variants[0]?.sku,
+        offers:
+          product.variants.length > 0
+            ? {
+                "@type": "AggregateOffer",
+                priceCurrency: "INR",
+                lowPrice: Math.min(...product.variants.map((v) => v.salePrice)),
+                highPrice: Math.max(...product.variants.map((v) => v.salePrice)),
+                offerCount: product.variants.length,
+                availability: product.variants.some((v) => !v.outOfStock)
+                  ? "https://schema.org/InStock"
+                  : "https://schema.org/OutOfStock",
+              }
+            : undefined,
+      }
+    : null;
+
   return (
-    <PageContainer>
-      <Breadcrumb
-        items={[
-          { label: "Products", href: "/products" },
-          ...(product.category
-            ? [{ label: product.category.name, href: `/categories/${product.category.id}` }]
-            : []),
-          { label: product.name },
-        ]}
-      />
-      <div className="mt-6">
-        <ProductDetails product={product} />
-      </div>
-    </PageContainer>
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      <ProductDetailClient slug={slug} />
+    </>
   );
 }

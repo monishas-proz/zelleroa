@@ -3,6 +3,8 @@ import { db } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma";
 import { ApiError } from "@/lib/api/api-error";
 import { formatVariantMeasurement } from "@/features/variants/utils/measurement.util";
+import { reservationService } from "@/features/inventory/services/reservation.service";
+import { getDelhiveryTrackingUrl } from "@/lib/shipping/delhivery-client";
 import type {
   OrderDetailResponse,
   OrderListItemResponse,
@@ -101,6 +103,11 @@ export const orderDetailInclude = Prisma.validator<Prisma.OrderInclude>()({
           email: true,
           phone: true,
         },
+      },
+      delivery_partners: true,
+      shipment_tracking: {
+        where: { is_active: true },
+        orderBy: { id: "asc" },
       },
     },
   },
@@ -221,6 +228,42 @@ export function formatOrderDelivery(
   };
 }
 
+export function formatCourierShipment(
+  shipments?: Array<{
+    uuid: string | null;
+    id: bigint;
+    status: string;
+    tracking_number: string | null;
+    delivery_partners?: { name: string; code: string } | null;
+    shipment_tracking?: Array<{
+      status: string;
+      location: string | null;
+      note: string | null;
+      tracked_at: Date;
+    }>;
+  }> | null
+) {
+  const shipment = shipments?.find((s) => s.delivery_partners && s.tracking_number);
+  if (!shipment || !shipment.delivery_partners || !shipment.tracking_number) return null;
+
+  return {
+    id: shipment.uuid || String(shipment.id),
+    carrier: shipment.delivery_partners.name,
+    trackingNumber: shipment.tracking_number,
+    trackingUrl:
+      shipment.delivery_partners.code === "DELHIVERY"
+        ? getDelhiveryTrackingUrl(shipment.tracking_number)
+        : "",
+    status: shipment.status,
+    timeline: (shipment.shipment_tracking || []).map((t) => ({
+      status: t.status,
+      location: t.location,
+      note: t.note,
+      trackedAt: t.tracked_at,
+    })),
+  };
+}
+
 export function formatOrderDetail(
   order: Prisma.OrderGetPayload<{ include: typeof orderDetailInclude }>
 ): OrderDetailResponse {
@@ -258,6 +301,7 @@ export function formatOrderDetail(
     totalAmount: Number(order.totalAmount),
     totalItems,
     delivery: formatOrderDelivery((order as any).shipments),
+    courierShipment: formatCourierShipment((order as any).shipments),
     notes: order.notes ?? null,
     placedAt: order.placed_at ?? null,
     createdAt: order.createdAt,
@@ -315,6 +359,7 @@ export function formatOrderListItem(
     totalAmount: Number(order.totalAmount),
     totalItems,
     delivery: formatOrderDelivery((order as any).shipments),
+    courierShipment: formatCourierShipment((order as any).shipments),
     notes: order.notes ?? null,
     placedAt: order.placed_at ?? null,
     createdAt: order.createdAt,
@@ -358,6 +403,7 @@ export const orderRepository = {
     orderStatus?: "pending" | "confirmed";
     paymentStatus?: "pending" | "paid";
     paymentMethod?: string;
+    coupon?: { id: bigint; discountAmount: number };
     shippingAddress: {
       fullName: string;
       phone: string;
@@ -409,6 +455,7 @@ export const orderRepository = {
           orderNumber,
           userId: params.userId,
           cart_id: params.cartId,
+          couponId: params.coupon?.id ?? null,
           order_status: (params.orderStatus ?? "pending") as any,
           payment_status: (params.paymentStatus ?? "pending") as any,
           subtotal: params.subtotal,
@@ -423,6 +470,21 @@ export const orderRepository = {
           updated_by: params.userId,
         },
       });
+
+      // Convert this cart's stock holds into confirmed holds against the
+      // order, before the exact-quantity decrement below.
+      await reservationService.confirmCart(tx, params.cartId, createdOrder.id);
+
+      if (params.coupon) {
+        await tx.coupon_usage.create({
+          data: {
+            coupon_id: params.coupon.id,
+            user_id: params.userId,
+            order_id: createdOrder.id,
+            discount_amount: params.coupon.discountAmount,
+          },
+        });
+      }
 
       // 2. Create Addresses (Shipping & Billing)
       await tx.orderAddress.createMany({

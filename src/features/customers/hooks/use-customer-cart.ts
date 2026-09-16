@@ -11,25 +11,25 @@ export const CUSTOMER_CART_QUERY_KEY = ["customer", "cart"] as const;
 
 export function useCustomerCart(options?: { enabled?: boolean }) {
   const { status } = useSession();
-  const isAuthenticated = status === "authenticated";
 
+  // Cart works for guests too (guest-session cookie), so the only reason to
+  // hold off is the session hook itself still resolving.
   return useQuery({
     queryKey: CUSTOMER_CART_QUERY_KEY,
     queryFn: () => customerCartApi.getCart(),
     staleTime: 1000 * 30, // 30 seconds
-    enabled: isAuthenticated && (options?.enabled ?? true),
+    enabled: status !== "loading" && (options?.enabled ?? true),
   });
 }
 
 export function useCustomerCartCount(options?: { enabled?: boolean }) {
   const { status } = useSession();
-  const isAuthenticated = status === "authenticated";
 
   return useQuery({
     queryKey: [...CUSTOMER_CART_QUERY_KEY, "count"],
     queryFn: () => customerCartApi.getCartCount(),
     staleTime: 0,
-    enabled: isAuthenticated && (options?.enabled ?? true),
+    enabled: status !== "loading" && (options?.enabled ?? true),
     retry: (failureCount, error: any) => {
       if (error?.status === 401 || error?.statusCode === 401) return false;
       return failureCount < 2;

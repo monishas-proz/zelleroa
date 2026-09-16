@@ -96,6 +96,10 @@ function toVariantListItemDto(
       sort_order?: number;
       is_primary?: boolean;
     }> | null;
+    variant_attribute_values?: Array<{
+      product_attributes: { name: string };
+      attribute_values: { uuid: string | null; value: string };
+    }> | null;
   },
   productUuid: string,
   productName: string
@@ -153,6 +157,11 @@ function toVariantListItemDto(
     cookingRecipe: variant.cooking_recipe ?? null,
     shelfLife: variant.shelf_life ?? null,
     unitPrices,
+    attributeValues: (variant.variant_attribute_values || []).map((vav) => ({
+      attributeName: vav.product_attributes.name,
+      valueId: vav.attribute_values.uuid || "",
+      value: vav.attribute_values.value,
+    })),
   };
 }
 
@@ -371,6 +380,12 @@ export const catalogRepository = {
       where.OR = [{ name: { contains: params.search } }];
     }
 
+    // Filter by audience - a men's/women's/kids' filter also includes unisex
+    // products, since those are designed to fit anyone.
+    if (params.gender) {
+      where.gender = params.gender === "unisex" ? "unisex" : { in: [params.gender, "unisex"] };
+    }
+
     // Variant-level filters (inStock, vegType, price range)
     const variantWhere: Prisma.ProductVariantWhereInput = {
       isActive: true,
@@ -573,6 +588,12 @@ export const catalogRepository = {
               orderBy: [{ is_primary: "desc" }, { sort_order: "asc" }],
             },
             variant_unit_prices: unitPriceListArgs,
+            variant_attribute_values: {
+              include: {
+                product_attributes: { select: { name: true } },
+                attribute_values: { select: { uuid: true, value: true } },
+              },
+            },
           },
           orderBy: { createdAt: "asc" },
         },
@@ -621,6 +642,7 @@ export const catalogRepository = {
         : null,
       category: categoryDto,
       image: imgUrl,
+      gender: (product.gender as CustomerProductDetailDto["gender"]) ?? null,
       variants: variantsDto,
     };
   },
@@ -926,6 +948,15 @@ export const catalogRepository = {
       where.product = {
         ...(where.product as Prisma.ProductWhereInput),
         categoryId: { in: cIds },
+      };
+    }
+
+    // Filter by audience - a men's/women's/kids' filter also includes unisex
+    // products, since those are designed to fit anyone.
+    if (params.gender) {
+      where.product = {
+        ...(where.product as Prisma.ProductWhereInput),
+        gender: params.gender === "unisex" ? "unisex" : { in: [params.gender, "unisex"] },
       };
     }
 

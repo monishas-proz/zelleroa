@@ -128,3 +128,19 @@ export interface StaffDeliveriesCountResponse {
   allTime: DeliveryStatusCounts;
 }
 
+export interface CourierShipmentResult {
+  id: string; // Shipment UUID
+  orderId: string; // Order UUID
+  carrier: string;
+  trackingNumber: string;
+  trackingUrl: string;
+  status: string;
+}
+
+export interface RefreshCourierTrackingResult {
+  id: string; // Shipment UUID
+  orderId: string;
+  status: string;
+  timeline: ShipmentTrackingItem[];
+}
+

@@ -24,5 +24,6 @@ export const POST = createApiHandler(
   {
     method: "POST",
     bodySchema: registerSchema,
+    rateLimit: { limit: 10, windowMs: 60_000 },
   }
 );

@@ -47,8 +47,15 @@ export function useDeleteAttribute() {
 export function useAddAttributeValue() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ attributeUuid, value }: { attributeUuid: string; value: string }) =>
-      addAttributeValue(attributeUuid, value),
+    mutationFn: ({
+      attributeUuid,
+      value,
+      priceAdjustment,
+    }: {
+      attributeUuid: string;
+      value: string;
+      priceAdjustment?: number;
+    }) => addAttributeValue(attributeUuid, value, priceAdjustment),
     onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: attributeKeys.all });
       queryClient.invalidateQueries({ queryKey: attributeKeys.detail(variables.attributeUuid) });
@@ -63,11 +70,13 @@ export function useUpdateAttributeValue() {
       attributeUuid,
       valueUuid,
       value,
+      priceAdjustment,
     }: {
       attributeUuid: string;
       valueUuid: string;
       value: string;
-    }) => updateAttributeValue(attributeUuid, valueUuid, value),
+      priceAdjustment?: number;
+    }) => updateAttributeValue(attributeUuid, valueUuid, value, priceAdjustment),
     onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: attributeKeys.all });
       queryClient.invalidateQueries({ queryKey: attributeKeys.detail(variables.attributeUuid) });

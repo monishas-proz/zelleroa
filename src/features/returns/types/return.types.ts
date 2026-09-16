@@ -92,3 +92,13 @@ export interface PickupReturnResult {
   returnStatus: "picked_up";
   orderStatus: "returned";
 }
+
+export interface RefundReturnResult {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  returnStatus: "refunded";
+  refundId: string;
+  refundAmount: number;
+  refundStatus: "initiated" | "completed";
+}

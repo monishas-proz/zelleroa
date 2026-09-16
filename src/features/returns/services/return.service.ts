@@ -14,6 +14,7 @@ import type {
   ApproveReturnResult,
   RejectReturnResult,
   PickupReturnResult,
+  RefundReturnResult,
   ReturnItemInfo,
 } from "../types/return.types";
 
@@ -389,6 +390,76 @@ export const returnService = {
       orderNumber: result.order.orderNumber,
       returnStatus: "picked_up",
       orderStatus: "returned",
+    };
+  },
+
+  /**
+   * Refunds a picked-up return. Online payments (Razorpay etc.) get a refund
+   * record marked 'initiated' - the actual money movement still has to be
+   * completed through the gateway, this just tracks that it's owed. COD
+   * orders never had a Payment row (nothing goes through the gateway), so one
+   * is created here representing the cash collected on delivery, and the
+   * refund is marked 'completed' immediately since settling it is already a
+   * manual, outside-the-app step for COD either way.
+   */
+  async initiateRefund(
+    adminSessionUserId: string,
+    uuid: string
+  ): Promise<RefundReturnResult> {
+    const admin = await userRepository.findById(adminSessionUserId);
+    if (!admin) {
+      throw ApiError.unauthorized("Session expired. Please log in again.");
+    }
+    const adminId = BigInt(admin.internalId || admin.id);
+
+    const req = await returnRepository.findReturnRequestByUuidOnly(uuid);
+    if (!req) {
+      throw ApiError.notFound("Return request not found");
+    }
+
+    if (req.status === "refunded") {
+      throw ApiError.badRequest("This return has already been refunded");
+    }
+
+    if (req.status !== "picked_up") {
+      throw ApiError.badRequest(
+        `Cannot refund a return request in '${req.status}' status. It must be 'picked_up' first.`
+      );
+    }
+
+    const orderId = req.orders.id;
+    const amount = Number(req.orders.totalAmount);
+
+    let payment = await returnRepository.findPaymentByOrderId(orderId);
+    const isOnlinePayment = Boolean(payment?.gateway);
+
+    if (!payment) {
+      payment = await returnRepository.findOrCreateCodPayment({
+        orderId,
+        amount,
+        adminId,
+      });
+    }
+
+    const refundStatus = isOnlinePayment ? "initiated" : "completed";
+
+    const result = await returnRepository.refundReturnTransaction({
+      returnRequestId: req.id,
+      orderId,
+      paymentId: payment.id,
+      amount,
+      refundStatus,
+      adminId,
+    });
+
+    return {
+      id: result.returnRequest.uuid || String(result.returnRequest.id),
+      orderId: result.order.uuid || String(result.order.id),
+      orderNumber: result.order.orderNumber,
+      returnStatus: "refunded",
+      refundId: String(result.refund.id),
+      refundAmount: Number(result.refund.amount),
+      refundStatus,
     };
   },
 };

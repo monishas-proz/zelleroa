@@ -27,6 +27,22 @@ export interface CancelCustomerOrderPayload {
   note?: string;
 }
 
+export interface CreateGuestOrderPayload {
+  email: string;
+  fullName: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2?: string;
+  landmark?: string;
+  city: string;
+  state: string;
+  pincode: string;
+  notes?: string;
+  paymentMethod?: "COD";
+  paymentDetails?: Record<string, any>;
+  couponCode?: string;
+}
+
 export const customerOrdersApi = {
   /**
    * Fetch customer orders with query parameters
@@ -106,6 +122,21 @@ export const customerOrdersApi = {
   ): Promise<OrderDetailResponse> {
     const response = await apiClient.post<any>(
       "/api/customer/orders",
+      payload
+    );
+    const result = (response as any)?.data?.data ?? (response as any)?.data ?? response;
+    return result as OrderDetailResponse;
+  },
+
+  /**
+   * Place a new order as a guest (no account required)
+   * Postman: POST /api/customer/orders/guest
+   */
+  async createGuestOrder(
+    payload: CreateGuestOrderPayload
+  ): Promise<OrderDetailResponse> {
+    const response = await apiClient.post<any>(
+      "/api/customer/orders/guest",
       payload
     );
     const result = (response as any)?.data?.data ?? (response as any)?.data ?? response;

@@ -32,6 +32,7 @@ import {
   usePackAdminOrder,
   useCancelOrderAdmin,
 } from "@/features/orders/hooks";
+import { useShipViaCourier, useRefreshCourierTracking } from "@/features/delivery/hooks";
 import { OrderDetailView } from "@/features/orders/components/OrderDetailView";
 import {
   OrderStatusBadge,
@@ -80,6 +81,8 @@ export function AdminOrderListTable({
   const processOrder = useProcessAdminOrder();
   const packOrder = usePackAdminOrder();
   const cancelOrder = useCancelOrderAdmin();
+  const shipViaCourier = useShipViaCourier();
+  const refreshCourierTracking = useRefreshCourierTracking();
 
   const orders = data?.data ?? [];
   const meta = data?.meta;
@@ -102,7 +105,8 @@ export function AdminOrderListTable({
     confirmOrder.isPending ||
     processOrder.isPending ||
     packOrder.isPending ||
-    cancelOrder.isPending;
+    cancelOrder.isPending ||
+    shipViaCourier.isPending;
 
   const currentDetailStatus = orderDetail?.status?.toLowerCase();
   const isOrderLocked =
@@ -558,6 +562,48 @@ export function AdminOrderListTable({
                   >
                     <Truck className="mr-1.5 h-4 w-4" />
                     Assign Delivery Staff
+                  </Button>
+                )}
+
+                {currentDetailStatus === "packed" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      shipViaCourier.mutate(
+                        { orderId: orderDetail.id },
+                        { onSuccess: () => refetch() }
+                      );
+                    }}
+                    disabled={isTransitionPending}
+                  >
+                    {shipViaCourier.isPending ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Package className="mr-1.5 h-4 w-4" />
+                    )}
+                    Ship via Delhivery
+                  </Button>
+                )}
+
+                {orderDetail.courierShipment && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      refreshCourierTracking.mutate(
+                        { shipmentId: orderDetail.courierShipment!.id },
+                        { onSuccess: () => refetch() }
+                      );
+                    }}
+                    disabled={refreshCourierTracking.isPending}
+                  >
+                    {refreshCourierTracking.isPending ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Truck className="mr-1.5 h-4 w-4" />
+                    )}
+                    Refresh Tracking
                   </Button>
                 )}
 

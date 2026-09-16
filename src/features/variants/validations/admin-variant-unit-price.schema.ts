@@ -8,14 +8,18 @@ export const createVariantUnitPriceSchema = z
     unitValue: z
       .number({ message: "Unit value is required" })
       .gt(0, "Unit value must be greater than 0"),
+    /** Auto-generated from the product code + the variant's Size/Color when omitted. */
     sku: z
-      .string({ message: "SKU is required" })
+      .string()
       .trim()
       .min(1, "SKU cannot be empty")
-      .max(100, "SKU cannot exceed 100 characters"),
+      .max(100, "SKU cannot exceed 100 characters")
+      .optional(),
+    /** Left blank, this is auto-calculated from product base price + color/size add-ons. */
     basePrice: z
-      .number({ message: "Base price is required" })
-      .min(0, "Base price cannot be negative"),
+      .number()
+      .min(0, "Base price cannot be negative")
+      .optional(),
     stock: z
       .number()
       .int("Stock must be an integer")

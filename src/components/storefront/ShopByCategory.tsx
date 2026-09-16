@@ -1,0 +1,104 @@
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+
+interface CategoryCard {
+  slug: string;
+  name: string;
+  subtitle: string;
+  tag: string;
+  href?: string;
+  cta?: string;
+  comingSoon?: boolean;
+}
+
+const CATEGORIES: CategoryCard[] = [
+  { slug: "men", name: "Men", subtitle: "Shirts • T-Shirts • Jeans", tag: "Collection", href: "/men", cta: "Explore" },
+  { slug: "women", name: "Women", subtitle: "Dresses • Tops • Ethnic", tag: "Collection", href: "/women", cta: "Explore" },
+  { slug: "kids", name: "Kids", subtitle: "Boys • Girls • Baby", tag: "Collection", href: "/kids", cta: "Explore" },
+  { slug: "accessories", name: "Accessories", subtitle: "Bags • Watches • Shoes", tag: "Collection", href: "/accessories", cta: "Explore" },
+  { slug: "electronics", name: "Electronics", subtitle: "Audio • Wearables • Smart", tag: "Ecosystem", comingSoon: true, cta: "Pre-launch alerts ready" },
+  { slug: "home-living", name: "Home Living", subtitle: "Decors • Bedding • Kitchen", tag: "Living", comingSoon: true, cta: "Curations dropping soon" },
+];
+
+export function ShopByCategory() {
+  return (
+    <section className="w-full bg-white">
+      <div className="w-full max-w-[1400px] 2xl:max-w-[1600px] 3xl:max-w-[1800px] mx-auto px-4 sm:px-6 md:px-8 py-10 sm:py-14">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wide text-theme-primary">
+              Collections &amp; More
+            </span>
+            <h2 className="mt-1 text-3xl sm:text-4xl font-extrabold uppercase tracking-tight text-theme-text-primary">
+              Shop By Category
+            </h2>
+            <p className="mt-2 text-sm text-theme-text-subtle">
+              Find something perfect for every style, every day.
+            </p>
+          </div>
+
+          <Link
+            href="/products"
+            className="flex items-center gap-1.5 text-sm font-semibold text-theme-primary hover:text-theme-primary-hover transition-colors"
+          >
+            Browse Complete Catalog
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {CATEGORIES.map((category) => {
+            const CardInner = (
+              <>
+                <div className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-gradient-to-br from-slate-700 via-slate-600 to-slate-800">
+                  {category.comingSoon && (
+                    <span className="absolute left-2.5 top-2.5 rounded bg-theme-primary px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+                      Coming Soon
+                    </span>
+                  )}
+
+                  <div className="absolute inset-x-0 bottom-0 p-3">
+                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                      {category.tag}
+                    </span>
+                    <span className="block text-lg font-extrabold uppercase tracking-tight text-white">
+                      {category.name}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-2.5">
+                  <p className="text-xs text-theme-text-subtle truncate">{category.subtitle}</p>
+                  {category.comingSoon ? (
+                    <p className="mt-0.5 text-xs italic text-theme-text-subtle">{category.cta}</p>
+                  ) : (
+                    <span className="mt-0.5 flex items-center gap-1 text-sm font-semibold text-theme-primary">
+                      {category.cta}
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </span>
+                  )}
+                </div>
+              </>
+            );
+
+            if (category.comingSoon || !category.href) {
+              return (
+                <div key={category.slug} className="group">
+                  {CardInner}
+                </div>
+              );
+            }
+
+            return (
+              <Link key={category.slug} href={category.href} className="group">
+                {CardInner}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export default ShopByCategory;

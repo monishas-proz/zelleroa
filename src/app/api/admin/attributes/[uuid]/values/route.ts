@@ -18,7 +18,12 @@ export const POST = createApiHandler(
       const body = context.body as CreateAttributeValueInput;
       const adminEmail = context.session?.user?.email ?? undefined;
 
-      const attribute = await attributeService.addValue(uuid, body.value, adminEmail);
+      const attribute = await attributeService.addValue(
+        uuid,
+        body.value,
+        adminEmail,
+        body.priceAdjustment
+      );
       return apiCreated(attribute, "Attribute value added successfully");
     },
   },

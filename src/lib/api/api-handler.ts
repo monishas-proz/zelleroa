@@ -6,17 +6,29 @@ import { ApiError } from "./api-error";
 import { handlePrismaError } from "./api-error";
 import { auth } from "@/lib/auth/config";
 import { verifyAccessToken } from "@/lib/auth/jwt";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limiter";
 import type { Session } from "next-auth";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
+interface RateLimitOptions {
+  limit: number;
+  windowMs: number;
+}
+
 interface ApiHandlerOptions {
   method?: HttpMethod | HttpMethod[];
   requireAuth?: boolean;
+  /** Resolve a session/JWT if one is present, but don't reject the request when there isn't one (guest access). */
+  optionalAuth?: boolean;
   requiredRole?: string[];
   bodySchema?: ZodSchema;
   querySchema?: ZodSchema;
+  /** Per-IP, per-route request cap. Defaults to 60 requests/minute; pass `false` to disable. */
+  rateLimit?: RateLimitOptions | false;
 }
+
+const DEFAULT_RATE_LIMIT: RateLimitOptions = { limit: 60, windowMs: 60_000 };
 
 export interface HandlerContext {
   params?: Record<string, string>;
@@ -74,9 +86,33 @@ export function createApiHandler(
       return apiError("Method not allowed", 405);
     }
 
+    const rateLimitConfig =
+      options.rateLimit === false ? null : options.rateLimit || DEFAULT_RATE_LIMIT;
+
+    if (rateLimitConfig) {
+      const key = `${request.nextUrl.pathname}:${getClientIp(request)}`;
+      const result = checkRateLimit(key, rateLimitConfig);
+
+      if (!result.allowed) {
+        return NextResponse.json(
+          {
+            success: false,
+            data: null,
+            message: "Too many requests. Please try again later.",
+          },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": Math.ceil((result.resetAt - Date.now()) / 1000).toString(),
+            },
+          }
+        );
+      }
+    }
+
     let session: Session | null = null;
 
-    if (options.requireAuth) {
+    if (options.requireAuth || options.optionalAuth) {
       try {
         // 1. Try NextAuth session (Google OAuth & NextAuth Credentials)
         session = (await auth()) as Session | null;
@@ -109,16 +145,19 @@ export function createApiHandler(
               expires: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
             } as unknown as Session;
           } catch {
-            return apiError("Session expired. Please log in again.", 401);
+            if (options.requireAuth) {
+              return apiError("Session expired. Please log in again.", 401);
+            }
+            session = null;
           }
         }
       }
 
       if (!session?.user) {
-        return apiError("You must be logged in", 401);
-      }
-
-      if (options.requiredRole && options.requiredRole.length > 0) {
+        if (options.requireAuth) {
+          return apiError("You must be logged in", 401);
+        }
+      } else if (options.requiredRole && options.requiredRole.length > 0) {
         const userRole = (session.user as { role?: string }).role;
         if (!userRole || !options.requiredRole.includes(userRole)) {
           return apiError("You don't have permission", 403);

@@ -12,6 +12,9 @@ import { FormRichText } from "@/components/forms/form-rich-text";
 import { FormSelect } from "@/components/forms/form-select";
 import { FormCheckbox } from "@/components/forms/form-checkbox";
 import { FormSubmitButton } from "@/components/forms/form-submit-button";
+import { useAttributesForCategory } from "@/features/attributes/hooks/use-attributes";
+import { useSizeChart } from "@/features/size-charts/hooks/use-size-chart";
+import type { SizeChartGender } from "@/features/size-charts/types";
 
 // Item-level fields only. Unit + price combinations (sku, unit, base price)
 // are managed separately per (unit) via VariantUnitPriceList, since one item
@@ -48,7 +51,9 @@ const variantFormSchema = z.object({
     .regex(/^#[0-9A-Fa-f]{6}$/, "Enter a valid hex color, e.g. #FF5733")
     .optional()
     .or(z.literal("")),
+  priceAdjustment: z.number().optional(),
   isFeatured: z.boolean(),
+  attributeValueIds: z.array(z.string().uuid()).optional(),
 });
 
 export type VariantFormValues = z.infer<typeof variantFormSchema>;
@@ -72,6 +77,10 @@ interface VariantFormProps {
   isEditing?: boolean;
   fixedProductId?: string;
   fixedProductSlug?: string;
+  /** Category UUID of the (fixed or selected) product, used to fetch its configured attributes. */
+  categoryUuid?: string | null;
+  /** The product's audience - the Size attribute's options are the category+gender size chart. */
+  productGender?: SizeChartGender | null;
   products?: SelectOption[];
   onSubmit: (data: VariantFormValues) => Promise<void>;
   isLoading?: boolean;
@@ -83,11 +92,15 @@ function VariantForm({
   isEditing: _isEditing = false,
   fixedProductId,
   fixedProductSlug,
+  categoryUuid,
+  productGender,
   products = [],
   onSubmit,
   isLoading = false,
   submitLabel = "Save Item",
 }: VariantFormProps) {
+  const { data: categoryAttributes = [] } = useAttributesForCategory(categoryUuid || null);
+  const { data: sizeChart = [] } = useSizeChart(categoryUuid || null, productGender || null);
   // Helper to compute prefix from Product Code / Slug
   const computePrefix = (prodId?: string): string => {
     if (fixedProductSlug) {
@@ -146,13 +159,31 @@ function VariantForm({
       description: initialData?.description || "",
       colorName: initialData?.colorName || "",
       colorHex: initialData?.colorHex || "",
+      priceAdjustment: initialData?.priceAdjustment ?? 0,
       isFeatured: initialData?.isFeatured ?? false,
+      attributeValueIds: initialData?.attributeValueIds || [],
     },
   });
 
   const selectedProductId = methods.watch("productId");
   const watchedVariantName = methods.watch("variantName");
   const watchedColorHex = methods.watch("colorHex");
+  const watchedAttributeValueIds = methods.watch("attributeValueIds") || [];
+
+  const handleAttributeValueChange = (
+    attributeValueIdsForAttribute: string[],
+    newValueId: string
+  ) => {
+    const current = methods.getValues("attributeValueIds") || [];
+    const withoutThisAttribute = current.filter(
+      (id) => !attributeValueIdsForAttribute.includes(id)
+    );
+    methods.setValue(
+      "attributeValueIds",
+      newValueId ? [...withoutThisAttribute, newValueId] : withoutThisAttribute,
+      { shouldValidate: true, shouldDirty: true }
+    );
+  };
 
   // Dynamic non-editable prefix based on currently selected Product
   const slugPrefix = useMemo(
@@ -190,7 +221,9 @@ function VariantForm({
         description: initialData.description || "",
         colorName: initialData.colorName || "",
         colorHex: initialData.colorHex || "",
+        priceAdjustment: initialData.priceAdjustment ?? 0,
         isFeatured: initialData.isFeatured ?? false,
+        attributeValueIds: initialData.attributeValueIds || [],
       });
 
       setExtraSlug(extractInitialExtraSlug(initialData.slug, initialPrefix));
@@ -402,12 +435,87 @@ function VariantForm({
             )}
           </div>
 
+          <div>
+            <label className="block text-xs font-semibold text-[var(--color-neutral-800)] mb-1.5">
+              Color price add-on (₹)
+            </label>
+            <FormInput
+              name="priceAdjustment"
+              type="number"
+              step="any"
+              placeholder="e.g. 100"
+            />
+            <p className="mt-1 text-[11px] text-neutral-500">
+              Added on top of the product&apos;s base price whenever this color is picked. Leave
+              as 0 if this color doesn&apos;t change the price.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           <FormCheckbox
             name="isFeatured"
             label="Featured Item"
             description="Display this item prominently in featured sections"
           />
         </div>
+
+        {/* Attribute Values (e.g. Size, Material) — set per category via Catalog > Attributes.
+            The Size attribute's options come from the category+gender size chart instead of
+            its full value list, and the field disappears entirely when that chart is empty
+            (category isn't size-applicable, or no chart configured for this gender yet). */}
+        {(() => {
+          const visibleAttributes = categoryAttributes
+            .map((attribute) => {
+              if (attribute.name.trim().toLowerCase() === "size") {
+                return { ...attribute, values: sizeChart };
+              }
+              return attribute;
+            })
+            .filter((attribute) => attribute.values.length > 0);
+
+          if (visibleAttributes.length === 0) return null;
+
+          return (
+          <div>
+            <label className="block text-xs font-semibold text-[var(--color-neutral-800)] mb-1.5">
+              Attributes
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {visibleAttributes.map((attribute) => {
+                const valueIdsForAttribute = attribute.values.map((v) => v.id);
+                const selectedValueId =
+                  watchedAttributeValueIds.find((id) =>
+                    valueIdsForAttribute.includes(id)
+                  ) || "";
+
+                return (
+                  <div key={attribute.id}>
+                    <label className="block text-xs font-medium text-neutral-600 mb-1">
+                      {attribute.name}
+                      {attribute.isRequired && <span className="text-red-500"> *</span>}
+                    </label>
+                    <select
+                      value={selectedValueId}
+                      onChange={(e) =>
+                        handleAttributeValueChange(valueIdsForAttribute, e.target.value)
+                      }
+                      className="w-full h-10 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-900 outline-none focus:border-secondary-600 focus:ring-2 focus:ring-secondary-600/20"
+                    >
+                      <option value="">Select {attribute.name}</option>
+                      {attribute.values.map((value) => (
+                        <option key={value.id} value={value.id}>
+                          {value.value}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          );
+        })()}
 
         {/* Short Description */}
         <FormTextarea

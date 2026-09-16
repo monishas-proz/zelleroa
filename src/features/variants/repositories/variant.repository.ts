@@ -15,6 +15,7 @@ export const variantInclude = Prisma.validator<Prisma.ProductVariantInclude>()({
       slug: true,
       isActive: true,
       deleted_at: true,
+      base_price: true,
     },
   },
   product_variant_images: {
@@ -49,6 +50,12 @@ export const variantInclude = Prisma.validator<Prisma.ProductVariantInclude>()({
       },
     },
     orderBy: [{ is_default: "desc" }, { createdAt: "asc" }],
+  },
+  variant_attribute_values: {
+    include: {
+      product_attributes: { select: { uuid: true, name: true, slug: true } },
+      attribute_values: { select: { uuid: true, value: true, price_adjustment: true } },
+    },
   },
 });
 
@@ -387,5 +394,67 @@ export const variantRepository = {
         ...(adminId ? { updated_by: adminId } : {}),
       },
     });
+  },
+
+  /**
+   * Every other active variant of this product, each with its sorted set of
+   * attribute_value ids - used to reject a new/edited variant that would
+   * duplicate an existing attribute combination (e.g. two "Red, M" variants).
+   */
+  async findAttributeSetsForProduct(
+    productId: bigint,
+    excludeVariantId?: bigint
+  ): Promise<Array<{ variantId: bigint; attributeValueIds: bigint[] }>> {
+    const variants = await db.productVariant.findMany({
+      where: {
+        productId,
+        deleted_at: null,
+        ...(excludeVariantId ? { id: { not: excludeVariantId } } : {}),
+      },
+      select: {
+        id: true,
+        variant_attribute_values: { select: { attribute_value_id: true } },
+      },
+    });
+
+    return variants.map((v) => ({
+      variantId: v.id,
+      attributeValueIds: v.variant_attribute_values
+        .map((vav) => vav.attribute_value_id)
+        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+    }));
+  },
+
+  /**
+   * Replaces this variant's attribute values (Color=Red, Size=M, ...) with the given
+   * set. One attribute can hold only one value per variant, enforced by resolving
+   * each value's parent attribute and replacing the whole set atomically.
+   */
+  async setAttributeValuesForVariant(
+    variantId: bigint,
+    attributeValueInternalIds: bigint[]
+  ) {
+    const entries =
+      attributeValueInternalIds.length > 0
+        ? await db.attributeValue.findMany({
+            where: { id: { in: attributeValueInternalIds } },
+            select: { id: true, attributeId: true },
+          })
+        : [];
+
+    await db.$transaction([
+      db.variant_attribute_values.deleteMany({ where: { variant_id: variantId } }),
+      ...(entries.length
+        ? [
+            db.variant_attribute_values.createMany({
+              data: entries.map((entry) => ({
+                variant_id: variantId,
+                attribute_id: entry.attributeId,
+                attribute_value_id: entry.id,
+              })),
+            }),
+          ]
+        : []),
+    ]);
   },
 };

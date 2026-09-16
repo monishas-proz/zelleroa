@@ -43,8 +43,10 @@ export function MegaMenu({ root, path, isActive }: MegaMenuProps) {
     >
       <Link
         href={href}
-        className={`flex items-center gap-1 text-sm font-medium transition-colors hover:text-theme-primary ${
-          isActive ? "text-theme-primary font-semibold" : "text-hover-primary"
+        className={`flex items-center gap-1 rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
+          isActive
+            ? "bg-theme-primary text-theme-primary-fg font-semibold"
+            : "text-hover-primary hover:text-theme-primary"
         }`}
       >
         {root.name}

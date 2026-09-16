@@ -1,38 +1,34 @@
 import { createApiHandler } from "@/lib/api/api-handler";
 import { apiSuccess } from "@/lib/api/api-response";
-import { ApiError } from "@/lib/api/api-error";
 import { cartService } from "@/features/cart/services/cart.service";
+import { resolveCartIdentity, attachGuestCartCookie } from "@/lib/cart/guest-session";
 
 export const GET = createApiHandler(
   {
-    GET: async (_request, context) => {
-      const sessionUserId = context.session?.user?.id;
-      if (!sessionUserId) {
-        throw ApiError.unauthorized("Please login to access your cart");
-      }
+    GET: async (request, context) => {
+      const { identity, guestCookie } = resolveCartIdentity(request, context);
+      const cart = await cartService.getCart(identity);
 
-      const cart = await cartService.getCart(sessionUserId);
-      return apiSuccess(cart, "Cart fetched successfully", 200);
+      const response = apiSuccess(cart, "Cart fetched successfully", 200);
+      return guestCookie?.isNew ? attachGuestCartCookie(response, guestCookie.id) : response;
     },
   },
   {
-    requireAuth: true,
+    optionalAuth: true,
   }
 );
 
 export const DELETE = createApiHandler(
   {
-    DELETE: async (_request, context) => {
-      const sessionUserId = context.session?.user?.id;
-      if (!sessionUserId) {
-        throw ApiError.unauthorized("Please login to access your cart");
-      }
+    DELETE: async (request, context) => {
+      const { identity, guestCookie } = resolveCartIdentity(request, context);
+      await cartService.clearCart(identity);
 
-      await cartService.clearCart(sessionUserId);
-      return apiSuccess(null, "Cart cleared successfully", 200);
+      const response = apiSuccess(null, "Cart cleared successfully", 200);
+      return guestCookie?.isNew ? attachGuestCartCookie(response, guestCookie.id) : response;
     },
   },
   {
-    requireAuth: true,
+    optionalAuth: true,
   }
 );

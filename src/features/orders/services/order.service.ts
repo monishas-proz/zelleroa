@@ -1,7 +1,12 @@
+import crypto from "crypto";
 import { db } from "@/lib/db/prisma";
 import { ApiError } from "@/lib/api/api-error";
 import { userRepository } from "@/features/users/repositories/user.repository";
 import { offerService } from "@/features/offers/services/offer.service";
+import { couponValidationService } from "@/features/coupons/services/coupon-validation.service";
+import { customerAddressService } from "@/features/customers/services/customer-address.service";
+import { cartRepository } from "@/features/cart/repositories/cart.repository";
+import { generateAccessToken, generateRefreshToken } from "@/lib/auth/jwt";
 import { orderRepository } from "../repositories/order.repository";
 import type {
   OrderDetailResponse,
@@ -12,6 +17,7 @@ import type {
 } from "../types";
 import type {
   CustomerCreateOrderInput,
+  GuestCreateOrderInput,
   CustomerOrdersQueryInput,
   CustomerOrdersListInput,
   AdminOrdersListInput,
@@ -20,6 +26,8 @@ import type {
   OrderStatusTransitionInput,
 } from "../validations/order.schema";
 import type { orders_order_status } from "@/generated/prisma";
+
+const CUSTOMER_ROLE_ID = BigInt(3);
 
 export const orderService = {
   async createCustomerOrder(
@@ -81,6 +89,7 @@ export const orderService = {
       taxAmount: number;
       totalPrice: number;
       itemUuid: string;
+      categoryId: bigint | null;
     }> = [];
 
     let subtotal = 0;
@@ -134,6 +143,7 @@ export const orderService = {
         taxAmount: 0,
         totalPrice,
         itemUuid: unitPriceRow.uuid,
+        categoryId: item.product.categoryId,
       });
     }
 
@@ -156,6 +166,25 @@ export const orderService = {
 
     const offerDiscount = pricing.totalDiscount;
     subtotal = pricing.subtotal;
+
+    // 2c. Validate and price the coupon (if any) against the priced-down lines,
+    // so its restrictions and min-order check see what the customer actually pays.
+    let appliedCoupon: { id: bigint; discountAmount: number } | undefined;
+    if (input.couponCode) {
+      const validated = await couponValidationService.validate(
+        input.couponCode,
+        userId,
+        orderItemsData.map((item) => ({
+          productId: item.productId,
+          categoryId: item.categoryId,
+          unitPrice: item.totalPrice / item.quantity,
+          quantity: item.quantity,
+        }))
+      );
+      appliedCoupon = { id: validated.couponId, discountAmount: validated.discountAmount };
+    }
+    const couponDiscount = appliedCoupon?.discountAmount ?? 0;
+    const totalDiscount = offerDiscount + couponDiscount;
 
     // 3. Validate shipping address
     const isShippingNumeric = /^\d+$/.test(input.shippingAddressId);
@@ -211,8 +240,8 @@ export const orderService = {
 
 
 
-    // Free delivery is judged on what the customer actually pays, after offers.
-    const payableBeforeShipping = subtotal - offerDiscount;
+    // Free delivery is judged on what the customer actually pays, after offers and coupon.
+    const payableBeforeShipping = subtotal - totalDiscount;
     const shippingCharge = payableBeforeShipping >= 499 ? 0 : 49;
     const totalAmount = payableBeforeShipping + shippingCharge;
 
@@ -221,9 +250,10 @@ export const orderService = {
       userId,
       cartId: cart.id,
       subtotal,
-      discountAmount: offerDiscount,
+      discountAmount: totalDiscount,
       shippingCharge,
       totalAmount,
+      coupon: appliedCoupon,
       orderStatus,
       paymentStatus,
       paymentMethod,
@@ -256,6 +286,92 @@ export const orderService = {
       },
       items: orderItemsData,
     });
+  },
+
+  /**
+   * Places an order for a visitor with no account. A "shadow" customer record
+   * is created (or reused) from their email with no password set, so the
+   * order creation path below is the exact same one a logged-in customer
+   * uses. If they later reset the password on that email, they see every
+   * order placed as a guest under it - that's the intended "claim" flow.
+   *
+   * @param guestSessionId The guest cart cookie value, so their anonymous
+   * cart can be handed over to the new/existing shadow account before order
+   * creation, which otherwise only ever looks up carts by `userId`.
+   */
+  async createGuestOrder(
+    input: GuestCreateOrderInput,
+    guestSessionId: string | null
+  ): Promise<{ order: OrderDetailResponse; accessToken: string; refreshToken: string }> {
+    if (!guestSessionId) {
+      throw ApiError.badRequest("Your cart could not be found. Please add items again.");
+    }
+
+    let shadowUser = await userRepository.findByEmail(input.email);
+
+    if (shadowUser) {
+      // A real account already owns this email - never auto-login as someone
+      // else's account just because a guest typed their address in checkout.
+      if (shadowUser.password_hash) {
+        throw ApiError.conflict(
+          "An account already exists with this email. Please log in to continue."
+        );
+      }
+      if (!shadowUser.isActive) {
+        throw ApiError.forbidden("This account is inactive or blocked. Please contact support.");
+      }
+    } else {
+      await db.user.create({
+        data: {
+          uuid: crypto.randomUUID(),
+          name: input.fullName,
+          email: input.email,
+          phone: null, // the phone on file is the address's, not a verified account phone
+          password_hash: null,
+          role: { connect: { id: CUSTOMER_ROLE_ID } },
+          status: "active",
+        },
+      });
+      shadowUser = await userRepository.findByEmail(input.email);
+    }
+
+    if (!shadowUser || !shadowUser.internalId) {
+      throw ApiError.badRequest("Could not create your order. Please try again.");
+    }
+
+    const address = await customerAddressService.createAddress(shadowUser.uuid, {
+      addressType: "shipping",
+      fullName: input.fullName,
+      phone: input.phone,
+      addressLine1: input.addressLine1,
+      addressLine2: input.addressLine2,
+      landmark: input.landmark,
+      city: input.city,
+      state: input.state,
+      pincode: input.pincode,
+      country: "India",
+      isDefault: true,
+    });
+
+    await cartRepository.claimGuestCart(guestSessionId, BigInt(shadowUser.internalId));
+
+    const order = await this.createCustomerOrder(shadowUser.uuid, {
+      shippingAddressId: address.id,
+      notes: input.notes,
+      paymentMethod: input.paymentMethod || "COD",
+      paymentDetails: input.paymentDetails,
+      couponCode: input.couponCode,
+    });
+
+    const userRole = shadowUser.roleName || "CUSTOMER";
+    const accessToken = generateAccessToken({
+      userId: shadowUser.uuid,
+      email: shadowUser.email ?? "",
+      role: userRole,
+    });
+    const refreshToken = generateRefreshToken({ userId: shadowUser.uuid });
+
+    return { order, accessToken, refreshToken };
   },
 
   async getCustomerOrders(
@@ -627,7 +743,7 @@ export const orderService = {
   async getCheckoutSummary(
     userId: number | string | bigint,
     deliveryMethod?: string,
-    _couponCode?: string
+    couponCode?: string
   ) {
     const user = await userRepository.findById(String(userId));
     if (!user || !user.internalId) throw ApiError.unauthorized("User not found");
@@ -636,43 +752,66 @@ export const orderService = {
       include: {
         items: {
           where: { is_active: true },
-          include: { variant_unit_price: true },
+          include: { variant_unit_price: true, product: { select: { categoryId: true } } },
         },
       },
     });
 
     // Priced from the live `base_price`, not the price captured when the item
     // was added, so the summary reflects today's catalog and today's offers.
-    const lines = (cart?.items ?? [])
-      .filter((it) => it.variant_unit_price)
-      .map((it) => ({
-        itemId: it.variant_unit_price!.uuid,
-        quantity: it.quantity,
-        unitPrice: Number(it.variant_unit_price!.base_price ?? 0),
-      }));
+    const cartItems = (cart?.items ?? []).filter((it) => it.variant_unit_price);
+    const lines = cartItems.map((it) => ({
+      itemId: it.variant_unit_price!.uuid,
+      quantity: it.quantity,
+      unitPrice: Number(it.variant_unit_price!.base_price ?? 0),
+    }));
 
     const pricing = await offerService.priceCartItems(lines);
     const deliveryCharge = deliveryMethod === "EXPRESS" || deliveryMethod === "express" ? 100 : 0;
-    const totalAmount = pricing.total + deliveryCharge;
+
+    let couponResult: { code: string; discount: number } | null = null;
+    let couponError: string | null = null;
+    if (couponCode) {
+      try {
+        const validated = await couponValidationService.validate(
+          couponCode,
+          user.internalId,
+          cartItems.map((it) => ({
+            productId: it.productId,
+            categoryId: it.product?.categoryId ?? null,
+            unitPrice: Number(it.variant_unit_price!.base_price ?? 0),
+            quantity: it.quantity,
+          }))
+        );
+        couponResult = { code: validated.code, discount: validated.discountAmount };
+      } catch (err) {
+        couponError = err instanceof ApiError ? err.message : "Unable to apply coupon";
+      }
+    }
+
+    const couponDiscount = couponResult?.discount ?? 0;
+    const totalDiscount = pricing.totalDiscount + couponDiscount;
+    const totalAmount = pricing.subtotal - totalDiscount + deliveryCharge;
 
     return {
       subtotal: pricing.subtotal,
       deliveryCharge,
       shippingCharge: deliveryCharge,
-      discount: pricing.totalDiscount,
-      discountAmount: pricing.totalDiscount,
-      totalSavings: pricing.totalSavings,
+      discount: totalDiscount,
+      discountAmount: totalDiscount,
+      totalSavings: pricing.totalSavings + couponDiscount,
       items: pricing.lines,
       total: totalAmount,
       totalAmount,
       totals: {
         subtotal: pricing.subtotal,
         shipping: deliveryCharge,
-        discount: pricing.totalDiscount,
+        discount: totalDiscount,
         total: totalAmount,
       },
-      coupon: _couponCode ? { code: _couponCode, discount: pricing.totalDiscount } : null,
-      couponCode: _couponCode || null,
+      coupon: couponResult,
+      couponCode: couponResult?.code || null,
+      couponError,
     };
   },
 };

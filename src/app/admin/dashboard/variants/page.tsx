@@ -763,6 +763,7 @@ export default function AdminVariantsPage() {
                 description: formData.description || null,
                 colorName: formData.colorName || null,
                 colorHex: formData.colorHex || null,
+                priceAdjustment: formData.priceAdjustment ?? 0,
                 isFeatured: formData.isFeatured,
               };
 
@@ -976,6 +977,7 @@ export default function AdminVariantsPage() {
                   description: selectedVariant.description || "",
                   colorName: selectedVariant.colorName || "",
                   colorHex: selectedVariant.colorHex || "",
+                  priceAdjustment: selectedVariant.priceAdjustment ?? 0,
                   isFeatured: selectedVariant.isFeatured ?? false,
                 }}
                 isEditing
@@ -991,6 +993,7 @@ export default function AdminVariantsPage() {
                     description: formData.description || null,
                     colorName: formData.colorName || null,
                     colorHex: formData.colorHex || null,
+                    priceAdjustment: formData.priceAdjustment ?? 0,
                     isFeatured: formData.isFeatured,
                   };
 

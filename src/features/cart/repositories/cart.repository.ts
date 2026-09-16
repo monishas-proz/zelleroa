@@ -2,6 +2,18 @@ import crypto from "crypto";
 import { db } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma";
 import { ApiError } from "@/lib/api/api-error";
+import { reservationService } from "@/features/inventory/services/reservation.service";
+
+/** A cart belongs either to a real customer or, before checkout, to an anonymous browser session. */
+export type CartOwner = { userId: bigint } | { sessionId: string };
+
+function ownerWhere(owner: CartOwner): Prisma.CartWhereInput {
+  return "userId" in owner ? { userId: owner.userId } : { sessionId: owner.sessionId };
+}
+
+function ownerCreateData(owner: CartOwner): Pick<Prisma.CartUncheckedCreateInput, "userId" | "sessionId"> {
+  return "userId" in owner ? { userId: owner.userId } : { sessionId: owner.sessionId };
+}
 
 export const cartItemInclude = Prisma.validator<Prisma.CartItemInclude>()({
   product: {
@@ -78,10 +90,10 @@ export const cartInclude = Prisma.validator<Prisma.CartInclude>()({
 });
 
 export const cartRepository = {
-  async findActiveCartByUserId(userId: bigint) {
+  async findActiveCartByOwner(owner: CartOwner) {
     return db.cart.findFirst({
       where: {
-        userId,
+        ...ownerWhere(owner),
         status: "active",
         is_active: true,
       },
@@ -90,13 +102,13 @@ export const cartRepository = {
   },
 
   async getOrCreateActiveCart(
-    userId: bigint,
+    owner: CartOwner,
     adminOrUserId?: bigint,
     prismaClient: Prisma.TransactionClient | typeof db = db
   ) {
     const existing = await prismaClient.cart.findFirst({
       where: {
-        userId,
+        ...ownerWhere(owner),
         status: "active",
         is_active: true,
       },
@@ -110,7 +122,7 @@ export const cartRepository = {
     return prismaClient.cart.create({
       data: {
         uuid: crypto.randomUUID(),
-        userId,
+        ...ownerCreateData(owner),
         status: "active",
         is_active: true,
         last_activity_at: new Date(),
@@ -122,7 +134,7 @@ export const cartRepository = {
   },
 
   async addItemToCart(params: {
-    userId: bigint;
+    owner: CartOwner;
     productId: bigint;
     variantId: bigint;
     variantUnitPriceId?: bigint | null;
@@ -133,7 +145,7 @@ export const cartRepository = {
     return db.$transaction(async (tx) => {
       // 1. Get or create active cart
       const cart = await this.getOrCreateActiveCart(
-        params.userId,
+        params.owner,
         params.adminOrUserId,
         tx
       );
@@ -154,16 +166,11 @@ export const cartRepository = {
           : params.quantity;
 
         if (params.variantUnitPriceId) {
-          const inventory = await tx.inventory.findUnique({
-            where: { variantUnitPriceId: params.variantUnitPriceId },
-            select: { quantity_available: true },
+          await reservationService.checkAndReserve(tx, {
+            variantUnitPriceId: params.variantUnitPriceId,
+            cartId: cart.id,
+            quantity: newQuantity,
           });
-          const available = inventory?.quantity_available ?? 0;
-          if (newQuantity > available) {
-            throw ApiError.badRequest(
-              `Only ${available} left in stock for this item`
-            );
-          }
         }
 
         await tx.cartItem.update({
@@ -178,16 +185,11 @@ export const cartRepository = {
         });
       } else {
         if (params.variantUnitPriceId) {
-          const inventory = await tx.inventory.findUnique({
-            where: { variantUnitPriceId: params.variantUnitPriceId },
-            select: { quantity_available: true },
+          await reservationService.checkAndReserve(tx, {
+            variantUnitPriceId: params.variantUnitPriceId,
+            cartId: cart.id,
+            quantity: params.quantity,
           });
-          const available = inventory?.quantity_available ?? 0;
-          if (params.quantity > available) {
-            throw ApiError.badRequest(
-              `Only ${available} left in stock for this item`
-            );
-          }
         }
 
         // Create new item
@@ -225,10 +227,10 @@ export const cartRepository = {
     });
   },
 
-  async findCartItem(params: { userId: bigint; identifier: string }) {
+  async findCartItem(params: { owner: CartOwner; identifier: string }) {
     const cart = await db.cart.findFirst({
       where: {
-        userId: params.userId,
+        ...ownerWhere(params.owner),
         status: "active",
         is_active: true,
       },
@@ -251,7 +253,7 @@ export const cartRepository = {
   },
 
   async updateItemQuantity(params: {
-    userId: bigint;
+    owner: CartOwner;
     variantUnitPriceUuid: string;
     quantity: number;
     currentPrice?: number;
@@ -260,7 +262,7 @@ export const cartRepository = {
     return db.$transaction(async (tx) => {
       const cart = await tx.cart.findFirst({
         where: {
-          userId: params.userId,
+          ...ownerWhere(params.owner),
           status: "active",
           is_active: true,
         },
@@ -288,10 +290,11 @@ export const cartRepository = {
       if (!item) return null;
 
       if (item.variant_unit_price) {
-        const available = item.variant_unit_price.inventories?.quantity_available ?? 0;
-        if (params.quantity > available) {
-          throw ApiError.badRequest(`Only ${available} left in stock for this item`);
-        }
+        await reservationService.checkAndReserve(tx, {
+          variantUnitPriceId: item.variant_unit_price.id,
+          cartId: cart.id,
+          quantity: params.quantity,
+        });
       }
 
       const price =
@@ -327,14 +330,14 @@ export const cartRepository = {
   },
 
   async removeCartItem(params: {
-    userId: bigint;
+    owner: CartOwner;
     variantUnitPriceUuid: string;
     adminOrUserId?: bigint;
   }) {
     return db.$transaction(async (tx) => {
       const cart = await tx.cart.findFirst({
         where: {
-          userId: params.userId,
+          ...ownerWhere(params.owner),
           status: "active",
           is_active: true,
         },
@@ -355,6 +358,14 @@ export const cartRepository = {
       });
 
       if (!item) return null;
+
+      if (item.variantUnitPriceId) {
+        await reservationService.checkAndReserve(tx, {
+          variantUnitPriceId: item.variantUnitPriceId,
+          cartId: cart.id,
+          quantity: 0,
+        });
+      }
 
       await tx.cartItem.update({
         where: { id: item.id },
@@ -382,19 +393,21 @@ export const cartRepository = {
   },
 
   async clearCart(params: {
-    userId: bigint;
+    owner: CartOwner;
     adminOrUserId?: bigint;
   }) {
     return db.$transaction(async (tx) => {
       const cart = await tx.cart.findFirst({
         where: {
-          userId: params.userId,
+          ...ownerWhere(params.owner),
           status: "active",
           is_active: true,
         },
       });
 
       if (!cart) return true;
+
+      await reservationService.releaseCart(tx, cart.id);
 
       await tx.cartItem.updateMany({
         where: {
@@ -422,11 +435,11 @@ export const cartRepository = {
   },
 
   async getCartItemCount(
-    userId: bigint
+    owner: CartOwner
   ): Promise<{ count: number; totalQuantity: number }> {
     const cart = await db.cart.findFirst({
       where: {
-        userId,
+        ...ownerWhere(owner),
         status: "active",
         is_active: true,
       },
@@ -464,5 +477,13 @@ export const cartRepository = {
       count: result._count.id ?? 0,
       totalQuantity: result._sum.quantity ?? 0,
     };
+  },
+
+  /** Hands a guest's session-based cart over to the (shadow) user account created for their order. */
+  async claimGuestCart(sessionId: string, userId: bigint) {
+    return db.cart.updateMany({
+      where: { sessionId, status: "active", is_active: true },
+      data: { userId, sessionId: null, updatedAt: new Date() },
+    });
   },
 };

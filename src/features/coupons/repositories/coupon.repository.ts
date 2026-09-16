@@ -112,4 +112,38 @@ export const couponRepository = {
   async delete(id: number | bigint) {
     return db.coupon.delete({ where: { id: BigInt(id) } });
   },
+
+  /** Active coupon by code, with its category/product restrictions (internal ids). */
+  async findActiveByCodeForValidation(code: string) {
+    return db.coupon.findFirst({
+      where: { code, isActive: true },
+      include: {
+        coupon_categories: { select: { category_id: true } },
+        coupon_products: { select: { product_id: true } },
+      },
+    });
+  },
+
+  async countUsage(couponId: bigint) {
+    return db.coupon_usage.count({ where: { coupon_id: couponId } });
+  },
+
+  async countUsageForUser(couponId: bigint, userId: bigint) {
+    return db.coupon_usage.count({ where: { coupon_id: couponId, user_id: userId } });
+  },
+
+  /** Records a coupon's use against an order. Call inside the order-creation transaction. */
+  async recordUsage(
+    tx: Prisma.TransactionClient,
+    params: { couponId: bigint; userId: bigint; orderId: bigint; discountAmount: number }
+  ) {
+    return tx.coupon_usage.create({
+      data: {
+        coupon_id: params.couponId,
+        user_id: params.userId,
+        order_id: params.orderId,
+        discount_amount: params.discountAmount,
+      },
+    });
+  },
 };

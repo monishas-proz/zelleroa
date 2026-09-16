@@ -68,7 +68,6 @@ const sidebarItems: SidebarItem[] = [
     icon: Package,
     children: [
       { label: "Categories", href: "/admin/dashboard/categories", icon: FolderTree },
-      { label: "Subcategories", href: "/admin/dashboard/subcategories", icon: FolderTree },
       { label: "Products", href: "/admin/dashboard/products", icon: Package },
       { label: "Items", href: "/admin/dashboard/variants", icon: Layers },
       { label: "Brands", href: "/admin/dashboard/brands", icon: Crown },

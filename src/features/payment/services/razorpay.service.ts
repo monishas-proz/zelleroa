@@ -33,7 +33,7 @@ export const razorpayService = {
 
     // A. Cart-First Flow: Create Razorpay Order directly from active cart (No internal order created yet)
     if (isCartCheckout) {
-      const cart = await cartService.getCart(sessionUserId);
+      const cart = await cartService.getCart({ sessionUserId });
       if (!cart || cart.items.length === 0) {
         throw ApiError.badRequest("Your cart is empty. Please add items before checking out.");
       }
@@ -487,7 +487,7 @@ export const razorpayService = {
     const userId = user.internalId;
 
     // 1. Compute amount from active cart
-    const cart = await cartService.getCart(sessionUserId);
+    const cart = await cartService.getCart({ sessionUserId });
     if (!cart || cart.items.length === 0)
       throw ApiError.badRequest("Your cart is empty. Please add items before checking out.");
 

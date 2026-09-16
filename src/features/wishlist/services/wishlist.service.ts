@@ -208,7 +208,7 @@ export const wishlistService = {
     }
 
     // 3. Add to active cart with the exact variant pack size
-    const cart = await cartService.addItem(sessionUserId, {
+    const cart = await cartService.addItem({ sessionUserId }, {
       variantUnitPriceId: unitPrice.uuid,
       quantity: 1,
     });

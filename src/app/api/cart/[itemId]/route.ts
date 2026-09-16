@@ -12,7 +12,7 @@ export const PUT = createApiHandler(
         const itemId = context.params?.itemId ?? "";
         const body = context.body as { quantity: number };
         const cart = await cartService.updateItemQuantity(
-          userId,
+          { sessionUserId: userId },
           itemId,
           { quantity: body.quantity }
         );
@@ -32,7 +32,7 @@ export const DELETE = createApiHandler(
         const userId = context.session?.user?.id;
         if (!userId) return apiFromError(new Error("Unauthorized"));
         const itemId = context.params?.itemId ?? "";
-        const cart = await cartService.removeItem(userId, itemId);
+        const cart = await cartService.removeItem({ sessionUserId: userId }, itemId);
         return apiSuccess(cart, "Item removed from cart");
       } catch (error) {
         return apiFromError(error);

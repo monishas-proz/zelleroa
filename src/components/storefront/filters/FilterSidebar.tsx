@@ -58,6 +58,10 @@ export interface FilterSidebarProps {
   vegType: "all" | "veg" | "non_veg" | "vegan";
   onVegTypeChange: (vegType: "all" | "veg" | "non_veg" | "vegan") => void;
 
+  // Gender / Audience (Men / Women / Kids / Unisex)
+  genderFilter?: "all" | "men" | "women" | "kids" | "unisex";
+  onGenderFilterChange?: (gender: "all" | "men" | "women" | "kids" | "unisex") => void;
+
   // Facet availability counts
   facets?: {
     inStockCount?: number;
@@ -114,6 +118,8 @@ export function FilterSidebar({
   onStockStatusChange,
   vegType,
   onVegTypeChange,
+  genderFilter = "all",
+  onGenderFilterChange,
   facets,
   minPriceLimit = 0,
   maxPriceLimit = 1000,
@@ -563,6 +569,33 @@ export function FilterSidebar({
       </div>
 
 {/* Dietary filter omitted for clothing & fashion domain */}
+
+      {/* 5. Gender / Audience Pills */}
+      {onGenderFilterChange && (
+        <div className="flex flex-col gap-2">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#7A6258]">
+            Shop By
+          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            {(["men", "women", "kids", "unisex"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() =>
+                  onGenderFilterChange(genderFilter === option ? "all" : option)
+                }
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold capitalize transition-all select-none cursor-pointer ${
+                  genderFilter === option
+                    ? "bg-[#7A2224] text-white border border-[#7A2224] shadow-xs"
+                    : "bg-white text-[#4A3228] border border-[#DCC7B7] hover:bg-[#FAF6F0]"
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 6. Categories -> Product List Nested Tree (Matching Image 3 on light theme) */}
       <div className="flex flex-col gap-2.5 pt-3 border-t border-[#F0E4D8]">

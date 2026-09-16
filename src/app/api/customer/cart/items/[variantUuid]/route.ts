@@ -2,6 +2,7 @@ import { createApiHandler } from "@/lib/api/api-handler";
 import { apiSuccess } from "@/lib/api/api-response";
 import { ApiError } from "@/lib/api/api-error";
 import { cartService } from "@/features/cart/services/cart.service";
+import { resolveCartIdentity, attachGuestCartCookie } from "@/lib/cart/guest-session";
 import {
   updateCartItemSchema,
   type UpdateCartItemInput,
@@ -9,34 +10,29 @@ import {
 
 export const GET = createApiHandler(
   {
-    GET: async (_request, context) => {
-      const sessionUserId = context.session?.user?.id;
-      if (!sessionUserId) {
-        throw ApiError.unauthorized("Please login to access your cart");
-      }
+    GET: async (request, context) => {
+      const { identity, guestCookie } = resolveCartIdentity(request, context);
 
       const variantUuid = context.params?.variantUuid;
       if (!variantUuid) {
         throw ApiError.badRequest("variantUuid is required");
       }
 
-      const item = await cartService.getCartItem(sessionUserId, variantUuid);
+      const item = await cartService.getCartItem(identity, variantUuid);
 
-      return apiSuccess(item, "Cart item fetched successfully", 200);
+      const response = apiSuccess(item, "Cart item fetched successfully", 200);
+      return guestCookie?.isNew ? attachGuestCartCookie(response, guestCookie.id) : response;
     },
   },
   {
-    requireAuth: true,
+    optionalAuth: true,
   }
 );
 
 export const PUT = createApiHandler(
   {
-    PUT: async (_request, context) => {
-      const sessionUserId = context.session?.user?.id;
-      if (!sessionUserId) {
-        throw ApiError.unauthorized("Please login to access your cart");
-      }
+    PUT: async (request, context) => {
+      const { identity, guestCookie } = resolveCartIdentity(request, context);
 
       const variantUuid = context.params?.variantUuid;
       if (!variantUuid) {
@@ -45,39 +41,38 @@ export const PUT = createApiHandler(
 
       const body = context.body as UpdateCartItemInput;
       const cart = await cartService.updateItemQuantity(
-        sessionUserId,
+        identity,
         variantUuid,
         body
       );
 
-      return apiSuccess(cart, "Cart item updated successfully", 200);
+      const response = apiSuccess(cart, "Cart item updated successfully", 200);
+      return guestCookie?.isNew ? attachGuestCartCookie(response, guestCookie.id) : response;
     },
   },
   {
-    requireAuth: true,
+    optionalAuth: true,
     bodySchema: updateCartItemSchema,
   }
 );
 
 export const DELETE = createApiHandler(
   {
-    DELETE: async (_request, context) => {
-      const sessionUserId = context.session?.user?.id;
-      if (!sessionUserId) {
-        throw ApiError.unauthorized("Please login to access your cart");
-      }
+    DELETE: async (request, context) => {
+      const { identity, guestCookie } = resolveCartIdentity(request, context);
 
       const variantUuid = context.params?.variantUuid;
       if (!variantUuid) {
         throw ApiError.badRequest("variantUuid is required");
       }
 
-      const cart = await cartService.removeItem(sessionUserId, variantUuid);
+      const cart = await cartService.removeItem(identity, variantUuid);
 
-      return apiSuccess(cart, "Cart item removed successfully", 200);
+      const response = apiSuccess(cart, "Cart item removed successfully", 200);
+      return guestCookie?.isNew ? attachGuestCartCookie(response, guestCookie.id) : response;
     },
   },
   {
-    requireAuth: true,
+    optionalAuth: true,
   }
 );

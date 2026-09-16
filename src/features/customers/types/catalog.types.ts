@@ -97,6 +97,8 @@ export interface CustomerVariantListItemDto {
   // `salePrice`/`measurement` above mirror the default (or first) entry here
   // for backward compatibility with callers that expect a single price/sku.
   unitPrices: CustomerVariantUnitPriceDto[];
+  /** This variant's non-color attribute values (e.g. Size=M) - empty unless the caller requested them. */
+  attributeValues: Array<{ attributeName: string; valueId: string; value: string }>;
 }
 
 export interface CustomerVariantDetailDto extends CustomerVariantListItemDto {
@@ -116,6 +118,7 @@ export interface CustomerProductDetailDto {
     name: string;
   } | null;
   image: string | null;
+  gender: "men" | "women" | "kids" | "unisex" | null;
   variants: CustomerVariantListItemDto[];
 }
 

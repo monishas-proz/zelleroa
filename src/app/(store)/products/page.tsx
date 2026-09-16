@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Sparkles, ChevronRight, SlidersHorizontal, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FilterSidebar } from "@/components/storefront/filters/FilterSidebar";
@@ -60,9 +61,19 @@ function ProductCatalogSkeleton() {
   );
 }
 
+const VALID_GENDERS = ["men", "women", "kids", "unisex"] as const;
+type GenderFilter = (typeof VALID_GENDERS)[number];
+
 export default function ShopAllPage() {
+  const searchParams = useSearchParams();
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => searchParams.get("search") ?? "");
+  const [genderFilter, setGenderFilter] = useState<GenderFilter | undefined>(() => {
+    const raw = searchParams.get("gender");
+    return (VALID_GENDERS as readonly string[]).includes(raw ?? "")
+      ? (raw as GenderFilter)
+      : undefined;
+  });
   const [sortKey, setSortKey] = useState("createdAt_desc");
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
@@ -123,6 +134,7 @@ export default function ShopAllPage() {
     maxPrice: maxPrice < 1000 ? maxPrice : undefined,
     inStock: inStockParam,
     vegType: vegTypeParam,
+    gender: genderFilter,
     sortBy: activeSort.sortBy,
     sortOrder: activeSort.sortOrder,
   });
@@ -216,6 +228,7 @@ export default function ShopAllPage() {
     selectedProductIds.length > 0 ||
     stockStatus !== "all" ||
     vegType !== "all" ||
+    Boolean(genderFilter) ||
     minPrice > 0 ||
     maxPrice < 1000 ||
     sortKey !== "createdAt_desc";
@@ -229,6 +242,7 @@ export default function ShopAllPage() {
     setSelectedProductIds([]);
     setStockStatus("all");
     setVegType("all");
+    setGenderFilter(undefined);
     setMinPrice(0);
     setMaxPrice(1000);
     setPage(1);
@@ -241,6 +255,7 @@ export default function ShopAllPage() {
     selectedProductIds.length > 0,
     stockStatus !== "all",
     vegType !== "all",
+    Boolean(genderFilter),
     minPrice > 0 || maxPrice < 1000,
     sortKey !== "createdAt_desc",
   ].filter(Boolean).length;
@@ -348,6 +363,12 @@ export default function ShopAllPage() {
               vegType={vegType}
               onVegTypeChange={(val) => {
                 setVegType(val);
+                setPage(1);
+                scrollToCatalogTop();
+              }}
+              genderFilter={genderFilter ?? "all"}
+              onGenderFilterChange={(val) => {
+                setGenderFilter(val === "all" ? undefined : val);
                 setPage(1);
                 scrollToCatalogTop();
               }}

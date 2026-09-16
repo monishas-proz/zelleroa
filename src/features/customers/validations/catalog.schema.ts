@@ -38,6 +38,8 @@ export const customerProductListSchema = z
     maxPrice: z.number().min(0, "maxPrice cannot be negative").optional().nullable(),
     inStock: z.boolean().optional(),
     vegType: z.enum(["veg", "non_veg", "nonveg", "vegan", "na"]).optional(),
+    /** Filtering by a specific audience also includes unisex products. */
+    gender: z.enum(["men", "women", "kids", "unisex"]).optional(),
     sortBy: z.enum(["name", "price", "createdAt"]).optional().default("createdAt"),
     sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
   })
@@ -104,6 +106,8 @@ export const customerGlobalVariantListSchema = z
     maxPrice: z.number().min(0, "maxPrice cannot be negative").optional().nullable(),
     inStock: z.boolean().optional(),
     vegType: z.enum(["veg", "non_veg", "nonveg", "vegan", "na"]).optional(),
+    /** Filtering by a specific audience also includes unisex products. */
+    gender: z.enum(["men", "women", "kids", "unisex"]).optional(),
     sortBy: z
       .enum(["variantName", "salePrice", "basePrice", "createdAt", "productName"])
       .optional()
@@ -169,3 +173,18 @@ export type CustomerVariantListInput = z.input<typeof customerVariantListSchema>
 export type CustomerGlobalVariantListInput = z.input<typeof customerGlobalVariantListSchema>;
 export type CustomerRelatedProductsQueryInput = z.infer<typeof customerRelatedProductsQuerySchema>;
 export type CustomerRelatedVariantsQueryInput = z.infer<typeof customerRelatedVariantsQuerySchema>;
+
+export const recordRecentlyViewedSchema = z
+  .object({
+    productId: uuidParamSchema,
+  })
+  .strict();
+
+export type RecordRecentlyViewedInput = z.infer<typeof recordRecentlyViewedSchema>;
+
+export const recentlyViewedQuerySchema = z.object({
+  exclude: uuidParamSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(20).optional().default(8),
+});
+
+export type RecentlyViewedQueryInput = z.infer<typeof recentlyViewedQuerySchema>;

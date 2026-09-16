@@ -3,6 +3,9 @@ import { z } from "zod";
 export const vegTypeEnum = z.enum(["veg", "nonveg", "vegan", "na"]);
 export type VegType = z.infer<typeof vegTypeEnum>;
 
+export const productGenderEnum = z.enum(["men", "women", "kids", "unisex"]);
+export type ProductGender = z.infer<typeof productGenderEnum>;
+
 export const createAdminProductSchema = z
   .object({
     categoryId: z
@@ -25,6 +28,8 @@ export const createAdminProductSchema = z
       .trim()
       .min(1, "Product code cannot be empty")
       .max(220, "Product code cannot exceed 220 characters"),
+    /** Audience this product is designed for - drives which size chart applies. */
+    gender: productGenderEnum.optional(),
   })
   .strict();
 

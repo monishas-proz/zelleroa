@@ -2,374 +2,223 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import {
-  LOGOS,
-  ICONS,
-  contacts as defaultContacts,
-  footerSocialIcons,
-  readyToAssist,
-  mainMenu,
-} from "@/constants/storefront";
-import { ContactCard, ContactItem } from "@/components/storefront/cards/ContactCard";
-import { FooterLinks } from "@/components/storefront/footer/FooterLinks";
-import { IconButton } from "@/components/storefront/buttons/IconButton";
+import Link from "next/link";
+import { Mail, ShieldCheck, Loader2 } from "lucide-react";
+import { LOGOS, footerSocialIcons } from "@/constants/storefront";
 import { ContactFormModal } from "@/features/contact/components/ContactFormModal";
 import { useCustomerCompany } from "@/features/customers/hooks/use-customer-company";
+import { useNewsletterSubscribe } from "@/features/newsletter/hooks/use-newsletter-subscribe";
 import { getImageUrl } from "@/lib/utils";
 
+const SHOP_LINKS = [
+  { label: "Men's Collection", href: "/men" },
+  { label: "Women's Wear", href: "/women" },
+  { label: "Kids & Teens", href: "/kids" },
+  { label: "Accessories & Footwear", href: "/accessories" },
+  { label: "New Arrivals", href: "/products" },
+  { label: "Offers & Clearance", href: "/products?sortBy=discount" },
+];
+
+const ABOUT_LINKS = [
+  { label: "About Us", href: "/about" },
+  { label: "Terms & Conditions", href: "/terms-and-conditions" },
+  { label: "Privacy Policy", href: "/privacy-policy" },
+];
+
+const PAYMENT_METHODS = ["UPI", "Visa", "Mastercard", "RuPay", "NetBanking"];
+
 export function Footer() {
-  const router = useRouter();
-  const [email, setEmail] = React.useState("");
-  const [isSubscribed, setIsSubscribed] = React.useState(false);
   const [isContactModalOpen, setIsContactModalOpen] = React.useState(false);
+  const [vipEmail, setVipEmail] = React.useState("");
+  const subscribe = useNewsletterSubscribe();
 
   const { data: company } = useCustomerCompany();
 
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email.trim()) {
-      setIsSubscribed(true);
-      setTimeout(() => {
-        setEmail("");
-        setIsSubscribed(false);
-      }, 3000);
-    }
-  };
-
-  // Dynamic Contact Cards based on Company API
-  const dynamicContacts: ContactItem[] = React.useMemo(() => {
-    const phone = company?.phone?.trim();
-
-    const formatPhoneDisplay = (
-      rawPhone: string | null | undefined,
-      defaultVal: string
-    ): string => {
-      const target = rawPhone?.trim() || defaultVal;
-      if (!target) return "";
-
-      const digits = target.replace(/\D/g, "");
-      if (digits.length === 12 && digits.startsWith("91")) {
-        return `+91 ${digits.slice(2)}`;
-      }
-      if (digits.length === 10) {
-        return `+91 ${digits}`;
-      }
-      if (digits.length > 10 && digits.startsWith("91")) {
-        return `+91 ${digits.slice(2)}`;
-      }
-
-      // Fallback for other international formats
-      const match = target.match(/^(\+\d{1,3})\s*(.*)$/);
-      if (match) {
-        const countryCode = match[1];
-        const numberPart = match[2].replace(/\s+/g, "");
-        return numberPart ? `${countryCode} ${numberPart}` : countryCode;
-      }
-
-      return target;
-    };
-
-    // 1. Call
-    const defaultCallVal = defaultContacts[0]?.value || "+91 9486150579";
-    const callValue = formatPhoneDisplay(phone, defaultCallVal);
-    const callDigits = (phone || defaultCallVal).replace(/\D/g, "");
-    const cleanCallNumber = callDigits.length === 10 ? `91${callDigits}` : callDigits;
-    const callLink = cleanCallNumber ? `tel:+${cleanCallNumber}` : "tel:+919486150579";
-
-    // 2. WhatsApp (uses phonenumber field value as specified)
-    const defaultWaVal = defaultContacts[1]?.value || "+91 8667380899";
-    const waValue = formatPhoneDisplay(phone, defaultWaVal);
-    const waDigits = (phone || defaultWaVal).replace(/\D/g, "");
-    const cleanWaNumber = waDigits.length === 10 ? `91${waDigits}` : waDigits;
-    const waLink = cleanWaNumber
-      ? `https://wa.me/${cleanWaNumber}`
-      : "https://wa.me/918667380899";
-
-    // 3. Mail
-    const companyEmail = company?.email?.trim();
-    const mailValue =
-      companyEmail || defaultContacts[2]?.value || "support@zellora.com";
-    const mailLink = companyEmail
-      ? `mailto:${companyEmail}`
-      : defaultContacts[2]?.link || "mailto:support@zellora.com";
-
-    return [
-      {
-        id: 1,
-        icon: ICONS.call,
-        title: "Call",
-        value: callValue,
-        link: callLink,
-      },
-      {
-        id: 2,
-        icon: ICONS.whatsapp,
-        title: "WhatsApp",
-        value: waValue,
-        link: waLink,
-      },
-      {
-        id: 3,
-        icon: ICONS.mail,
-        title: "Mail",
-        value: mailValue,
-        link: mailLink,
-      },
-    ];
-  }, [company]);
-
-  // Company Name
-  const companyName =
-    company?.companyName?.trim() || "Zellora";
-
-  // Company Logo
+  const companyName = company?.companyName?.trim() || "Zellora";
   const companyLogo = company?.logo ? getImageUrl(company.logo) : LOGOS.logo;
 
-  // Formatted Location Address
-  const formattedLocation = React.useMemo(() => {
-    if (!company) {
-      return "Zellora Fashion Studio, Namakkal - 637 002.";
-    }
-
-    const parts: string[] = [];
-    if (company.address?.trim()) parts.push(company.address.trim());
-    if (company.city?.trim()) parts.push(company.city.trim());
-
-    const statePinParts: string[] = [];
-    if (company.state?.trim()) statePinParts.push(company.state.trim());
-    if (company.pincode?.trim()) statePinParts.push(company.pincode.trim());
-
-    if (statePinParts.length > 0) {
-      parts.push(statePinParts.join(" - "));
-    }
-
-    if (parts.length === 0) {
-      return "Zellora Fashion Studio, Namakkal - 637 002.";
-    }
-
-    return parts.join(", ");
+  const whatsappLink = React.useMemo(() => {
+    const phone = company?.phone?.trim();
+    const digits = (phone || "8667380899").replace(/\D/g, "");
+    const clean = digits.length === 10 ? `91${digits}` : digits;
+    return `https://wa.me/${clean}`;
   }, [company]);
 
-  const mapsUrl = React.useMemo(() => {
-    if (!company?.address && !company?.city) {
-      return "https://www.google.com/maps/search/?api=1&query=Zellora";
-    }
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formattedLocation)}`;
-  }, [company, formattedLocation]);
-
-  // Handle clicks on "Ready to Assist" links
-  const handleReadyToAssistClick = (item: string) => {
-    if (item === "Contact Us") {
-      setIsContactModalOpen(true);
-      return;
-    }
-    if (item === "Track My Order") {
-      router.push("/orders");
-      return;
-    }
-    if (item === "Terms & Condition" || item === "Terms & Conditions") {
-      router.push("/terms-and-conditions");
-      return;
-    }
-    if (item === "Privacy Policy") {
-      router.push("/privacy-policy");
-      return;
-    }
-    if (item === "Return & Refund Policy") {
-      router.push("/return-refund-policy");
-      return;
-    }
-    if (item === "FAQ's") {
-      router.push("/faq");
-      return;
-    }
-  };
-
-  // Handle clicks on "Main Menu" links
-  const handleMainMenuClick = (item: string) => {
-    if (item === "Shop All") {
-      router.push("/products");
-      return;
-    }
-    if (item === "Collections" || item === "Our Snacks") {
-      router.push("/categories");
-      return;
-    }
-    if (item === "New Arrivals") {
-      router.push("/products");
-      return;
-    }
-    if (item === "Lookbook") {
-      router.push("/products");
-      return;
-    }
-    if (item === "Festive Gifting") {
-      router.push("/festive-gifting");
-      return;
-    }
-    if (item === "Bulk Order") {
-      router.push("/bulk-order");
-      return;
-    }
-    if (item === "About Us") {
-      router.push("/about");
-      return;
-    }
+  const handleVipSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = vipEmail.trim();
+    if (!trimmed) return;
+    subscribe.mutate({ email: trimmed }, { onSuccess: () => setVipEmail("") });
   };
 
   return (
-    <footer className="relative pt-4">
-      {/* Floating Contact Cards */}
-      <div className="relative z-10 lg:translate-y-12 mb-6 lg:mb-0">
-        <div className="grid md:grid-cols-3 gap-5 max-w-[1100px] mx-auto px-4">
-          {dynamicContacts.map((contact) => (
-            <ContactCard key={contact.id} contact={contact} />
-          ))}
+    <footer className="w-full bg-white border-t border-theme-border">
+      {/* VIP signup bar */}
+      <div className="w-full bg-theme-primary-light/50">
+        <div className="w-full max-w-[1400px] 2xl:max-w-[1600px] 3xl:max-w-[1800px] mx-auto px-4 sm:px-6 md:px-8 py-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+              <Mail className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-theme-text-primary">
+                Stay updated with {companyName} drops
+              </h3>
+              <p className="text-sm text-theme-text-subtle">
+                Subscribe for early access, curated lookbooks, and member offers.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleVipSubmit} className="flex w-full md:w-auto gap-2">
+            <input
+              type="email"
+              required
+              value={vipEmail}
+              onChange={(e) => setVipEmail(e.target.value)}
+              placeholder="Enter your mobile or email..."
+              className="flex-1 md:w-72 h-11 px-4 rounded-md border border-theme-border bg-white text-sm text-theme-text-primary placeholder:text-theme-text-subtle outline-none focus:border-theme-primary transition-colors"
+            />
+            <button
+              type="submit"
+              disabled={subscribe.isPending}
+              className="h-11 shrink-0 px-6 rounded-md bg-theme-primary hover:bg-theme-primary-hover text-white text-sm font-bold transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {subscribe.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {subscribe.isSuccess ? "Joined" : "Join"}
+            </button>
+          </form>
         </div>
       </div>
 
-      {/* Main Brown Footer Area */}
-      <div className="bg-[var(--brown-700)] min-h-[350px] pt-10 lg:pt-24 text-white">
-        <div className="w-full max-w-[1400px] 2xl:max-w-[1600px] 3xl:max-w-[1800px] mx-auto px-6 lg:px-10">
-          <div className="flex flex-col gap-10 lg:justify-between lg:flex-row">
-            {/* Column 1: Ready to Assist */}
-            <FooterLinks
-              title="Ready to Assist"
-              items={readyToAssist}
-              onItemClick={handleReadyToAssistClick}
-              className="mb-2"
-            />
-
-            {/* Column 2: Main Menu */}
-            <FooterLinks
-              title="Main Menu"
-              items={mainMenu}
-              onItemClick={handleMainMenuClick}
-              className="mb-2"
-            />
-
-            {/* Column 3: Newsletter Sign Up */}
-            <div>
-              <h3 className="text-[24px] sm:text-[28px] lg:text-xl font-semibold mb-6">
-                Sign Up and Save
-              </h3>
-
-              <p className="text-gray-200 header-font">
-                Join Our Newsletter for Updates & Offers
-              </p>
-
-              {isSubscribed ? (
-                <div className="mt-8 py-2 text-sm text-amber-300 font-medium header-font">
-                  ✓ Thank you for subscribing!
-                </div>
-              ) : (
-                <form
-                  onSubmit={handleSubscribe}
-                  className="mt-8 border-b border-gray-300 flex items-center pb-3 header-font max-w-[300px] lg:max-w-none transition-colors duration-300 hover:border-white"
-                >
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter Your Email"
-                    className="flex-1 bg-transparent outline-hidden text-white placeholder:text-gray-300 text-sm"
-                  />
-
-                  {email.trim() ? (
-                    <button
-                      type="submit"
-                      className="bg-[var(--brown-600)] text-white px-4 py-1 rounded-md text-sm transition-all duration-300 hover:bg-[var(--brown-500)] cursor-pointer"
-                    >
-                      Submit
-                    </button>
-                  ) : (
-                    <Image
-                      src={ICONS.mail}
-                      alt="mail"
-                      width={20}
-                      height={20}
-                      className="invert transition-all duration-300"
-                    />
-                  )}
-                </form>
-              )}
-
-              {/* Social Icons */}
-              <div className="flex mt-7 gap-5">
-                {footerSocialIcons.map((item) => (
-                  <IconButton
-                    key={item.id}
-                    icon={item.icon}
-                    alt={item.name}
-                    imageClassName="w-[30px] h-[30px]"
-                    className="hover:-translate-y-1"
-                  />
-                ))}
+      {/* Main footer columns */}
+      <div className="w-full max-w-[1400px] 2xl:max-w-[1600px] 3xl:max-w-[1800px] mx-auto px-4 sm:px-6 md:px-8 py-12">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
+          {/* Brand */}
+          <div className="sm:col-span-2 lg:col-span-1">
+            <div className="flex items-center gap-2">
+              <Image src={companyLogo} alt={companyName} width={32} height={32} className="object-contain" />
+              <div>
+                <p className="text-lg font-extrabold uppercase tracking-tight text-theme-text-primary leading-none">
+                  {companyName}
+                </p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-theme-text-subtle">
+                  Lifestyle &amp; Beyond
+                </p>
               </div>
             </div>
+            <p className="mt-4 text-sm text-theme-text-subtle">
+              Shop smarter. Shop better. Quality essentials and contemporary lifestyle picks
+              for every day.
+            </p>
+            <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-theme-text-subtle">
+              <ShieldCheck className="h-4 w-4 text-theme-primary" />
+              100% Authentic Products
+            </div>
+          </div>
 
-            {/* Column 4: Brand Logo & Address */}
-            <div className="mt-2 lg:mt-0">
-              <div className="flex justify-center">
-                <Image
-                  src={companyLogo}
-                  alt={companyName}
-                  width={90}
-                  height={90}
-                  className="transition-transform duration-300 hover:scale-105 object-contain"
-                />
-              </div>
+          {/* Shop */}
+          <div>
+            <h4 className="font-bold text-theme-text-primary">Shop</h4>
+            <ul className="mt-4 space-y-2.5 text-sm text-theme-text-subtle">
+              {SHOP_LINKS.map((link) => (
+                <li key={link.label}>
+                  <Link href={link.href} className="hover:text-theme-primary transition-colors">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+              <li className="italic text-xs pt-1">Coming Soon: Electronics &amp; Home</li>
+            </ul>
+          </div>
 
-              <h3 className="text-xl lg:text-2xl font-semibold mt-5 text-center">
-                {companyName}
-              </h3>
-
-              <div className="flex gap-2 mt-4 justify-center lg:justify-start">
-                <Image
-                  src={ICONS.location}
-                  alt="location_icon"
-                  width={25}
-                  height={25}
-                />
+          {/* Customer Service */}
+          <div>
+            <h4 className="font-bold text-theme-text-primary">Customer Service</h4>
+            <ul className="mt-4 space-y-2.5 text-sm text-theme-text-subtle">
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setIsContactModalOpen(true)}
+                  className="hover:text-theme-primary transition-colors text-left cursor-pointer"
+                >
+                  Contact Us
+                </button>
+              </li>
+              <li>
+                <Link href="/orders" className="hover:text-theme-primary transition-colors">
+                  Track Order
+                </Link>
+              </li>
+              <li>
+                <Link href="/return-refund-policy" className="hover:text-theme-primary transition-colors">
+                  Returns &amp; Refunds
+                </Link>
+              </li>
+              <li>
+                <Link href="/faqs" className="hover:text-theme-primary transition-colors">
+                  Help &amp; FAQs
+                </Link>
+              </li>
+              <li>
                 <a
-                  href={mapsUrl}
+                  href={whatsappLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="header-font text-sm hover:underline text-gray-200"
+                  className="text-theme-primary font-medium hover:text-theme-primary-hover transition-colors"
                 >
-                  {formattedLocation}
+                  WhatsApp Support
                 </a>
-              </div>
+              </li>
+            </ul>
+          </div>
+
+          {/* About */}
+          <div>
+            <h4 className="font-bold text-theme-text-primary">About {companyName}</h4>
+            <ul className="mt-4 space-y-2.5 text-sm text-theme-text-subtle">
+              {ABOUT_LINKS.map((link) => (
+                <li key={link.label}>
+                  <Link href={link.href} className="hover:text-theme-primary transition-colors">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Connect */}
+          <div>
+            <h4 className="font-bold text-theme-text-primary">Connect With Us</h4>
+            <div className="mt-4 flex items-center gap-3">
+              {footerSocialIcons.map((item) => (
+                <span
+                  key={item.id}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-theme-surface-alt"
+                >
+                  <Image src={item.icon} alt={item.name} width={16} height={16} />
+                </span>
+              ))}
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Separator Line */}
-        <div className="mt-8 h-[3px] bg-[var(--brown-600)]" />
-
-        {/* Copyright Bar */}
-        <div className="flex flex-col gap-2 pt-5 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] lg:pb-6 text-sm text-gray-200 header-font text-center lg:flex-row lg:justify-between lg:items-center lg:text-left px-4 sm:px-6 lg:px-8 max-w-[1400px] mx-auto">
-          <p className="header-font">
-            Copyright © {new Date().getFullYear()} {companyName}. All Rights Reserved.
+      {/* Bottom bar */}
+      <div className="border-t border-theme-border">
+        <div className="w-full max-w-[1400px] 2xl:max-w-[1600px] 3xl:max-w-[1800px] mx-auto px-4 sm:px-6 md:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-theme-text-subtle">
+          <p>
+            © {new Date().getFullYear()} {companyName}. All Rights Reserved. Built for
+            contemporary lifestyle.
           </p>
-
-          <p className="header-font">
-            Design and Developed By{" "}
-            <a
-              href="https://proz.in/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:underline hover:text-white transition-colors cursor-pointer"
-            >
-              ProZ Solutions LLP
-            </a>
-            .
-          </p>
+          <div className="flex items-center gap-4 font-semibold uppercase tracking-wide">
+            {PAYMENT_METHODS.map((method) => (
+              <span key={method}>{method}</span>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Contact Form Modal */}
       <ContactFormModal
         open={isContactModalOpen}
         onClose={() => setIsContactModalOpen(false)}
@@ -379,4 +228,3 @@ export function Footer() {
 }
 
 export default Footer;
-

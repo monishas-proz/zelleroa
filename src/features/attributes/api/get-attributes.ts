@@ -46,10 +46,14 @@ export async function deleteAttribute(uuid: string) {
   return response;
 }
 
-export async function addAttributeValue(attributeUuid: string, value: string) {
+export async function addAttributeValue(
+  attributeUuid: string,
+  value: string,
+  priceAdjustment?: number
+) {
   const response = await apiClient.post<AttributeListItem>(
     `/api/admin/attributes/${attributeUuid}/values`,
-    { value }
+    { value, priceAdjustment }
   );
   return response.data as AttributeListItem;
 }
@@ -57,11 +61,12 @@ export async function addAttributeValue(attributeUuid: string, value: string) {
 export async function updateAttributeValue(
   attributeUuid: string,
   valueUuid: string,
-  value: string
+  value: string,
+  priceAdjustment?: number
 ) {
   const response = await apiClient.put<AttributeListItem>(
     `/api/admin/attributes/${attributeUuid}/values/${valueUuid}`,
-    { value }
+    { value, priceAdjustment }
   );
   return response.data as AttributeListItem;
 }

@@ -13,6 +13,8 @@ import {
   getAdminDeliveryOrders,
   getAdminDeliveryStaff,
   assignDelivery,
+  shipViaCourier,
+  refreshCourierTracking,
 } from "../api/delivery.api";
 import type {
   StaffDeliveryListInput,
@@ -21,12 +23,16 @@ import type {
   AdminDeliveryOrdersListInput,
   AdminDeliveryStaffListInput,
   AssignDeliveryInput,
+  ShipViaCourierInput,
+  RefreshCourierTrackingInput,
 } from "../validations/delivery.schema";
 import type {
   StaffDeliveryDetailResponse,
   AssignDeliveryResult,
   DeliveryTransitionResult,
   StaffDeliveriesCountResponse,
+  CourierShipmentResult,
+  RefreshCourierTrackingResult,
 } from "../types/delivery.types";
 
 /* ----------------------- Staff Delivery Queries & Mutations ----------------------- */
@@ -214,6 +220,40 @@ export function useAssignDelivery() {
     meta: {
       successMessage: "Delivery assigned to staff successfully.",
       errorMessage: "Failed to assign delivery",
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: deliveryKeys.all });
+      queryClient.invalidateQueries({ queryKey: orderKeys.all });
+      queryClient.invalidateQueries({ queryKey: adminOrderKeys.all });
+    },
+  });
+}
+
+export function useShipViaCourier() {
+  const queryClient = useQueryClient();
+
+  return useMutation<CourierShipmentResult, Error, ShipViaCourierInput>({
+    mutationFn: (input: ShipViaCourierInput) => shipViaCourier(input),
+    meta: {
+      successMessage: "Shipment booked with Delhivery.",
+      errorMessage: "Failed to book Delhivery shipment",
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: deliveryKeys.all });
+      queryClient.invalidateQueries({ queryKey: orderKeys.all });
+      queryClient.invalidateQueries({ queryKey: adminOrderKeys.all });
+    },
+  });
+}
+
+export function useRefreshCourierTracking() {
+  const queryClient = useQueryClient();
+
+  return useMutation<RefreshCourierTrackingResult, Error, RefreshCourierTrackingInput>({
+    mutationFn: (input: RefreshCourierTrackingInput) => refreshCourierTracking(input),
+    meta: {
+      successMessage: "Tracking updated.",
+      errorMessage: "Failed to refresh tracking",
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: deliveryKeys.all });

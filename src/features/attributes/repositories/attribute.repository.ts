@@ -114,21 +114,33 @@ export const attributeRepository = {
     const existing = await db.productAttribute.findFirst({ where: { uuid } });
     if (!existing) return null;
 
+    const suffix = `-deleted-${existing.id}`;
+    const slug = `${existing.slug.slice(0, 120 - suffix.length)}${suffix}`;
+
     return db.productAttribute.update({
       where: { id: existing.id },
       data: {
         is_active: false,
+        // Free up the unique slug so a new attribute can reuse it; the
+        // deleted row keeps a namespaced slug instead of blocking inserts.
+        slug,
         ...(adminId ? { updated_by: adminId } : {}),
       },
     });
   },
 
-  async createValue(attributeId: bigint, value: string, adminId?: bigint | null) {
+  async createValue(
+    attributeId: bigint,
+    value: string,
+    adminId?: bigint | null,
+    priceAdjustment?: number
+  ) {
     return db.attributeValue.create({
       data: {
         uuid: crypto.randomUUID(),
         attributeId,
         value,
+        price_adjustment: priceAdjustment ?? 0,
         created_by: adminId ?? undefined,
         updated_by: adminId ?? undefined,
       },
@@ -139,13 +151,22 @@ export const attributeRepository = {
     return db.attributeValue.findFirst({ where: { uuid, is_active: true } });
   },
 
-  async updateValueByUuid(uuid: string, value: string, adminId?: bigint | null) {
+  async updateValueByUuid(
+    uuid: string,
+    value: string | undefined,
+    adminId?: bigint | null,
+    priceAdjustment?: number
+  ) {
     const existing = await db.attributeValue.findFirst({ where: { uuid } });
     if (!existing) return null;
 
     return db.attributeValue.update({
       where: { id: existing.id },
-      data: { value, updated_by: adminId ?? undefined },
+      data: {
+        ...(value !== undefined ? { value } : {}),
+        ...(priceAdjustment !== undefined ? { price_adjustment: priceAdjustment } : {}),
+        updated_by: adminId ?? undefined,
+      },
     });
   },
 

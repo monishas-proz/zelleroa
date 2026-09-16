@@ -2,9 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Heart } from "lucide-react";
+import { Heart, ShoppingCart } from "lucide-react";
 import { formatPrice, getImageUrl } from "@/lib/utils";
 import { ProductImage } from "@/components/common/ProductImage";
+import { ProductRating } from "@/features/products/components/ProductRating";
+import { usePublicProductReviews } from "@/features/reviews/hooks/use-public-reviews";
 import type { StorefrontProduct } from "@/constants/storefront";
 
 export interface SnackCardVariant {
@@ -52,6 +54,8 @@ export interface SnackCardProps {
   fallbackPrice?: number;
   /** Optional preformatted price range text (e.g. "₹135.00 – ₹260.00") */
   priceRangeText?: string;
+  /** Fetch and show the real average rating/review count for this product. Off by default to avoid firing a reviews request per card in large grids. */
+  showRating?: boolean;
 }
 
 export function SnackCard({
@@ -73,12 +77,19 @@ export function SnackCard({
   product,
   fallbackPrice,
   priceRangeText,
+  showRating = false,
 }: SnackCardProps) {
   // If product prop is supplied, derive fields from it
   const resolvedId = id || product?.productId || product?.id || "";
   const resolvedName = name || product?.name || "Fashion Item";
   const resolvedImage = image || product?.image || "";
   const resolvedHref = href || (resolvedId ? `/products/${resolvedId}` : "#");
+
+  const { data: reviewsData } = usePublicProductReviews(resolvedId, {
+    enabled: showRating && !!resolvedId,
+  });
+  const avgRating = reviewsData?.ratingSummary?.averageRating ?? 0;
+  const reviewCount = reviewsData?.ratingSummary?.totalReviews ?? 0;
 
   // Derive variants from StorefrontProduct if variants prop not explicitly given
   const resolvedVariants: SnackCardVariant[] = React.useMemo(() => {
@@ -128,10 +139,10 @@ export function SnackCard({
 
   return (
     <div
-      className={`group bg-[var(--theme-surface)]  pb-3 flex flex-col justify-between w-full max-w-sm transition-all duration-300 hover:shadow-md hover:border-[var(--brown-700)]/40 ${className}`}
+      className={`group bg-theme-surface rounded-xl border border-theme-border pb-3 flex flex-col justify-between w-full max-w-sm transition-all duration-300 hover:shadow-md hover:border-theme-primary/40 ${className}`}
     >
       {/* 1. Square Product Image Container */}
-      <div className="relative aspect-square w-full overflow-hidden bg-[var(--cream-100)]">
+      <div className="relative aspect-square w-full overflow-hidden rounded-t-xl bg-theme-surface-alt">
         <Link href={resolvedHref} className="block w-full h-full">
           <ProductImage
             src={resolvedImage}
@@ -142,9 +153,9 @@ export function SnackCard({
           />
         </Link>
 
-        {/* Discount Badge (Top-Left) using global danger color */}
+        {/* Discount Badge (Top-Left) */}
         {discount > 0 && (
-          <div className="absolute top-2.5 left-2.5 z-10 bg-[var(--danger-base)] text-white font-extrabold text-[11px] sm:text-xs px-2 py-0.5 uppercase tracking-wider rounded-[2px] shadow-xs pointer-events-none">
+          <div className="absolute top-2.5 left-2.5 z-10 bg-amber-100 text-amber-900 font-extrabold text-[11px] sm:text-xs px-2 py-0.5 uppercase tracking-wider rounded shadow-xs pointer-events-none">
             {discount}% OFF
           </div>
         )}
@@ -171,24 +182,27 @@ export function SnackCard({
       </div>
 
       {/* 2. Middle Info Row: Title on Left, Variants + Price on Right */}
-      <div className="mt-3.5 sm:mt-4 flex items-start justify-between gap-3 px-0.5">
-        {/* Left Column: Product/Variant Title using global brown typography */}
+      <div className="mt-3.5 sm:mt-4 flex items-start justify-between gap-3 px-3">
+        {/* Left Column: Product/Variant Title */}
         <div className="flex-1 pr-1 min-w-0">
           {subtitle && (
-            <p className="text-[11px] sm:text-xs text-stone-500 font-medium truncate mb-0.5">
+            <p className="text-[11px] sm:text-xs text-theme-text-subtle font-medium truncate mb-0.5">
               {subtitle}
             </p>
           )}
           <Link href={resolvedHref} className="block">
-            <h3 className="font-extrabold text-[var(--brown-900)] uppercase text-sm sm:text-base md:text-[17px] tracking-tight leading-tight line-clamp-2 text-hover-primary transition-colors">
+            <h3 className="font-bold text-theme-text-primary text-sm sm:text-base tracking-tight leading-tight line-clamp-2 text-hover-primary transition-colors">
               {resolvedName}
             </h3>
           </Link>
+          {showRating && reviewCount > 0 && (
+            <ProductRating rating={avgRating} reviewCount={reviewCount} size="sm" className="mt-1" />
+          )}
         </div>
 
         {/* Right Column: Variant Selector & Prices */}
         <div className="flex flex-col items-end shrink-0">
-          {/* Variant Selector Pills using global brown colors */}
+          {/* Variant Selector Pills */}
           {resolvedVariants.length > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap justify-end">
               {resolvedVariants.map((v) => {
@@ -198,10 +212,10 @@ export function SnackCard({
                     key={v.id}
                     type="button"
                     onClick={() => handleSelectVariant(v.id)}
-                    className={`px-2 sm:px-2.5 py-0.5 text-xs font-bold rounded-[2px] transition-all cursor-pointer select-none ${
+                    className={`px-2 sm:px-2.5 py-0.5 text-xs font-bold rounded transition-all cursor-pointer select-none ${
                       isSelected
-                        ? "bg-[var(--brown-700)] text-white border border-[var(--brown-700)]"
-                        : "bg-white text-[var(--brown-700)] border border-[var(--brown-700)] hover:bg-[var(--cream-50)]"
+                        ? "bg-theme-primary text-white border border-theme-primary"
+                        : "bg-white text-theme-primary border border-theme-primary hover:bg-theme-primary-light"
                     }`}
                   >
                     {typeof v.label === "string"
@@ -218,12 +232,12 @@ export function SnackCard({
           {/* Price & Strikethrough Row */}
           <div className="flex items-baseline gap-1.5 sm:gap-2 mt-1.5 justify-end">
             {priceRangeText && resolvedVariants.length === 0 ? (
-              <span className="font-bold text-[var(--brown-900)] text-sm sm:text-base tracking-tight">
+              <span className="font-bold text-theme-text-primary text-sm sm:text-base tracking-tight">
                 {priceRangeText}
               </span>
             ) : (
               <>
-                <span className="font-bold text-[var(--brown-900)] text-sm sm:text-base tracking-tight">
+                <span className="font-bold text-theme-text-primary text-sm sm:text-base tracking-tight">
                   {formatPrice(currentPrice)}
                 </span>
 
@@ -238,14 +252,15 @@ export function SnackCard({
         </div>
       </div>
 
-      {/* 3. Bottom Action: Bright Golden "ADD TO CART" Button using global .btn-yellow */}
-      <div className="w-full flex justify-end mt-3.5 sm:mt-4">
+      {/* 3. Bottom Action: "Add to Cart" Button */}
+      <div className="w-full px-3 mt-3.5 sm:mt-4">
         <button
           type="button"
           disabled={disabled || isLoading || (activeVariant && activeVariant.inStock === false)}
           onClick={() => onAddToCart?.(activeVariant?.id)}
-          className="w-[75%] sm:w-[70%] btn-yellow text-[var(--brown-900)] hover:scale-[1.02] active:scale-[0.98] font-extrabold text-xs sm:text-sm tracking-wider uppercase py-2.5 sm:py-3 px-4 rounded-[2px] shadow-xs flex items-center justify-center transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-theme-primary-light text-theme-primary hover:bg-theme-primary hover:text-theme-primary-fg font-bold text-xs sm:text-sm tracking-wide uppercase py-2.5 sm:py-3 px-4 rounded-lg shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
+          <ShoppingCart className="w-4 h-4" strokeWidth={2} />
           {isLoading
             ? "Adding..."
             : activeVariant?.inStock === false

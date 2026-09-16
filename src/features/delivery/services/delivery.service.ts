@@ -1,6 +1,12 @@
 import { ApiError } from "@/lib/api/api-error";
 import { deliveryRepository } from "../repositories/delivery.repository";
 import { userRepository } from "@/features/users/repositories/user.repository";
+import {
+  isDelhiveryConfigured,
+  createDelhiveryShipment,
+  trackDelhiveryShipment,
+  getDelhiveryTrackingUrl,
+} from "@/lib/shipping/delhivery-client";
 import type {
   AdminDeliveryOrdersListInput,
   AdminDeliveryStaffListInput,
@@ -8,6 +14,8 @@ import type {
   StaffDeliveryListInput,
   MarkDeliveredInput,
   MarkFailedInput,
+  ShipViaCourierInput,
+  RefreshCourierTrackingInput,
 } from "../validations/delivery.schema";
 import type {
   AdminDeliveryOrderItem,
@@ -18,7 +26,32 @@ import type {
   DeliveryTransitionResult,
   DeliveryAddressInfo,
   StaffDeliveriesCountResponse,
+  CourierShipmentResult,
+  RefreshCourierTrackingResult,
 } from "../types/delivery.types";
+
+/**
+ * Very rough classification of Delhivery's free-text scan statuses into the
+ * shipment/order lifecycle this app already tracks. Delhivery's actual status
+ * vocabulary (Manifested, In Transit, Dispatched, Pending, RTO, etc.) should
+ * be reconciled against this once live tracking responses are available.
+ */
+function classifyDelhiveryStatus(
+  rawStatus: string
+): "in_transit" | "out_for_delivery" | "delivered" | "failed" | null {
+  const status = rawStatus.trim().toLowerCase();
+  if (status.includes("deliver") && !status.includes("out for")) return "delivered";
+  if (status.includes("out for delivery") || status.includes("dispatched")) {
+    return "out_for_delivery";
+  }
+  if (status.includes("rto") || status.includes("undelivered") || status.includes("failed")) {
+    return "failed";
+  }
+  if (status.includes("transit") || status.includes("manifested") || status.includes("pending")) {
+    return "in_transit";
+  }
+  return null;
+}
 
 function formatShippingAddress(addresses: any[]): DeliveryAddressInfo | null {
   if (!addresses || addresses.length === 0) return null;
@@ -545,6 +578,168 @@ export const deliveryService = {
       orderId: result.order.uuid || String(result.order.id),
       shipmentStatus: result.shipment.status,
       orderStatus: result.order.order_status,
+    };
+  },
+
+  async shipViaDelhivery(
+    input: ShipViaCourierInput,
+    adminEmail?: string | null
+  ): Promise<CourierShipmentResult> {
+    if (!isDelhiveryConfigured()) {
+      throw ApiError.badRequest(
+        "Delhivery is not configured. Set DELHIVERY_API_BASE_URL, DELHIVERY_API_TOKEN and DELHIVERY_PICKUP_LOCATION."
+      );
+    }
+
+    const adminId = await getAdminInternalId(adminEmail);
+
+    const order = await deliveryRepository.findOrderForCourierShipment(input.orderId);
+    if (!order) {
+      throw ApiError.notFound("Order not found");
+    }
+
+    if (order.order_status !== "packed") {
+      throw ApiError.badRequest(
+        `Cannot ship order with status '${order.order_status}'. Order must be in 'packed' status.`
+      );
+    }
+
+    const activeShipment = await deliveryRepository.findActiveShipmentByOrderId(order.id);
+    if (activeShipment) {
+      throw ApiError.conflict("Order already has an active shipment");
+    }
+
+    const shippingAddress =
+      order.address.find((a) => a.type === "shipping") ?? order.address[0] ?? null;
+    if (!shippingAddress) {
+      throw ApiError.badRequest("Order has no shipping address to ship to");
+    }
+
+    const quantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+
+    let created;
+    try {
+      created = await createDelhiveryShipment({
+        orderNumber: order.orderNumber,
+        paymentMode: order.payment_status === "paid" ? "Prepaid" : "COD",
+        codAmount: order.payment_status === "paid" ? 0 : Number(order.totalAmount),
+        totalAmount: Number(order.totalAmount),
+        quantity: quantity || 1,
+        consignee: {
+          name: shippingAddress.full_name,
+          addressLine1: shippingAddress.address_line1,
+          addressLine2: shippingAddress.address_line2,
+          city: shippingAddress.city,
+          state: shippingAddress.state,
+          pincode: shippingAddress.pincode,
+          phone: shippingAddress.phone,
+        },
+      });
+    } catch (error) {
+      throw ApiError.badRequest(
+        error instanceof Error ? error.message : "Failed to create Delhivery shipment"
+      );
+    }
+
+    const partner = await deliveryRepository.findOrCreateDelhiveryPartner(adminId);
+
+    const { shipment } = await deliveryRepository.createCourierShipmentTransaction({
+      orderId: order.id,
+      partnerId: partner.id,
+      trackingNumber: created.waybill,
+      adminId,
+    });
+
+    return {
+      id: shipment.uuid || String(shipment.id),
+      orderId: order.uuid || String(order.id),
+      carrier: partner.name,
+      trackingNumber: created.waybill,
+      trackingUrl: getDelhiveryTrackingUrl(created.waybill),
+      status: shipment.status,
+    };
+  },
+
+  async refreshCourierTracking(
+    input: RefreshCourierTrackingInput,
+    adminEmail?: string | null
+  ): Promise<RefreshCourierTrackingResult> {
+    if (!isDelhiveryConfigured()) {
+      throw ApiError.badRequest(
+        "Delhivery is not configured. Set DELHIVERY_API_BASE_URL, DELHIVERY_API_TOKEN and DELHIVERY_PICKUP_LOCATION."
+      );
+    }
+
+    const adminId = await getAdminInternalId(adminEmail);
+
+    const shipment = await deliveryRepository.findCourierShipmentByUuid(input.shipmentId);
+    if (!shipment) {
+      throw ApiError.notFound("Shipment not found");
+    }
+    if (!shipment.tracking_number) {
+      throw ApiError.badRequest("This shipment has no courier tracking number");
+    }
+
+    let tracking;
+    try {
+      tracking = await trackDelhiveryShipment(shipment.tracking_number);
+    } catch (error) {
+      throw ApiError.badRequest(
+        error instanceof Error ? error.message : "Failed to fetch Delhivery tracking"
+      );
+    }
+
+    const knownKeys = new Set(
+      (shipment.shipment_tracking || []).map(
+        (t) => `${t.status}|${t.tracked_at?.toISOString() ?? ""}`
+      )
+    );
+
+    const newScans = tracking.scans
+      .filter((scan) => {
+        const trackedAt = scan.scanDateTime ? new Date(scan.scanDateTime) : new Date();
+        return !knownKeys.has(`${scan.status}|${trackedAt.toISOString()}`);
+      })
+      .map((scan) => ({
+        status: scan.status,
+        location: scan.location,
+        note: scan.instructions,
+        trackedAt: scan.scanDateTime ? new Date(scan.scanDateTime) : new Date(),
+      }));
+
+    const classification = classifyDelhiveryStatus(tracking.status);
+    const finalOrderStatus =
+      classification === "delivered"
+        ? "delivered"
+        : classification === "out_for_delivery"
+          ? "out_for_delivery"
+          : classification === "in_transit" && shipment.orders.order_status === "packed"
+            ? "shipped"
+            : undefined;
+
+    if (newScans.length > 0 || classification) {
+      await deliveryRepository.appendCourierTrackingTransaction({
+        shipmentId: shipment.id,
+        orderId: shipment.orders.id,
+        newScans,
+        finalShipmentStatus: classification ?? undefined,
+        finalOrderStatus,
+        adminId,
+      });
+    }
+
+    const refreshed = await deliveryRepository.findCourierShipmentByUuid(input.shipmentId);
+
+    return {
+      id: shipment.uuid || String(shipment.id),
+      orderId: shipment.orders.uuid || String(shipment.orders.id),
+      status: refreshed?.status || shipment.status,
+      timeline: (refreshed?.shipment_tracking || []).map((t) => ({
+        status: t.status,
+        location: t.location,
+        note: t.note,
+        trackedAt: t.tracked_at,
+      })),
     };
   },
 };

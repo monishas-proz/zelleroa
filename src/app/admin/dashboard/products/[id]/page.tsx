@@ -1183,6 +1183,7 @@ export default function AdminProductDetailsPage() {
             categoryId: product.categoryId || "",
             brandId: product.brandId || "",
             hsnCodeId: product.hsnCodeId || "",
+            gender: product.gender || "unisex",
           }}
           initialImageUrl={primaryProductImage}
           isEditing
@@ -1231,6 +1232,8 @@ export default function AdminProductDetailsPage() {
           <VariantForm
             fixedProductId={canonicalProductId}
             fixedProductSlug={product.slug}
+            categoryUuid={product.categoryId}
+            productGender={product.gender}
             isLoading={createVariantMutation.isPending}
             submitLabel="Next: Units & Pricing"
             onSubmit={async (formData: VariantFormValues) => {
@@ -1244,7 +1247,9 @@ export default function AdminProductDetailsPage() {
                     description: formData.description || null,
                     colorName: formData.colorName || null,
                     colorHex: formData.colorHex || null,
+                    priceAdjustment: formData.priceAdjustment ?? 0,
                     isFeatured: formData.isFeatured,
+                    attributeValueIds: formData.attributeValueIds || [],
                   },
                 });
                 if (res && (res as any).data) {
@@ -1351,11 +1356,17 @@ export default function AdminProductDetailsPage() {
                   description: editingVariant.description || "",
                   colorName: editingVariant.colorName || "",
                   colorHex: editingVariant.colorHex || "",
+                  priceAdjustment: editingVariant.priceAdjustment ?? 0,
                   isFeatured: editingVariant.isFeatured ?? false,
+                  attributeValueIds: (editingVariant.attributeValues || []).map(
+                    (av) => av.valueId
+                  ),
                 }}
                 isEditing
                 fixedProductId={canonicalProductId}
                 fixedProductSlug={product.slug}
+                categoryUuid={product.categoryId}
+                productGender={product.gender}
                 isLoading={updateVariantMutation.isPending}
                 submitLabel="Update Item"
                 onSubmit={async (formData: VariantFormValues) => {
@@ -1370,7 +1381,9 @@ export default function AdminProductDetailsPage() {
                         description: formData.description || null,
                         colorName: formData.colorName || null,
                         colorHex: formData.colorHex || null,
+                        priceAdjustment: formData.priceAdjustment ?? 0,
                         isFeatured: formData.isFeatured,
+                        attributeValueIds: formData.attributeValueIds || [],
                       },
                     });
                     setEditingVariant(null);

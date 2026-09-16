@@ -8,6 +8,7 @@ import { formatVariantMeasurement } from "../utils/measurement.util";
 import type { Prisma } from "@/generated/prisma";
 import type {
   AdminVariantResponse,
+  AdminVariantAttributeValueResponse,
   VariantUnitPriceResponse,
   GetAdminVariantsParams,
   AdminVariantListParams,
@@ -94,6 +95,7 @@ function formatAdminVariantResponse(
     veg_type?: string | null;
     color_name?: string | null;
     color_hex?: string | null;
+    price_adjustment?: Prisma.Decimal | number | null;
     is_featured?: boolean;
     isActive: boolean;
     out_of_stock?: boolean;
@@ -102,6 +104,10 @@ function formatAdminVariantResponse(
     product?: { uuid: string | null; name: string; slug?: string | null } | null;
     product_variant_images?: Array<{ image_url: string; is_primary: boolean }> | null;
     variant_unit_prices?: VariantUnitPriceWithRelations[] | null;
+    variant_attribute_values?: Array<{
+      product_attributes: { uuid: string | null; name: string; slug: string };
+      attribute_values: { uuid: string | null; value: string; price_adjustment?: Prisma.Decimal | number | null };
+    }> | null;
   },
   cachedProductUuid?: string,
   cachedProductName?: string
@@ -129,6 +135,17 @@ function formatAdminVariantResponse(
     0
   );
 
+  const attributeValues: AdminVariantAttributeValueResponse[] = (
+    variant.variant_attribute_values || []
+  ).map((vav) => ({
+    attributeId: vav.product_attributes.uuid || "",
+    attributeName: vav.product_attributes.name,
+    attributeSlug: vav.product_attributes.slug,
+    valueId: vav.attribute_values.uuid || "",
+    value: vav.attribute_values.value,
+    priceAdjustment: Number(vav.attribute_values.price_adjustment ?? 0),
+  }));
+
   return {
     id: variantUuid,
     productId: productUuid,
@@ -145,6 +162,7 @@ function formatAdminVariantResponse(
     vegType: (variant.veg_type as AdminVariantResponse["vegType"]) || "na",
     colorName: variant.color_name ?? null,
     colorHex: variant.color_hex ?? null,
+    priceAdjustment: Number(variant.price_adjustment ?? 0),
     isFeatured: Boolean(variant.is_featured),
     primaryImage,
     isActive: Boolean(variant.isActive),
@@ -152,6 +170,7 @@ function formatAdminVariantResponse(
     createdAt: variant.createdAt,
     updatedAt: variant.updatedAt,
     unitPrices,
+    attributeValues,
     // Backward-compatible convenience fields mirrored from the default unit price
     measurement: defaultUnitPrice?.measurement,
     sku: defaultUnitPrice?.sku,
@@ -170,6 +189,49 @@ async function getAdminInternalId(email?: string): Promise<bigint | null> {
   const user = await userRepository.findByEmail(email);
   if (!user) return null;
   return BigInt(user.internalId || user.id);
+}
+
+async function resolveAttributeValueInternalIds(uuids: string[]): Promise<bigint[]> {
+  if (!uuids.length) return [];
+  const values = await db.attributeValue.findMany({
+    where: { uuid: { in: uuids }, is_active: true },
+    select: { id: true },
+  });
+  return values.map((v) => v.id);
+}
+
+/**
+ * Rejects a variant whose attribute combination (e.g. Color=Red, Size=M)
+ * exactly matches another active variant of the same product. A variant with
+ * no attributes at all (product has no Size/Color configured) is exempt -
+ * that's the normal single-variant case, not a duplicate.
+ */
+async function assertNoDuplicateAttributeCombination(
+  productId: bigint,
+  attributeValueInternalIds: bigint[],
+  excludeVariantId?: bigint
+): Promise<void> {
+  if (attributeValueInternalIds.length === 0) return;
+
+  const sortedNew = [...attributeValueInternalIds].sort((a, b) =>
+    a < b ? -1 : a > b ? 1 : 0
+  );
+  const existingSets = await variantRepository.findAttributeSetsForProduct(
+    productId,
+    excludeVariantId
+  );
+
+  const duplicate = existingSets.some(
+    (existing) =>
+      existing.attributeValueIds.length === sortedNew.length &&
+      existing.attributeValueIds.every((id, i) => id === sortedNew[i])
+  );
+
+  if (duplicate) {
+    throw ApiError.conflict(
+      "Another item on this product already has this exact combination of attributes"
+    );
+  }
 }
 
 export const variantService = {
@@ -193,6 +255,12 @@ export const variantService = {
       throw ApiError.conflict(`An active variant with slug '${data.slug}' already exists`);
     }
 
+    // 2b. Reject a duplicate attribute combination before writing anything.
+    const newAttributeValueIds = data.attributeValueIds
+      ? await resolveAttributeValueInternalIds(data.attributeValueIds)
+      : [];
+    await assertNoDuplicateAttributeCombination(product.id, newAttributeValueIds);
+
     // 3. Create Variant (item-level only; unit/price combos are managed
     // separately via variantUnitPriceService)
     const variant = await variantRepository.create({
@@ -209,6 +277,7 @@ export const variantService = {
       veg_type: (data.vegType as Prisma.ProductVariantUncheckedCreateInput["veg_type"]) ?? "na",
       color_name: data.colorName ?? null,
       color_hex: data.colorHex ?? null,
+      price_adjustment: data.priceAdjustment ?? 0,
       is_featured: data.isFeatured ?? false,
       isActive: data.isActive !== undefined ? data.isActive : false,
       out_of_stock: data.outOfStock !== undefined ? data.outOfStock : false,
@@ -216,7 +285,16 @@ export const variantService = {
       updated_by: adminId,
     });
 
-    return formatAdminVariantResponse(variant, product.uuid || productUuid, product.name);
+    if (data.attributeValueIds !== undefined) {
+      await variantRepository.setAttributeValuesForVariant(variant.id, newAttributeValueIds);
+    }
+
+    const withAttributes = await variantRepository.findByUuid(variant.uuid);
+    return formatAdminVariantResponse(
+      withAttributes || variant,
+      product.uuid || productUuid,
+      product.name
+    );
   },
 
   async getAllAdminVariants(params: AdminVariantListParams = {}) {
@@ -326,12 +404,31 @@ export const variantService = {
       updateData.slug = normalizedSlug;
     }
 
+    let updateAttributeValueIds: bigint[] | undefined;
+    if (data.attributeValueIds !== undefined) {
+      updateAttributeValueIds = await resolveAttributeValueInternalIds(data.attributeValueIds);
+      await assertNoDuplicateAttributeCombination(
+        product.id,
+        updateAttributeValueIds,
+        existing.id
+      );
+    }
+
     const updated = await variantRepository.updateByUuid(variantUuid, updateData, adminId);
     if (!updated) {
       throw ApiError.notFound("Variant not found");
     }
 
-    return formatAdminVariantResponse(updated, product.uuid || productUuid, product.name);
+    if (updateAttributeValueIds !== undefined) {
+      await variantRepository.setAttributeValuesForVariant(updated.id, updateAttributeValueIds);
+    }
+
+    const withAttributes = await variantRepository.findByUuid(variantUuid);
+    return formatAdminVariantResponse(
+      withAttributes || updated,
+      product.uuid || productUuid,
+      product.name
+    );
   },
 
   async updateVariantByUuid(
@@ -373,12 +470,27 @@ export const variantService = {
       updateData.slug = normalizedSlug;
     }
 
+    let updateAttributeValueIds: bigint[] | undefined;
+    if (data.attributeValueIds !== undefined) {
+      updateAttributeValueIds = await resolveAttributeValueInternalIds(data.attributeValueIds);
+      await assertNoDuplicateAttributeCombination(
+        existing.productId,
+        updateAttributeValueIds,
+        existing.id
+      );
+    }
+
     const updated = await variantRepository.updateByUuid(variantUuid, updateData, adminId);
     if (!updated) {
       throw ApiError.notFound("Variant not found");
     }
 
-    return formatAdminVariantResponse(updated);
+    if (updateAttributeValueIds !== undefined) {
+      await variantRepository.setAttributeValuesForVariant(updated.id, updateAttributeValueIds);
+    }
+
+    const withAttributes = await variantRepository.findByUuid(variantUuid);
+    return formatAdminVariantResponse(withAttributes || updated);
   },
 
   async deleteAdminVariant(
@@ -444,6 +556,9 @@ function buildVariantUpdateData(
   }
   if (data.colorHex !== undefined) {
     updateData.color_hex = data.colorHex;
+  }
+  if (data.priceAdjustment !== undefined) {
+    updateData.price_adjustment = data.priceAdjustment;
   }
   if (data.isFeatured !== undefined) {
     updateData.is_featured = data.isFeatured;

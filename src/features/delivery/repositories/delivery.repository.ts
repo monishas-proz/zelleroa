@@ -488,6 +488,170 @@ export const deliveryRepository = {
     });
   },
 
+  /* ----------------------- Courier (Delhivery) Shipments ----------------------- */
+
+  async findOrCreateDelhiveryPartner(adminId?: bigint | null) {
+    const existing = await db.delivery_partners.findUnique({
+      where: { code: "DELHIVERY" },
+    });
+    if (existing) return existing;
+
+    return db.delivery_partners.create({
+      data: {
+        name: "Delhivery",
+        code: "DELHIVERY",
+        is_active: true,
+        created_by: adminId,
+        updated_by: adminId,
+      },
+    });
+  },
+
+  async findOrderForCourierShipment(orderUuid: string) {
+    return db.order.findFirst({
+      where: { uuid: orderUuid, is_active: true },
+      include: {
+        address: { where: { is_active: true } },
+        items: { where: { is_active: true } },
+      },
+    });
+  },
+
+  async createCourierShipmentTransaction(params: {
+    orderId: bigint;
+    partnerId: bigint;
+    trackingNumber: string;
+    adminId?: bigint | null;
+  }) {
+    const shipmentUuid = crypto.randomUUID();
+
+    return db.$transaction(async (tx) => {
+      const shipment = await tx.shipments.create({
+        data: {
+          uuid: shipmentUuid,
+          order_id: params.orderId,
+          delivery_partner_id: params.partnerId,
+          tracking_number: params.trackingNumber,
+          status: "pending",
+          created_by: params.adminId,
+          updated_by: params.adminId,
+        },
+        include: {
+          delivery_partners: true,
+          orders: { select: { id: true, uuid: true, orderNumber: true } },
+        },
+      });
+
+      await tx.shipment_tracking.create({
+        data: {
+          shipment_id: shipment.id,
+          status: "booked",
+          note: `Shipment booked with Delhivery. AWB: ${params.trackingNumber}`,
+          created_by: params.adminId,
+          updated_by: params.adminId,
+        },
+      });
+
+      const updatedOrder = await tx.order.update({
+        where: { id: params.orderId },
+        data: {
+          order_status: "shipped",
+          updated_by: params.adminId,
+        },
+      });
+
+      await tx.order_status_history.create({
+        data: {
+          order_id: params.orderId,
+          status: "shipped",
+          note: `Shipped via Delhivery. AWB: ${params.trackingNumber}`,
+          changed_by: params.adminId,
+          created_by: params.adminId,
+          updated_by: params.adminId,
+        },
+      });
+
+      return { shipment, order: updatedOrder };
+    });
+  },
+
+  async findCourierShipmentByUuid(uuid: string) {
+    return db.shipments.findFirst({
+      where: { uuid, is_active: true },
+      include: {
+        delivery_partners: true,
+        orders: { select: { id: true, uuid: true, orderNumber: true, order_status: true } },
+        shipment_tracking: { orderBy: { id: "asc" } },
+      },
+    });
+  },
+
+  async appendCourierTrackingTransaction(params: {
+    shipmentId: bigint;
+    orderId: bigint;
+    newScans: { status: string; location: string | null; note: string | null; trackedAt: Date }[];
+    finalShipmentStatus?: "in_transit" | "out_for_delivery" | "delivered" | "failed";
+    finalOrderStatus?: "shipped" | "out_for_delivery" | "delivered";
+    adminId?: bigint | null;
+  }) {
+    if (params.newScans.length === 0 && !params.finalShipmentStatus) {
+      return null;
+    }
+
+    return db.$transaction(async (tx) => {
+      for (const scan of params.newScans) {
+        await tx.shipment_tracking.create({
+          data: {
+            shipment_id: params.shipmentId,
+            status: scan.status,
+            location: scan.location,
+            note: scan.note,
+            tracked_at: scan.trackedAt,
+            created_by: params.adminId,
+            updated_by: params.adminId,
+          },
+        });
+      }
+
+      let updatedShipment = null;
+      if (params.finalShipmentStatus) {
+        updatedShipment = await tx.shipments.update({
+          where: { id: params.shipmentId },
+          data: {
+            status: params.finalShipmentStatus,
+            shipped_at: params.finalShipmentStatus === "out_for_delivery" ? new Date() : undefined,
+            delivered_at: params.finalShipmentStatus === "delivered" ? new Date() : undefined,
+            updated_by: params.adminId,
+          },
+        });
+      }
+
+      let updatedOrder = null;
+      if (params.finalOrderStatus) {
+        updatedOrder = await tx.order.update({
+          where: { id: params.orderId },
+          data: {
+            order_status: params.finalOrderStatus,
+            updated_by: params.adminId,
+          },
+        });
+
+        await tx.order_status_history.create({
+          data: {
+            order_id: params.orderId,
+            status: params.finalOrderStatus,
+            note: `Delhivery tracking update: ${params.finalOrderStatus.replace(/_/g, " ")}`,
+            changed_by: params.adminId,
+            created_by: params.adminId,
+            updated_by: params.adminId,
+          },
+        });
+      }
+
+      return { shipment: updatedShipment, order: updatedOrder };
+    });
+  },
+
   async acceptDeliveryTransaction(
     shipmentId: bigint,
     staffInternalId: bigint

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { indiaPhoneSchema, pincodeSchema } from "@/features/customers/validations/customer-address.schema";
 
 export const ORDER_STATUS_ENUM = [
   "pending",
@@ -27,10 +28,39 @@ export const customerCreateOrderSchema = z
     notes: z.string().max(500, "Notes cannot exceed 500 characters").optional(),
     paymentMethod: z.enum(["CARD", "COD", "UPI"]).default("CARD").optional(),
     paymentDetails: z.record(z.string(), z.any()).optional(),
+    couponCode: z.string().trim().max(50).optional(),
   })
   .strict();
 
 export type CustomerCreateOrderInput = z.infer<typeof customerCreateOrderSchema>;
+
+export const guestCreateOrderSchema = z
+  .object({
+    email: z.string().trim().toLowerCase().email("Invalid email address"),
+    fullName: z
+      .string()
+      .trim()
+      .min(1, "Full name is required")
+      .max(150, "Full name cannot exceed 150 characters"),
+    phone: indiaPhoneSchema,
+    addressLine1: z
+      .string()
+      .trim()
+      .min(1, "Address line 1 is required")
+      .max(255, "Address line 1 cannot exceed 255 characters"),
+    addressLine2: z.string().trim().max(255).optional(),
+    landmark: z.string().trim().max(150).optional(),
+    city: z.string().trim().min(1, "City is required").max(100),
+    state: z.string().trim().min(1, "State is required").max(100),
+    pincode: pincodeSchema,
+    notes: z.string().max(500, "Notes cannot exceed 500 characters").optional(),
+    paymentMethod: z.enum(["COD"]).default("COD").optional(),
+    paymentDetails: z.record(z.string(), z.any()).optional(),
+    couponCode: z.string().trim().max(50).optional(),
+  })
+  .strict();
+
+export type GuestCreateOrderInput = z.infer<typeof guestCreateOrderSchema>;
 
 export const customerOrdersQuerySchema = z
   .object({

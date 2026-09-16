@@ -337,4 +337,104 @@ export const returnRepository = {
       };
     });
   },
+
+  async findPaymentByOrderId(orderId: bigint) {
+    return db.payment.findFirst({ where: { orderId } });
+  },
+
+  /**
+   * Retroactively records the COD collection as a Payment row, for orders that
+   * were paid on delivery and so never went through the online payment flow
+   * (the only place Payment rows are normally created). Needed so a refund -
+   * whose schema requires a payment_id - has something to attach to.
+   */
+  async findOrCreateCodPayment(params: {
+    orderId: bigint;
+    amount: number;
+    adminId: bigint;
+  }) {
+    const existing = await db.payment.findFirst({ where: { orderId: params.orderId } });
+    if (existing) return existing;
+
+    let codMethod = await db.payment_methods.findFirst({ where: { code: "COD" } });
+    if (!codMethod) {
+      codMethod = await db.payment_methods.create({
+        data: { name: "Cash on Delivery", code: "COD", is_active: true },
+      });
+    }
+
+    return db.payment.create({
+      data: {
+        orderId: params.orderId,
+        payment_method_id: codMethod.id,
+        amount: params.amount,
+        currency: "INR",
+        status: "success",
+        created_by: params.adminId,
+        updated_by: params.adminId,
+      },
+    });
+  },
+
+  async refundReturnTransaction(params: {
+    returnRequestId: bigint;
+    orderId: bigint;
+    paymentId: bigint;
+    amount: number;
+    refundStatus: "initiated" | "completed";
+    adminId: bigint;
+  }) {
+    const now = new Date();
+
+    return db.$transaction(async (tx) => {
+      const refund = await tx.refunds.create({
+        data: {
+          payment_id: params.paymentId,
+          order_id: params.orderId,
+          amount: params.amount,
+          reason: "Return approved and refunded",
+          status: params.refundStatus,
+          processed_at: params.refundStatus === "completed" ? now : null,
+          created_by: params.adminId,
+          updated_by: params.adminId,
+        },
+      });
+
+      const updatedReturn = await tx.return_requests.update({
+        where: { id: params.returnRequestId },
+        data: {
+          status: "refunded",
+          updated_at: now,
+          updated_by: params.adminId,
+        },
+        include: returnDetailInclude,
+      });
+
+      const updatedOrder = await tx.order.update({
+        where: { id: params.orderId },
+        data: {
+          payment_status: "refunded",
+          updatedAt: now,
+          updated_by: params.adminId,
+        },
+      });
+
+      await tx.order_status_history.create({
+        data: {
+          order_id: params.orderId,
+          status: "returned",
+          note:
+            params.refundStatus === "completed"
+              ? `Refund of ₹${params.amount} completed`
+              : `Refund of ₹${params.amount} initiated`,
+          changed_by: params.adminId,
+          is_active: true,
+          created_by: params.adminId,
+          updated_by: params.adminId,
+        },
+      });
+
+      return { refund, returnRequest: updatedReturn, order: updatedOrder };
+    });
+  },
 };

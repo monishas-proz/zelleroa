@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -36,6 +36,7 @@ import {
 } from "@/features/customers/hooks/use-customer-address";
 import {
   useCreateCustomerOrder,
+  useCreateGuestOrder,
   CUSTOMER_ORDERS_QUERY_KEY,
 } from "@/features/customers/hooks/use-customer-orders";
 import { customerPaymentApi } from "@/features/customers/api/customer-payment.api";
@@ -87,7 +88,7 @@ function CheckoutSkeleton() {
 export default function CheckoutPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: session, status: authStatus } = useSession();
+  const { status: authStatus } = useSession();
   const { isOrderPlaced, setIsOrderPlaced } = useCheckout();
 
   // Customer Module TanStack Query hooks
@@ -96,6 +97,10 @@ export default function CheckoutPage() {
     useCustomerAddresses();
   const createAddressMutation = useCreateCustomerAddress();
   const createOrderMutation = useCreateCustomerOrder();
+  const createGuestOrderMutation = useCreateGuestOrder();
+
+  const isGuest = authStatus !== "loading" && authStatus !== "authenticated";
+  const [guestEmail, setGuestEmail] = useState<string>("");
 
   // Selected state
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
@@ -131,6 +136,10 @@ export default function CheckoutPage() {
   });
   const [addressFormError, setAddressFormError] = useState<string | null>(null);
 
+  // Online payment stays a logged-in-only convenience for now; guests are COD only.
+  useEffect(() => {
+    if (isGuest) setPaymentMethod("COD");
+  }, [isGuest]);
 
   // Effective selected address (fall back to default or first available)
   const effectiveAddressId = useMemo(() => {
@@ -156,10 +165,7 @@ export default function CheckoutPage() {
     return <CheckoutSkeleton />;
   }
 
-  if (authStatus === "unauthenticated" || !session) {
-    router.push("/login?callbackUrl=/checkout");
-    return null;
-  }
+  // Guests can check out too - no login redirect here.
 
   // Order placed confirmation guard (prevents flashing empty cart screen)
   if (isOrderPlaced) {
@@ -308,16 +314,87 @@ export default function CheckoutPage() {
     }
   };
 
+  // Place Order Handler (guest)
+  const handlePlaceGuestOrder = async () => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())) {
+      setCheckoutError("Please enter a valid email address to receive your order confirmation.");
+      return;
+    }
+    if (!newAddressForm.fullName.trim()) {
+      setCheckoutError("Full name is required.");
+      return;
+    }
+    if (!/^[6-9]\d{9}$/.test(newAddressForm.phone.replace(/\D/g, "").slice(-10))) {
+      setCheckoutError("Please enter a valid 10-digit Indian phone number.");
+      return;
+    }
+    if (!newAddressForm.addressLine1.trim()) {
+      setCheckoutError("Address line 1 is required.");
+      return;
+    }
+    if (!newAddressForm.city.trim()) {
+      setCheckoutError("City is required.");
+      return;
+    }
+    if (!/^\d{6}$/.test(newAddressForm.pincode.trim())) {
+      setCheckoutError("Please enter a valid 6-digit PIN code.");
+      return;
+    }
+
+    try {
+      const cleanPhone = newAddressForm.phone.startsWith("+91")
+        ? newAddressForm.phone
+        : `+91${newAddressForm.phone.replace(/\D/g, "").slice(-10)}`;
+
+      const order = await createGuestOrderMutation.mutateAsync({
+        email: guestEmail.trim(),
+        fullName: newAddressForm.fullName.trim(),
+        phone: cleanPhone,
+        addressLine1: newAddressForm.addressLine1.trim(),
+        addressLine2: newAddressForm.addressLine2.trim() || undefined,
+        landmark: newAddressForm.landmark.trim() || undefined,
+        city: newAddressForm.city.trim(),
+        state: newAddressForm.state.trim(),
+        pincode: newAddressForm.pincode.trim(),
+        notes: orderNotes.trim() || undefined,
+        paymentMethod: "COD",
+      });
+
+      const orderId = (order as any)?.id;
+      const orderNumber = (order as any)?.orderNumber;
+
+      setIsOrderPlaced(true);
+      queryClient.invalidateQueries({ queryKey: CUSTOMER_ORDERS_QUERY_KEY, refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["customer", "cart"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["cart"], refetchType: "all" });
+
+      const params = new URLSearchParams();
+      if (orderId) params.set("orderId", String(orderId));
+      if (orderNumber) params.set("orderNumber", String(orderNumber));
+      router.push(`/checkout/success${params.toString() ? `?${params.toString()}` : ""}`);
+    } catch (err: any) {
+      setIsOrderPlaced(false);
+      setCheckoutError(
+        err.message || "Failed to place your order. Please check your details and try again."
+      );
+    }
+  };
+
   // Place Order Handler
   const handlePlaceOrder = async () => {
     setCheckoutError(null);
 
-    if (!effectiveAddressId) {
-      setCheckoutError("Please select or add a delivery address to proceed.");
+    if (isProcessingPayment || isVerifyingPayment || createOrderMutation.isPending || createGuestOrderMutation.isPending) {
       return;
     }
 
-    if (isProcessingPayment || isVerifyingPayment || createOrderMutation.isPending) {
+    if (isGuest) {
+      await handlePlaceGuestOrder();
+      return;
+    }
+
+    if (!effectiveAddressId) {
+      setCheckoutError("Please select or add a delivery address to proceed.");
       return;
     }
 
@@ -431,7 +508,7 @@ export default function CheckoutPage() {
                 </h2>
               </div>
 
-              {!isAddingAddress && (
+              {!isAddingAddress && !isGuest && (
                 <Button
                   type="button"
                   variant="outline"
@@ -446,7 +523,7 @@ export default function CheckoutPage() {
             </div>
 
             {/* Address Selection List */}
-            {!isAddingAddress && (
+            {!isAddingAddress && !isGuest && (
               <div className="space-y-3">
                 {addresses.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-theme-border p-6 text-center">
@@ -524,27 +601,51 @@ export default function CheckoutPage() {
             )}
 
             {/* Inline Add Address Form */}
-            {isAddingAddress && (
+            {(isAddingAddress || isGuest) && (
               <form
-                onSubmit={handleCreateAddress}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!isGuest) void handleCreateAddress(e);
+                }}
                 className="rounded-xl border border-theme-border bg-theme-surface-warm p-4 sm:p-5 space-y-4"
               >
                 <div className="flex items-center justify-between border-b border-theme-border pb-2.5">
                   <h3 className="text-sm font-bold text-theme-text-primary">
-                    New Delivery Address
+                    {isGuest ? "Your Contact & Delivery Details" : "New Delivery Address"}
                   </h3>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingAddress(false)}
-                    className="text-theme-text-subtle hover:text-theme-text-primary"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                  {!isGuest && (
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingAddress(false)}
+                      className="text-theme-text-subtle hover:text-theme-text-primary"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
 
                 {addressFormError && (
                   <div className="rounded-lg bg-red-50 border border-red-200 p-2.5 text-xs text-red-600">
                     {addressFormError}
+                  </div>
+                )}
+
+                {isGuest && (
+                  <div>
+                    <label className="block text-xs font-semibold text-theme-text-secondary mb-1">
+                      Email Address *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="e.g. you@example.com"
+                      value={guestEmail}
+                      onChange={(e) => setGuestEmail(e.target.value)}
+                      className="w-full min-h-[44px] rounded-xl border border-theme-border-input bg-white px-3 text-xs text-theme-text-primary placeholder:text-theme-text-muted focus:border-theme-primary focus:outline-none"
+                    />
+                    <p className="mt-1 text-[11px] text-theme-text-muted">
+                      We&apos;ll send your order confirmation here.
+                    </p>
                   </div>
                 )}
 
@@ -646,32 +747,34 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2.5 pt-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsAddingAddress(false)}
-                    className="min-h-[40px] text-xs font-semibold rounded-xl text-theme-text-subtle"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={createAddressMutation.isPending}
-                    className="min-h-[40px] px-4 text-xs font-bold rounded-xl bg-theme-primary hover:bg-theme-primary-hover text-white"
-                  >
-                    {createAddressMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                        Saving Address...
-                      </>
-                    ) : (
-                      "Save Address"
-                    )}
-                  </Button>
-                </div>
+                {!isGuest && (
+                  <div className="flex items-center justify-end gap-2.5 pt-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsAddingAddress(false)}
+                      className="min-h-[40px] text-xs font-semibold rounded-xl text-theme-text-subtle"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={createAddressMutation.isPending}
+                      className="min-h-[40px] px-4 text-xs font-bold rounded-xl bg-theme-primary hover:bg-theme-primary-hover text-white"
+                    >
+                      {createAddressMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          Saving Address...
+                        </>
+                      ) : (
+                        "Save Address"
+                      )}
+                    </Button>
+                  </div>
+                )}
               </form>
             )}
           </div>
@@ -758,29 +861,43 @@ export default function CheckoutPage() {
                 </h2>
               </div>
 
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-0.5 text-[11px] font-bold text-emerald-700">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                Razorpay Secured
-              </span>
+              {!isGuest && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-0.5 text-[11px] font-bold text-emerald-700">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                  Razorpay Secured
+                </span>
+              )}
             </div>
 
+            {isGuest && (
+              <p className="mb-4 text-[11px] text-theme-text-muted bg-theme-surface-alt/60 border border-theme-border-subtle rounded-lg px-3 py-2">
+                Guest checkout supports Cash on Delivery only.{" "}
+                <Link href="/login?callbackUrl=/checkout" className="font-semibold text-theme-primary hover:underline">
+                  Log in
+                </Link>{" "}
+                to pay online instead.
+              </p>
+            )}
+
             {/* Payment Method Selector Tabs */}
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              <button
-                type="button"
-                onClick={() => setPaymentMethod("CARD")}
-                className={`flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all min-h-[64px] ${
-                  paymentMethod === "CARD" || paymentMethod === "UPI"
-                    ? "border-theme-primary bg-theme-surface-alt font-bold text-theme-primary shadow-xs ring-1 ring-theme-primary"
-                    : "border-theme-border bg-theme-surface text-theme-text-subtle hover:bg-theme-surface-warm"
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <CreditCard className="h-4 w-4 text-theme-primary" />
-                  <span className="text-xs font-black">UPI / Cards / NetBanking</span>
-                </div>
-                <span className="text-[11px] font-medium text-theme-text-muted">Online via Razorpay</span>
-              </button>
+            <div className={`grid gap-3 mb-5 ${isGuest ? "grid-cols-1" : "grid-cols-2"}`}>
+              {!isGuest && (
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("CARD")}
+                  className={`flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all min-h-[64px] ${
+                    paymentMethod === "CARD" || paymentMethod === "UPI"
+                      ? "border-theme-primary bg-theme-surface-alt font-bold text-theme-primary shadow-xs ring-1 ring-theme-primary"
+                      : "border-theme-border bg-theme-surface text-theme-text-subtle hover:bg-theme-surface-warm"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <CreditCard className="h-4 w-4 text-theme-primary" />
+                    <span className="text-xs font-black">UPI / Cards / NetBanking</span>
+                  </div>
+                  <span className="text-[11px] font-medium text-theme-text-muted">Online via Razorpay</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -959,10 +1076,10 @@ export default function CheckoutPage() {
                 onClick={handlePlaceOrder}
                 disabled={
                   createOrderMutation.isPending ||
+                  createGuestOrderMutation.isPending ||
                   isProcessingPayment ||
                   isVerifyingPayment ||
-                  addressesLoading ||
-                  !effectiveAddressId
+                  (!isGuest && (addressesLoading || !effectiveAddressId))
                 }
                 className="w-full min-h-[48px] rounded-xl bg-theme-primary hover:bg-theme-primary-hover text-white font-bold text-sm shadow-md transition-all disabled:opacity-50"
               >
@@ -976,7 +1093,7 @@ export default function CheckoutPage() {
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Redirecting to Payment...
                   </>
-                ) : createOrderMutation.isPending ? (
+                ) : createOrderMutation.isPending || createGuestOrderMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Placing Your Order...

@@ -92,9 +92,9 @@ export default auth(async (req) => {
     return applyCookies(NextResponse.next());
   }
 
+  // /cart and /checkout intentionally left off this list: guest checkout
+  // means anonymous visitors can shop and place an order without an account.
   const protectedCustomerRoutes = [
-    "/cart",
-    "/checkout",
     "/orders",
     "/profile",
     "/wishlist",

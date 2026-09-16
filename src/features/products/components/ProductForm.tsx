@@ -30,10 +30,18 @@ const productFormSchema = z.object({
   hsnCodeId: z
     .string()
     .min(1, "Please select an HSN code"),
+  gender: z.enum(["men", "women", "kids", "unisex"]).optional(),
   productImage: z.string().optional(),
 });
 
 export type ProductFormValues = z.infer<typeof productFormSchema>;
+
+const GENDER_OPTIONS = [
+  { value: "unisex", label: "Unisex" },
+  { value: "men", label: "Men" },
+  { value: "women", label: "Women" },
+  { value: "kids", label: "Kids" },
+];
 
 export interface ProductOption {
   value: string;
@@ -118,6 +126,7 @@ function ProductForm({
       categoryId: initialData?.categoryId || "",
       brandId: defaultBrandId,
       hsnCodeId: initialData?.hsnCodeId || "",
+      gender: initialData?.gender || "unisex",
       productImage: initialImageUrl || "",
     },
   });
@@ -313,7 +322,7 @@ function ProductForm({
           </div>
         </div>
 
-        {/* Row 3: HSN Code */}
+        {/* Row 3: HSN Code & Gender/Audience */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormSelect
             name="hsnCodeId"
@@ -321,6 +330,13 @@ function ProductForm({
             placeholder="Select HSN code"
             options={hsnCodeOptions}
             required
+          />
+
+          <FormSelect
+            name="gender"
+            label="Gender / Audience"
+            placeholder="Select audience"
+            options={GENDER_OPTIONS}
           />
         </div>
 

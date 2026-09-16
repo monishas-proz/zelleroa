@@ -7,6 +7,8 @@ import type {
   AssignDeliveryResult,
   DeliveryTransitionResult,
   StaffDeliveriesCountResponse,
+  CourierShipmentResult,
+  RefreshCourierTrackingResult,
 } from "../types/delivery.types";
 import type {
   StaffDeliveryListInput,
@@ -15,6 +17,8 @@ import type {
   AdminDeliveryOrdersListInput,
   AdminDeliveryStaffListInput,
   AssignDeliveryInput,
+  ShipViaCourierInput,
+  RefreshCourierTrackingInput,
 } from "../validations/delivery.schema";
 
 export interface PaginatedResult<T> {
@@ -345,6 +349,44 @@ export async function assignDelivery(
 
   if (!response.data) {
     throw new Error(response.message || "Failed to assign delivery");
+  }
+
+  return response.data;
+}
+
+/**
+ * Book a Delhivery courier shipment for a packed order (Admin).
+ * Endpoint: POST /api/admin/delivery/ship-courier
+ */
+export async function shipViaCourier(
+  input: ShipViaCourierInput
+): Promise<CourierShipmentResult> {
+  const response = await apiClient.post<CourierShipmentResult>(
+    "/api/admin/delivery/ship-courier",
+    input
+  );
+
+  if (!response.data) {
+    throw new Error(response.message || "Failed to book Delhivery shipment");
+  }
+
+  return response.data;
+}
+
+/**
+ * Pull the latest tracking scans from Delhivery for a shipment (Admin).
+ * Endpoint: POST /api/admin/delivery/refresh-tracking
+ */
+export async function refreshCourierTracking(
+  input: RefreshCourierTrackingInput
+): Promise<RefreshCourierTrackingResult> {
+  const response = await apiClient.post<RefreshCourierTrackingResult>(
+    "/api/admin/delivery/refresh-tracking",
+    input
+  );
+
+  if (!response.data) {
+    throw new Error(response.message || "Failed to refresh tracking");
   }
 
   return response.data;

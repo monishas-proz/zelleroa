@@ -73,7 +73,7 @@ function CartPageSkeleton() {
 }
 
 export default function CartPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
@@ -93,10 +93,7 @@ export default function CartPage() {
     return <CartPageSkeleton />;
   }
 
-  if (status === "unauthenticated" || !session) {
-    router.push("/login?callbackUrl=/cart");
-    return null;
-  }
+  // Guests can view and edit their cart too (guest-session cookie) — no login gate here.
 
   if (error) {
     return (

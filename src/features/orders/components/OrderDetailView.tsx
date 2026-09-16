@@ -14,6 +14,7 @@ import {
   Mail,
   ShieldCheck,
 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { formatDateTime, formatPrice } from "@/lib/utils";
 import { OrderItemsList } from "./OrderItemsList";
@@ -89,6 +90,8 @@ export function OrderDetailView({
   const statusHistory =
     "statusHistory" in order ? order.statusHistory || [] : [];
   const delivery = "delivery" in order ? order.delivery : (order as any).delivery;
+  const courierShipment =
+    "courierShipment" in order ? order.courierShipment : (order as any).courierShipment;
 
   const statusMeta = getStatusBadgeMeta(order.status);
   const paymentStatus = (order as any).paymentStatus || (order as any).payment_status;
@@ -140,6 +143,18 @@ export function OrderDetailView({
               {paymentStatus}
             </span>
           )}
+
+          {/* Download Invoice */}
+          <Link href={`/invoice/${order.id}`} target="_blank" rel="noopener noreferrer">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl text-xs font-semibold min-h-[36px]"
+            >
+              <FileText className="mr-1.5 h-3.5 w-3.5" />
+              Download Invoice
+            </Button>
+          </Link>
 
           {/* Cancel Order Action */}
           {canCancel && (
@@ -305,6 +320,57 @@ export function OrderDetailView({
                 )}
               </div>
             </div>
+
+            {/* Courier Shipment Tracking */}
+            {courierShipment && (
+              <div className="rounded-2xl border border-theme-border bg-theme-surface shadow-2xs overflow-hidden">
+                <div className="bg-theme-surface-alt border-b border-theme-border-subtle px-4 py-3 flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-theme-secondary" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-theme-text-primary">
+                    Shipment Tracking
+                  </h3>
+                </div>
+                <div className="p-4 text-xs space-y-2 text-theme-text-subtle">
+                  <p className="font-bold text-theme-text-primary">
+                    {courierShipment.carrier}
+                  </p>
+                  <p className="font-mono text-theme-text-muted">
+                    AWB: {courierShipment.trackingNumber}
+                  </p>
+                  <span className="inline-block text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded capitalize">
+                    {courierShipment.status.replace(/_/g, " ")}
+                  </span>
+                  {courierShipment.trackingUrl && (
+                    <a
+                      href={courierShipment.trackingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-xs font-semibold text-theme-primary hover:underline pt-1"
+                    >
+                      Track on carrier site →
+                    </a>
+                  )}
+                  {courierShipment.timeline?.length > 0 && (
+                    <ul className="pt-2 space-y-1.5 border-t border-theme-border-subtle mt-2">
+                      {courierShipment.timeline
+                        .slice()
+                        .reverse()
+                        .map((event: any, idx: number) => (
+                          <li key={idx} className="text-[11px] text-theme-text-muted">
+                            <span className="font-semibold text-theme-text-secondary capitalize">
+                              {event.status.replace(/_/g, " ")}
+                            </span>
+                            {event.location ? ` — ${event.location}` : ""}
+                            <span className="block">
+                              {formatDateTime(event.trackedAt)}
+                            </span>
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Order Notes */}

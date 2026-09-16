@@ -8,7 +8,7 @@ export const POST = createApiHandler(
   {
     POST: async (_request, context) => {
       try {
-        const userId = parseInt((context.session?.user as { id?: string })?.id ?? "0");
+        const userId = (context.session?.user as { id?: string })?.id;
         if (!userId) return apiFromError(new Error("Unauthorized"));
         const body = context.body as CheckoutSummarySchemaInput;
         const summary = await orderService.getCheckoutSummary(

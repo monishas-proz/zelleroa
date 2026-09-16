@@ -57,6 +57,15 @@ export interface VariantUnitPriceResponse {
   updatedAt: Date;
 }
 
+export interface AdminVariantAttributeValueResponse {
+  attributeId: string; // Public ProductAttribute UUID
+  attributeName: string;
+  attributeSlug: string;
+  valueId: string; // Public AttributeValue UUID
+  value: string;
+  priceAdjustment: number;
+}
+
 export interface AdminVariantResponse {
   id: string; // Public Variant UUID
   productId: string; // Public Product UUID
@@ -73,6 +82,8 @@ export interface AdminVariantResponse {
   vegType: "veg" | "nonveg" | "vegan" | "na";
   colorName: string | null;
   colorHex: string | null;
+  /** Amount added to the product base price whenever this color is picked. */
+  priceAdjustment: number;
   isFeatured: boolean;
   primaryImage: string | null;
   isActive: boolean;
@@ -81,6 +92,8 @@ export interface AdminVariantResponse {
   updatedAt: Date;
   // Item-level list of all sellable (unit, price) combinations for this variant.
   unitPrices: VariantUnitPriceResponse[];
+  // The specific attribute combination this variant represents (e.g. Color=Red, Size=M).
+  attributeValues: AdminVariantAttributeValueResponse[];
   // Convenience fields mirrored from the default (or first) unit price, kept for
   // backward compatibility with UI/consumers that expect a single price/sku per
   // variant row (e.g. admin list tables). Prefer `unitPrices` for anything new.

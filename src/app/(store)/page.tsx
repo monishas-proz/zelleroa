@@ -1,13 +1,15 @@
 
 import {
-  HeroSlider,
-  CategorySection,
+  HeroIntro,
+  ShopByCategory,
   ProductSection,
-  Banner,
-  Pledge,
-  Tradition,
+  PromoBanner,
+  TrendingNow,
+  DealsSection,
   Features,
+  OccasionEdits,
   Feedback,
+  Newsletter,
   OfferPopup,
   OfferReels,
 } from "@/components/storefront";
@@ -16,15 +18,17 @@ export default function HomePage() {
   return (
     <div className="bg-white">
       <OfferPopup />
-      <HeroSlider />
-      <CategorySection />
+      <HeroIntro />
+      <ShopByCategory />
       <ProductSection />
-      <Banner />
+      <PromoBanner />
+      <TrendingNow />
+      <DealsSection />
       <OfferReels />
-      <Pledge />
-      <Tradition />
       <Features />
+      <OccasionEdits />
       <Feedback />
+      <Newsletter />
     </div>
   );
 }

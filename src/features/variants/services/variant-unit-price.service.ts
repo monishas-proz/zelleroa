@@ -60,6 +60,76 @@ async function getAdminInternalId(email?: string): Promise<bigint | null> {
   return BigInt(user.internalId || user.id);
 }
 
+function skuPart(text: string): string {
+  return text.toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0, 20);
+}
+
+/**
+ * Builds a SKU as {product code}-{Size}-{Color}, skipping whichever parts the
+ * variant doesn't have (e.g. no Size on a Watch). Falls back to appending a
+ * numeric suffix if the generated code collides with an existing SKU.
+ */
+async function generateSku(variant: {
+  product?: { slug?: string | null } | null;
+  color_name?: string | null;
+  variant_attribute_values?: Array<{
+    product_attributes: { name: string };
+    attribute_values: { value: string };
+  }> | null;
+}): Promise<string> {
+  const parts: string[] = [];
+
+  if (variant.product?.slug) {
+    parts.push(skuPart(variant.product.slug));
+  }
+
+  const sizeValue = variant.variant_attribute_values?.find(
+    (vav) => vav.product_attributes.name.toLowerCase() === "size"
+  )?.attribute_values.value;
+  if (sizeValue) parts.push(skuPart(sizeValue));
+
+  const colorValue =
+    variant.color_name ||
+    variant.variant_attribute_values?.find(
+      (vav) => vav.product_attributes.name.toLowerCase() === "color"
+    )?.attribute_values.value;
+  if (colorValue) parts.push(skuPart(colorValue));
+
+  const base = parts.filter(Boolean).join("-") || `ITEM-${Date.now()}`;
+
+  let candidate = base;
+  let suffix = 1;
+  // eslint-disable-next-line no-await-in-loop
+  while (await variantUnitPriceRepository.findBySku(candidate)) {
+    suffix += 1;
+    candidate = `${base}-${suffix}`;
+  }
+  return candidate;
+}
+
+/**
+ * base_price + this variant's color add-on + its linked Size attribute
+ * value's add-on (if any) — used when an admin leaves "Price per pack"
+ * blank instead of typing a fully independent price for every combination.
+ */
+function computeAutoPrice(variant: {
+  product?: { base_price?: Prisma.Decimal | number | null } | null;
+  price_adjustment?: Prisma.Decimal | number | null;
+  variant_attribute_values?: Array<{
+    product_attributes: { name: string };
+    attribute_values: { price_adjustment?: Prisma.Decimal | number | null };
+  }> | null;
+}): number {
+  const productBase = Number(variant.product?.base_price ?? 0);
+  const colorAdjustment = Number(variant.price_adjustment ?? 0);
+  const sizeAdjustment = Number(
+    variant.variant_attribute_values?.find(
+      (vav) => vav.product_attributes.name.toLowerCase() === "size"
+    )?.attribute_values.price_adjustment ?? 0
+  );
+  return productBase + colorAdjustment + sizeAdjustment;
+}
+
 export const variantUnitPriceService = {
   async listByVariantUuid(variantUuid: string): Promise<VariantUnitPriceResponse[]> {
     const variant = await variantRepository.findByUuid(variantUuid);
@@ -88,9 +158,14 @@ export const variantUnitPriceService = {
       throw ApiError.badRequest("Invalid or inactive unit");
     }
 
-    const existingSku = await variantUnitPriceRepository.findBySku(data.sku);
-    if (existingSku) {
-      throw ApiError.conflict(`An active unit price with SKU '${data.sku}' already exists`);
+    let sku = data.sku;
+    if (sku) {
+      const existingSku = await variantUnitPriceRepository.findBySku(sku);
+      if (existingSku) {
+        throw ApiError.conflict(`An active unit price with SKU '${sku}' already exists`);
+      }
+    } else {
+      sku = await generateSku(variant);
     }
 
     const duplicateUnit = await variantUnitPriceRepository.findByVariantAndUnit(
@@ -106,13 +181,23 @@ export const variantUnitPriceService = {
       await variantUnitPriceRepository.unsetDefaultForVariant(variant.id);
     }
 
+    let basePrice = data.basePrice;
+    if (basePrice === undefined) {
+      basePrice = computeAutoPrice(variant);
+      if (basePrice <= 0) {
+        throw ApiError.badRequest(
+          "Enter a price, or set a base price / color add-on / size add-on to auto-calculate one"
+        );
+      }
+    }
+
     const created = await variantUnitPriceRepository.create({
       uuid: crypto.randomUUID(),
       variant_id: variant.id,
       unit_id: unit.id,
       unit_value: data.unitValue,
-      sku: data.sku,
-      base_price: data.basePrice,
+      sku,
+      base_price: basePrice,
       is_default: data.isDefault ?? false,
       isActive: data.isActive !== undefined ? data.isActive : true,
       created_by: adminId,

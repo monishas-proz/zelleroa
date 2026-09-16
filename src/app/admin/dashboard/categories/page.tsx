@@ -43,7 +43,6 @@ export default function AdminCategoriesPage() {
   const allCategories = data?.success && data.data ? data.data : [];
 
   // This page manages top-level categories only (Women, Men, Beauty, ...).
-  // Their children live on the separate "Subcategories" page.
   const rootCategories = useMemo(
     () => allCategories.filter((c) => !c.parentId).sort((a, b) => a.sortOrder - b.sortOrder),
     [allCategories]
@@ -118,7 +117,7 @@ export default function AdminCategoriesPage() {
     <div className="flex flex-1 min-h-0 flex-col">
       <AdminPageHeader
         title="Categories"
-        description="Manage your top-level product categories (e.g. Women, Men, Beauty). Their subcategories are managed separately."
+        description="Manage your product categories (e.g. Women, Men, Beauty)."
       />
       <AdminContent className="flex-1 min-h-0 overflow-hidden">
         <div className="flex h-full flex-col overflow-hidden bg-[var(--color-background)] py-1 rounded-2xl">

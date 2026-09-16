@@ -22,5 +22,6 @@ export const POST = createApiHandler(
   {
     method: "POST",
     bodySchema: verifyEmailOtpSchema,
+    rateLimit: { limit: 10, windowMs: 60_000 },
   }
 );

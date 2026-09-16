@@ -3,6 +3,7 @@ export interface AttributeValueItem {
   value: string;
   isActive: boolean;
   createdAt: Date;
+  priceAdjustment: number;
 }
 
 export interface AttributeListItem {

@@ -138,6 +138,32 @@ export const customerCatalogApi = {
   },
 
   /**
+   * Fetch the current customer's recently viewed products, most recent first.
+   * Postman: GET /api/customer/recently-viewed
+   */
+  async getRecentlyViewed(
+    excludeProductUuid?: string,
+    limit?: number
+  ): Promise<CustomerProductListItemDto[]> {
+    const params = new URLSearchParams();
+    if (excludeProductUuid) params.set("exclude", excludeProductUuid);
+    if (limit) params.set("limit", String(limit));
+    const query = params.toString();
+    const response = await apiClient.get<CustomerProductListItemDto[]>(
+      `/api/customer/recently-viewed${query ? `?${query}` : ""}`
+    );
+    return response.data ?? [];
+  },
+
+  /**
+   * Records a product view for the current customer.
+   * Postman: POST /api/customer/recently-viewed
+   */
+  async recordProductView(productUuid: string): Promise<void> {
+    await apiClient.post("/api/customer/recently-viewed", { productId: productUuid });
+  },
+
+  /**
    * Fetch variants of a specific product with min/max price filter
    * Postman: POST /api/customer/products/:productUuid/variants
    */

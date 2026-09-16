@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { customerCatalogApi } from "../api/customer-catalog.api";
 import type {
   CustomerBrandListInput,
@@ -81,6 +82,42 @@ export function useCustomerRelatedProducts(
     enabled: !!productUuid && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 5,
   });
+}
+
+/**
+ * Fetch the current customer's recently viewed products, most recent first.
+ * Requires login - disabled automatically when signed out.
+ */
+export function useRecentlyViewedProducts(
+  excludeProductUuid?: string,
+  limit?: number
+) {
+  const { status } = useSession();
+  const isAuthenticated = status === "authenticated";
+
+  return useQuery({
+    queryKey: [
+      ...CUSTOMER_CATALOG_QUERY_KEYS.all,
+      "recently-viewed",
+      excludeProductUuid ?? null,
+      limit ?? null,
+    ],
+    queryFn: () => customerCatalogApi.getRecentlyViewed(excludeProductUuid, limit),
+    enabled: isAuthenticated,
+    staleTime: 1000 * 60,
+  });
+}
+
+/** Records a product view for the current customer (no-op while signed out). */
+export function useRecordProductView() {
+  const { status } = useSession();
+  const isAuthenticated = status === "authenticated";
+
+  const mutation = useMutation({
+    mutationFn: (productUuid: string) => customerCatalogApi.recordProductView(productUuid),
+  });
+
+  return { ...mutation, isAuthenticated };
 }
 
 /**

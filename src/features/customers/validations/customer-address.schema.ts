@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const ADDRESS_TYPE_ENUM = ["shipping", "billing"] as const;
 
-const indiaPhoneSchema = z
+export const indiaPhoneSchema = z
   .string()
   .trim()
   .transform((val) => {
@@ -15,7 +15,7 @@ const indiaPhoneSchema = z
     message: "Phone number must be a valid 10-digit Indian number starting with +91 (e.g. +919876543210)",
   });
 
-const pincodeSchema = z
+export const pincodeSchema = z
   .string()
   .trim()
   .refine((val) => /^\d{6}$/.test(val), {

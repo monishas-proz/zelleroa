@@ -17,5 +17,6 @@ export const POST = createApiHandler(
   {
     method: "POST",
     bodySchema: resendForgotPasswordOtpSchema,
+    rateLimit: { limit: 5, windowMs: 60_000 },
   }
 );

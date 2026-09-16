@@ -324,6 +324,7 @@ export default function AdminProductsPage() {
               categoryId: formData.categoryId,
               brandId: formData.brandId,
               hsnCodeId: formData.hsnCodeId,
+              gender: formData.gender,
             };
 
             const created = await createMutation.mutateAsync(payload);
@@ -357,6 +358,7 @@ export default function AdminProductsPage() {
               categoryId: selectedProduct.categoryId || "",
               brandId: selectedProduct.brandId || "",
               hsnCodeId: selectedProduct.hsnCodeId || "",
+              gender: selectedProduct.gender || "unisex",
             }}
             initialImageUrl={selectedProductPrimaryImage}
             isEditing
@@ -372,6 +374,7 @@ export default function AdminProductsPage() {
                 categoryId: formData.categoryId,
                 brandId: formData.brandId,
                 hsnCodeId: formData.hsnCodeId,
+                gender: formData.gender,
               };
 
               await updateMutation.mutateAsync({

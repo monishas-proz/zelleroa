@@ -17,12 +17,18 @@ export const PUT = createApiHandler(
       }
 
       const body = context.body as UpdateAttributeValueInput;
-      if (!body.value) {
-        throw ApiError.badRequest("Value is required");
+      if (body.value === undefined && body.priceAdjustment === undefined) {
+        throw ApiError.badRequest("Nothing to update");
       }
       const adminEmail = context.session?.user?.email ?? undefined;
 
-      const attribute = await attributeService.updateValue(uuid, valueUuid, body.value, adminEmail);
+      const attribute = await attributeService.updateValue(
+        uuid,
+        valueUuid,
+        body.value,
+        adminEmail,
+        body.priceAdjustment
+      );
       return apiSuccess(attribute, "Attribute value updated successfully");
     },
   },

@@ -3,7 +3,7 @@ import { ApiError } from "@/lib/api/api-error";
 import { userRepository } from "@/features/users/repositories/user.repository";
 import { formatVariantMeasurement } from "@/features/variants/utils/measurement.util";
 import { offerService } from "@/features/offers/services/offer.service";
-import { cartRepository } from "../repositories/cart.repository";
+import { cartRepository, type CartOwner } from "../repositories/cart.repository";
 import type {
   AddCartItemInput,
   UpdateCartItemInput,
@@ -13,6 +13,9 @@ import type {
   CartItemResponse,
   CartCountResponse,
 } from "../types/cart.types";
+
+/** Who is calling: a real logged-in customer, or a browser identified only by a guest cookie. */
+export type CartIdentity = { sessionUserId: string } | { guestSessionId: string };
 
 type DefaultUnitPrice = {
   base_price: unknown;
@@ -43,7 +46,7 @@ const EMPTY_CART: CartResponse = {
 };
 
 async function formatCartResponse(
-  cart: Awaited<ReturnType<typeof cartRepository.findActiveCartByUserId>>
+  cart: Awaited<ReturnType<typeof cartRepository.findActiveCartByOwner>>
 ): Promise<CartResponse> {
   if (!cart) return { ...EMPTY_CART };
 
@@ -145,18 +148,25 @@ async function resolveInternalUserId(sessionUserId: string): Promise<bigint> {
   return BigInt(user.internalId);
 }
 
+async function resolveCartOwner(identity: CartIdentity): Promise<CartOwner> {
+  if ("sessionUserId" in identity) {
+    return { userId: await resolveInternalUserId(identity.sessionUserId) };
+  }
+  return { sessionId: identity.guestSessionId };
+}
+
 export const cartService = {
-  async getCart(sessionUserId: string): Promise<CartResponse> {
-    const userId = await resolveInternalUserId(sessionUserId);
-    const cart = await cartRepository.findActiveCartByUserId(userId);
+  async getCart(identity: CartIdentity): Promise<CartResponse> {
+    const owner = await resolveCartOwner(identity);
+    const cart = await cartRepository.findActiveCartByOwner(owner);
     return formatCartResponse(cart);
   },
 
   async addItem(
-    sessionUserId: string,
+    identity: CartIdentity,
     input: AddCartItemInput
   ): Promise<CartResponse> {
-    const userId = await resolveInternalUserId(sessionUserId);
+    const owner = await resolveCartOwner(identity);
 
     // 1. Validate requested variant unit price (exact pack size) & parents
     let unitPrice = input.variantUnitPriceId
@@ -211,26 +221,26 @@ export const cartService = {
 
     // 2. Add to cart in transaction
     const updatedCart = await cartRepository.addItemToCart({
-      userId,
+      owner,
       productId: variant.productId,
       variantId: variant.id,
       variantUnitPriceId: unitPrice.id,
       quantity: input.quantity,
       currentPrice,
-      adminOrUserId: userId,
+      adminOrUserId: "userId" in owner ? owner.userId : undefined,
     });
 
     return formatCartResponse(updatedCart);
   },
 
   async getCartItem(
-    sessionUserId: string,
+    identity: CartIdentity,
     identifier: string
   ): Promise<CartItemResponse> {
-    const userId = await resolveInternalUserId(sessionUserId);
+    const owner = await resolveCartOwner(identity);
 
     const item = await cartRepository.findCartItem({
-      userId,
+      owner,
       identifier,
     });
 
@@ -301,14 +311,14 @@ export const cartService = {
   },
 
   async updateItemQuantity(
-    sessionUserId: string,
+    identity: CartIdentity,
     identifier: string,
     input: UpdateCartItemInput
   ): Promise<CartResponse> {
-    const userId = await resolveInternalUserId(sessionUserId);
+    const owner = await resolveCartOwner(identity);
 
     const existingItem = await cartRepository.findCartItem({
-      userId,
+      owner,
       identifier,
     });
 
@@ -336,11 +346,11 @@ export const cartService = {
     const currentPrice = calculateVariantPrice(unitPrice);
 
     const updatedCart = await cartRepository.updateItemQuantity({
-      userId,
+      owner,
       variantUnitPriceUuid: identifier,
       quantity: input.quantity,
       currentPrice,
-      adminOrUserId: userId,
+      adminOrUserId: "userId" in owner ? owner.userId : undefined,
     });
 
     if (!updatedCart) {
@@ -351,15 +361,15 @@ export const cartService = {
   },
 
   async removeItem(
-    sessionUserId: string,
+    identity: CartIdentity,
     identifier: string
   ): Promise<CartResponse> {
-    const userId = await resolveInternalUserId(sessionUserId);
+    const owner = await resolveCartOwner(identity);
 
     const updatedCart = await cartRepository.removeCartItem({
-      userId,
+      owner,
       variantUnitPriceUuid: identifier,
-      adminOrUserId: userId,
+      adminOrUserId: "userId" in owner ? owner.userId : undefined,
     });
 
     if (!updatedCart) {
@@ -369,16 +379,16 @@ export const cartService = {
     return formatCartResponse(updatedCart);
   },
 
-  async clearCart(sessionUserId: string): Promise<void> {
-    const userId = await resolveInternalUserId(sessionUserId);
+  async clearCart(identity: CartIdentity): Promise<void> {
+    const owner = await resolveCartOwner(identity);
     await cartRepository.clearCart({
-      userId,
-      adminOrUserId: userId,
+      owner,
+      adminOrUserId: "userId" in owner ? owner.userId : undefined,
     });
   },
 
-  async getCartCount(sessionUserId: string): Promise<CartCountResponse> {
-    const userId = await resolveInternalUserId(sessionUserId);
-    return cartRepository.getCartItemCount(userId);
+  async getCartCount(identity: CartIdentity): Promise<CartCountResponse> {
+    const owner = await resolveCartOwner(identity);
+    return cartRepository.getCartItemCount(owner);
   },
 };

@@ -17,7 +17,14 @@ type AttributeWithRelations = {
   slug: string;
   is_active: boolean;
   createdAt: Date;
-  values: { id: bigint; uuid: string | null; value: string; is_active: boolean; createdAt: Date }[];
+  values: {
+    id: bigint;
+    uuid: string | null;
+    value: string;
+    is_active: boolean;
+    createdAt: Date;
+    price_adjustment: unknown;
+  }[];
   category_attributes: { category_id: bigint }[];
 };
 
@@ -53,6 +60,7 @@ function formatAttribute(attribute: AttributeWithRelations): AttributeListItem {
       value: v.value,
       isActive: Boolean(v.is_active),
       createdAt: v.createdAt,
+      priceAdjustment: Number(v.price_adjustment ?? 0),
     })),
     categoryIds: attribute.category_attributes.map((ca) => String(ca.category_id)),
     _count: { values: attribute.values.length },
@@ -175,7 +183,12 @@ export const attributeService = {
     return { success: true, message: "Attribute deleted successfully" };
   },
 
-  async addValue(attributeUuid: string, value: string, adminEmail?: string) {
+  async addValue(
+    attributeUuid: string,
+    value: string,
+    adminEmail?: string,
+    priceAdjustment?: number
+  ) {
     const attribute = await attributeRepository.findByUuid(attributeUuid);
     if (!attribute) {
       throw ApiError.notFound("Attribute not found");
@@ -189,7 +202,7 @@ export const attributeService = {
       throw ApiError.conflict(`Value '${value}' already exists for this attribute`);
     }
 
-    await attributeRepository.createValue(attribute.id, value, adminId);
+    await attributeRepository.createValue(attribute.id, value, adminId, priceAdjustment);
     const refreshed = await attributeRepository.findByUuid(attributeUuid);
     return formatAttribute(refreshed as AttributeWithRelations);
   },
@@ -197,8 +210,9 @@ export const attributeService = {
   async updateValue(
     attributeUuid: string,
     valueUuid: string,
-    value: string,
-    adminEmail?: string
+    value: string | undefined,
+    adminEmail?: string,
+    priceAdjustment?: number
   ) {
     const attribute = await attributeRepository.findByUuid(attributeUuid);
     if (!attribute) {
@@ -206,7 +220,12 @@ export const attributeService = {
     }
 
     const adminId = await getAdminInternalId(adminEmail);
-    const updated = await attributeRepository.updateValueByUuid(valueUuid, value, adminId);
+    const updated = await attributeRepository.updateValueByUuid(
+      valueUuid,
+      value,
+      adminId,
+      priceAdjustment
+    );
     if (!updated) {
       throw ApiError.notFound("Attribute value not found");
     }
@@ -267,6 +286,7 @@ export const attributeService = {
         value: v.value,
         isActive: Boolean(v.is_active),
         createdAt: v.createdAt,
+        priceAdjustment: Number(v.price_adjustment ?? 0),
       })),
     }));
   },

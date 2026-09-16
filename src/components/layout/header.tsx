@@ -5,8 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { LogIn } from "lucide-react";
-import { LOGOS, ICONS, desktopIcons, mobileBottomIcons } from "@/constants/storefront";
+import { LogIn, Search, Heart, ShoppingCart } from "lucide-react";
+import { LOGOS, ICONS, mobileBottomIcons } from "@/constants/storefront";
 import { NavButton } from "@/components/storefront/buttons/NavButton";
 import { IconButton } from "@/components/storefront/buttons/IconButton";
 import { useClickOutside } from "@/hooks/useClickOutside";
@@ -20,6 +20,7 @@ import { MobileCategoryAccordion } from "./MobileCategoryAccordion";
 
 export function Header() {
   const [isOpen, setIsOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
   const router = useRouter();
   const pathname = usePathname();
   const { data: session, status } = useSession();
@@ -50,9 +51,9 @@ export function Header() {
     return "U";
   }, [userName, session?.user?.email]);
 
-  // Real-time badge counts from customer endpoints (only enabled when authenticated)
+  // Wishlist requires an account; cart works for guests too (guest-session cookie).
   const { data: wishlistCount = 0 } = useCustomerWishlistCount({ enabled: isAuthenticated });
-  const { data: cartCountData } = useCustomerCartCount({ enabled: isAuthenticated });
+  const { data: cartCountData } = useCustomerCartCount();
   const cartCount =
     typeof cartCountData === "number"
       ? cartCountData
@@ -87,15 +88,37 @@ export function Header() {
         return isAuthenticated ? "/wishlist" : "/login?callbackUrl=/wishlist";
       }
       if (isCart) {
-        return isAuthenticated ? "/cart" : "/login?callbackUrl=/cart";
+        // Guests can view/checkout their cart too - no login gate here.
+        return "/cart";
       }
       return item.path || "/";
     },
     [isAuthenticated]
   );
 
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = searchQuery.trim();
+    if (!trimmed) return;
+    router.push(`/products?search=${encodeURIComponent(trimmed)}`);
+  };
+
+  const wishlistHref = isAuthenticated ? "/wishlist" : "/login?callbackUrl=/wishlist";
+
   return (
-    <header className="sticky top-0 z-50 w-full bg-white shadow-xs header-font">
+    <>
+      {/* Top promo bar */}
+      <div className="w-full bg-[var(--brown-600)] text-white text-[11px] sm:text-xs font-medium">
+        <div className="w-full max-w-[1400px] 2xl:max-w-[1600px] 3xl:max-w-[1800px] mx-auto px-4 sm:px-6 md:px-8 h-8 flex items-center justify-center gap-2 sm:gap-6 text-center">
+          <span className="truncate">Free Shipping Across India on Orders Above ₹999</span>
+          <span className="hidden sm:inline text-white/40">|</span>
+          <span className="hidden sm:inline truncate">Express 48-Hour Delivery in Metro Cities</span>
+          <span className="hidden md:inline text-white/40">|</span>
+          <span className="hidden md:inline truncate">Easy 15-Day Hassle-Free Returns</span>
+        </div>
+      </div>
+
+      <header className="sticky top-0 z-50 w-full bg-white shadow-xs header-font">
       <div className="w-full max-w-[1400px] 2xl:max-w-[1600px] 3xl:max-w-[1800px] mx-auto h-20 sm:h-24 px-4 sm:px-6 md:px-8 flex items-center justify-between">
         {/* Left Section (Logo + Brand Title) */}
         <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
@@ -136,7 +159,18 @@ export function Header() {
         </div>
 
         {/* Desktop Navigation */}
-        <nav className="hidden lg:flex items-center gap-8">
+        <nav className="hidden lg:flex items-center gap-1">
+          <Link
+            href="/"
+            className={`rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
+              pathname === "/"
+                ? "bg-theme-primary text-theme-primary-fg font-semibold"
+                : "text-hover-primary hover:text-theme-primary"
+            }`}
+          >
+            Home
+          </Link>
+
           {categoryTree.map((root) => (
             <MegaMenu
               key={root.id}
@@ -148,78 +182,93 @@ export function Header() {
 
           <Link
             href="/products?sortBy=discount"
-            className="text-sm font-semibold text-red-600 hover:-translate-y-0.5 transition-transform"
+            className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
           >
             Sale
+            <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-600">
+              Trending
+            </span>
           </Link>
         </nav>
 
         {/* Right Section (Icons & Hamburger) */}
         <div className="flex items-center gap-2 sm:gap-3 md:gap-5">
           <div className="hidden lg:flex items-center gap-5">
-            {desktopIcons.map((item) => {
-              const isUser =
-                item.alt === "user" || item.path === "/profile";
-              const targetPath = resolvePath(item);
-              const badge =
-                item.alt === "cart"
-                  ? cartCount
-                  : item.alt === "wishlist"
-                  ? wishlistCount
-                  : undefined;
+            {/* Inline search */}
+            <form onSubmit={handleSearchSubmit} className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-text-subtle pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search"
+                className="w-40 xl:w-56 h-9 pl-9 pr-3 rounded-full border border-theme-border bg-theme-surface-alt text-sm text-theme-text-primary placeholder:text-theme-text-subtle outline-none focus:border-theme-primary transition-colors"
+              />
+            </form>
 
-              if (isUser) {
-                // The account cell is the last item in a right-anchored row,
-                // so the Login pill (~92px) collapsing to the 26px avatar would
-                // drag every icon beside it. A fixed slot keeps the swap
-                // contained: siblings never move, whichever state wins.
-                return (
-                  <div
-                    key={item.id}
-                    className="flex min-w-[92px] justify-end"
-                  >
-                    {isAuthLoading ? (
-                      <div
-                        className="w-[26px] h-[26px] rounded-full bg-theme-surface-alt animate-pulse"
-                        aria-hidden="true"
-                      />
-                    ) : !isAuthenticated ? (
-                      <Link
-                        href="/login"
-                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-sm bg-theme-primary hover:bg-theme-primary-hover text-theme-primary-fg border border-theme-primary text-xs sm:text-sm font-semibold transition-all duration-150 shadow-xs hover:shadow-sm active:scale-95 cursor-pointer"
-                        aria-label="Login"
-                      >
-                        <span>Login</span>
-                        <LogIn
-                          className="w-4 h-4 text-inherit shrink-0"
-                          strokeWidth={2}
-                        />
-                      </Link>
-                    ) : (
-                      <IconButton
-                        alt={userName ? `${userName}'s profile` : "Profile"}
-                        href="/profile"
-                        customIcon={
-                          <div className="w-[26px] h-[26px] rounded-full bg-theme-primary text-theme-primary-fg text-[11px] font-bold flex items-center justify-center border border-theme-border-accent shadow-2xs select-none leading-none">
-                            {userInitials}
-                          </div>
-                        }
-                      />
-                    )}
-                  </div>
-                );
-              }
+            {/* Wishlist */}
+            <Link
+              href={wishlistHref}
+              className="flex items-center gap-1.5 text-sm font-medium text-neutral-700 hover:text-theme-primary transition-colors"
+            >
+              <Heart className="h-[18px] w-[18px]" strokeWidth={1.75} />
+              <span>Wishlist</span>
+              {wishlistCount > 0 && (
+                <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-theme-status-can-fg text-white text-[10px] font-bold">
+                  {wishlistCount > 99 ? "99+" : wishlistCount}
+                </span>
+              )}
+            </Link>
 
-              return (
-                <IconButton
-                  key={item.id}
-                  icon={item.icon}
-                  alt={item.alt}
-                  href={targetPath}
-                  badge={badge}
+            {/* Cart */}
+            <Link
+              href="/cart"
+              className="flex items-center gap-1.5 text-sm font-medium text-neutral-700 hover:text-theme-primary transition-colors"
+            >
+              <ShoppingCart className="h-[18px] w-[18px]" strokeWidth={1.75} />
+              <span>Cart</span>
+              {cartCount > 0 && (
+                <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-theme-primary text-white text-[10px] font-bold">
+                  {cartCount > 99 ? "99+" : cartCount}
+                </span>
+              )}
+            </Link>
+
+            {/* Account */}
+            {/* The account cell is the last item in a right-anchored row, so the
+                Login pill (~92px) collapsing to the 26px avatar would drag every
+                icon beside it. A fixed slot keeps the swap contained: siblings
+                never move, whichever state wins. */}
+            <div className="flex min-w-[92px] justify-end">
+              {isAuthLoading ? (
+                <div
+                  className="w-[26px] h-[26px] rounded-full bg-theme-surface-alt animate-pulse"
+                  aria-hidden="true"
                 />
-              );
-            })}
+              ) : !isAuthenticated ? (
+                <Link
+                  href="/login"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-sm bg-theme-primary hover:bg-theme-primary-hover text-theme-primary-fg border border-theme-primary text-xs sm:text-sm font-semibold transition-all duration-150 shadow-xs hover:shadow-sm active:scale-95 cursor-pointer"
+                  aria-label="Login"
+                >
+                  <span>Login</span>
+                  <LogIn
+                    className="w-4 h-4 text-inherit shrink-0"
+                    strokeWidth={2}
+                  />
+                </Link>
+              ) : (
+                <IconButton
+                  alt={userName ? `${userName}'s profile` : "Profile"}
+                  href="/profile"
+                  customIcon={
+                    <div className="w-[26px] h-[26px] rounded-full bg-theme-primary text-theme-primary-fg text-[11px] font-bold flex items-center justify-center border border-theme-border-accent shadow-2xs select-none leading-none">
+                      {userInitials}
+                    </div>
+                  }
+                />
+              )}
+            </div>
           </div>
 
           {/* Hamburger Menu Trigger */}
@@ -385,7 +434,8 @@ export function Header() {
           );
         })}
       </div>
-    </header>
+      </header>
+    </>
   );
 }
 

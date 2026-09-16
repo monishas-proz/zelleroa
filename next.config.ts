@@ -37,6 +37,17 @@ const nextConfig: NextConfig = {
       "@tanstack/react-query",
     ],
   },
+
+  webpack: (config) => {
+    // Baileys rewrites its session/key files under auth_baileys/ continuously
+    // while a WhatsApp socket is connected. Without this, webpack's dev-server
+    // watcher picks up every write and triggers a full page reload.
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: ["**/node_modules/**", "**/auth_baileys/**"],
+    };
+    return config;
+  },
 };
 
 export default nextConfig;

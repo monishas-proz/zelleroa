@@ -326,6 +326,9 @@ model ProductCategory {
   users_product_categories_updated_byTousers User?                     @relation("product_categories_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_categories_updated_by")
   product_category_images                    product_category_images[]
   category_attributes                        category_attributes[]
+  offer_categories                           offer_categories[]
+  coupon_categories                          coupon_categories[]
+  size_charts                                size_charts[]
 
   @@index([parentId], map: "fk_cat_parent")
   @@index([created_by], map: "fk_categories_created_by")
@@ -351,6 +354,7 @@ model ProductBrand {
   users_product_brands_updated_byTousers User?                 @relation("product_brands_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_brands_updated_by")
   products                               Product[]
   produt_brand_images                    produt_brand_images[]
+  offer_brands                           offer_brands[]
 
   @@index([created_by], map: "fk_brands_created_by")
   @@index([updated_by], map: "fk_brands_updated_by")
@@ -361,6 +365,7 @@ model Product {
   id                               BigInt                     @id @default(autoincrement()) @db.UnsignedBigInt
   uuid                             String?                    @unique(map: "idx_products_uuid") @default("UUID()") @db.VarChar(255)
   categoryId                       BigInt?                    @map("category_id")
+  gender                           products_gender?
   brandId                          BigInt?                    @map("brand_id") @db.UnsignedBigInt
   hsn_code_id                      BigInt?                    @db.UnsignedBigInt
   name                             String                     @db.VarChar(200)
@@ -378,6 +383,7 @@ model Product {
   cartItems                        CartItem[]
   combo_product_items              combo_product_items[]
   offer_products                   offer_products[]
+  coupon_products                  coupon_products[]
   orderItems                       OrderItem[]
   product_attribute_values         product_attribute_values[]
   images                           ProductImage[]
@@ -403,37 +409,39 @@ model Product {
 }
 
 model ProductVariant {
-  id                                       BigInt                   @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid                                     String                   @default("UUID()") @db.VarChar(255)
-  productId                                BigInt                   @map("product_id") @db.UnsignedBigInt
-  variant_name                             String                   @default("") @map("variant_name") @db.VarChar(100)
-  slug                                     String?                  @unique(map: "idx_variant_slug") @db.VarChar(255)
-  short_description                        String?                  @db.VarChar(500)
-  description                              String?                  @db.Text
-  ingredients                              String?                  @db.Text
-  is_ready_to_mix                          Boolean                  @default(false) @map("is_ready_to_mix")
-  cooking_recipe                           String?                  @map("cooking_recipe") @db.Text
-  shelf_life                               String?                  @map("shelf_life") @db.VarChar(100)
-  veg_type                                 products_veg_type        @default(na)
-  color_name                               String?                  @map("color_name") @db.VarChar(50)
-  color_hex                                String?                  @map("color_hex") @db.VarChar(7)
-  is_featured                              Boolean                  @default(false)
-  is_default                               Boolean                  @default(false)
-  isActive                                 Boolean                  @default(true) @map("is_active")
-  out_of_stock                             Boolean                  @default(false) @map("out_of_stock")
-  createdAt                                DateTime                 @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt                                DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-  deleted_at                               DateTime?                @db.Timestamp(0)
-  created_by                               BigInt?                  @db.UnsignedBigInt
-  updated_by                               BigInt?                  @db.UnsignedBigInt
+  id                                       BigInt                     @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                                     String                     @default("UUID()") @db.VarChar(255)
+  productId                                BigInt                     @map("product_id") @db.UnsignedBigInt
+  variant_name                             String                     @default("") @map("variant_name") @db.VarChar(100)
+  slug                                     String?                    @unique(map: "idx_variant_slug") @db.VarChar(255)
+  short_description                        String?                    @db.VarChar(500)
+  description                              String?                    @db.Text
+  ingredients                              String?                    @db.Text
+  is_ready_to_mix                          Boolean                    @default(false) @map("is_ready_to_mix")
+  cooking_recipe                           String?                    @map("cooking_recipe") @db.Text
+  shelf_life                               String?                    @map("shelf_life") @db.VarChar(100)
+  veg_type                                 products_veg_type          @default(na)
+  color_name                               String?                    @map("color_name") @db.VarChar(50)
+  color_hex                                String?                    @map("color_hex") @db.VarChar(7)
+  price_adjustment                         Decimal                    @default(0.00) @map("price_adjustment") @db.Decimal(10, 2)
+  is_featured                              Boolean                    @default(false)
+  is_default                               Boolean                    @default(false)
+  isActive                                 Boolean                    @default(true) @map("is_active")
+  out_of_stock                             Boolean                    @default(false) @map("out_of_stock")
+  createdAt                                DateTime                   @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                                DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  deleted_at                               DateTime?                  @db.Timestamp(0)
+  created_by                               BigInt?                    @db.UnsignedBigInt
+  updated_by                               BigInt?                    @db.UnsignedBigInt
   product_variant_images                   product_variant_images[]
-  users_product_variants_created_byTousers User?                    @relation("product_variants_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_product_variants_created_by")
-  users_product_variants_updated_byTousers User?                    @relation("product_variants_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_product_variants_updated_by")
-  product                                  Product                  @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_variant_product")
+  users_product_variants_created_byTousers User?                      @relation("product_variants_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_product_variants_created_by")
+  users_product_variants_updated_byTousers User?                      @relation("product_variants_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_product_variants_updated_by")
+  product                                  Product                    @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_variant_product")
   variant_unit_prices                      VariantUnitPrice[]
   cart_items                               CartItem[]
   wishlist_items                           WishlistItem[]
   order_items                              OrderItem[]
+  variant_attribute_values                 variant_attribute_values[]
 
   @@index([created_by], map: "fk_product_variants_created_by")
   @@index([updated_by], map: "fk_product_variants_updated_by")
@@ -442,27 +450,27 @@ model ProductVariant {
 }
 
 model VariantUnitPrice {
-  id                                          BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid                                        String                  @default("UUID()") @db.VarChar(255)
-  variant_id                                  BigInt                  @map("variant_id") @db.UnsignedBigInt
-  unit_id                                     BigInt                  @map("unit_id") @db.UnsignedBigInt
-  unit_value                                  Decimal                 @default(0.00) @db.Decimal(10, 2)
-  sku                                         String                  @unique(map: "sku") @db.VarChar(100)
-  base_price                                  Decimal                 @default(0.00) @db.Decimal(10, 2)
-  is_default                                  Boolean                 @default(false)
-  isActive                                    Boolean                 @default(true) @map("is_active")
-  createdAt                                   DateTime                @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt                                   DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-  deleted_at                                  DateTime?               @db.Timestamp(0)
-  created_by                                  BigInt?                 @db.UnsignedBigInt
-  updated_by                                  BigInt?                 @db.UnsignedBigInt
-  variant                                     ProductVariant          @relation(fields: [variant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_vup_variant")
-  product_units                               product_units           @relation(fields: [unit_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_vup_unit")
+  id                                          BigInt                   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                                        String                   @default("UUID()") @db.VarChar(255)
+  variant_id                                  BigInt                   @map("variant_id") @db.UnsignedBigInt
+  unit_id                                     BigInt                   @map("unit_id") @db.UnsignedBigInt
+  unit_value                                  Decimal                  @default(0.00) @db.Decimal(10, 2)
+  sku                                         String                   @unique(map: "sku") @db.VarChar(100)
+  base_price                                  Decimal                  @default(0.00) @db.Decimal(10, 2)
+  is_default                                  Boolean                  @default(false)
+  isActive                                    Boolean                  @default(true) @map("is_active")
+  createdAt                                   DateTime                 @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                                   DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  deleted_at                                  DateTime?                @db.Timestamp(0)
+  created_by                                  BigInt?                  @db.UnsignedBigInt
+  updated_by                                  BigInt?                  @db.UnsignedBigInt
+  variant                                     ProductVariant           @relation(fields: [variant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_vup_variant")
+  product_units                               product_units            @relation(fields: [unit_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_vup_unit")
   inventories                                 Inventory?
   inventory_transactions                      InventoryTransaction[]
   variant_price_history                       variant_price_history[]
-  users_variant_unit_prices_created_byTousers User?                   @relation("variant_unit_prices_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_vup_created_by")
-  users_variant_unit_prices_updated_byTousers User?                   @relation("variant_unit_prices_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_vup_updated_by")
+  users_variant_unit_prices_created_byTousers User?                    @relation("variant_unit_prices_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_vup_created_by")
+  users_variant_unit_prices_updated_byTousers User?                    @relation("variant_unit_prices_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_vup_updated_by")
   cartItems                                   CartItem[]
   orderItems                                  OrderItem[]
   wishlist_items                              WishlistItem[]
@@ -471,6 +479,7 @@ model VariantUnitPrice {
   stock_adjustments                           stock_adjustments[]
   stock_reports                               stock_reports[]
   offer_items                                 offer_items[]
+  inventory_reservations                      inventory_reservations[]
 
   @@index([variant_id], map: "fk_vup_variant")
   @@index([unit_id], map: "fk_vup_unit")
@@ -514,6 +523,7 @@ model ProductAttribute {
   values                                     AttributeValue[]
   product_attribute_values                   product_attribute_values[]
   category_attributes                        category_attributes[]
+  variant_attribute_values                   variant_attribute_values[]
   users_product_attributes_created_byTousers User?                      @relation("product_attributes_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_product_attributes_created_by")
   users_product_attributes_updated_byTousers User?                      @relation("product_attributes_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_product_attributes_updated_by")
 
@@ -527,6 +537,7 @@ model AttributeValue {
   uuid                                     String?                    @default("UUID()") @db.VarChar(255)
   attributeId                              BigInt                     @map("attribute_id") @db.UnsignedBigInt
   value                                    String                     @db.VarChar(150)
+  price_adjustment                         Decimal                    @default(0.00) @map("price_adjustment") @db.Decimal(10, 2)
   createdAt                                DateTime                   @default(now()) @map("created_at") @db.Timestamp(0)
   updated_at                               DateTime                   @default(now()) @db.Timestamp(0)
   is_active                                Boolean                    @default(true)
@@ -536,6 +547,8 @@ model AttributeValue {
   users_attribute_values_updated_byTousers User?                      @relation("attribute_values_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_attribute_values_updated_by")
   attribute                                ProductAttribute           @relation(fields: [attributeId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attrval_attr")
   product_attribute_values                 product_attribute_values[]
+  variant_attribute_values                 variant_attribute_values[]
+  size_charts                              size_charts[]
 
   @@index([created_by], map: "fk_attribute_values_created_by")
   @@index([updated_by], map: "fk_attribute_values_updated_by")
@@ -562,25 +575,67 @@ model category_attributes {
   @@index([attribute_id], map: "fk_catattr_attribute")
 }
 
+/// Pins a ProductVariant to the exact attribute value it represents (e.g. Color=Red,
+/// Size=M), so selecting a combination of attribute values on the product page can
+/// resolve to the one matching variant instead of leaving the mapping implicit.
+model variant_attribute_values {
+  id                 BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  variant_id         BigInt           @db.UnsignedBigInt
+  attribute_id       BigInt           @db.UnsignedBigInt
+  attribute_value_id BigInt           @db.UnsignedBigInt
+  created_at         DateTime         @default(now()) @db.Timestamp(0)
+  updated_at         DateTime         @default(now()) @db.Timestamp(0)
+  product_variants   ProductVariant   @relation(fields: [variant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_vav_variant")
+  product_attributes ProductAttribute @relation(fields: [attribute_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_vav_attribute")
+  attribute_values   AttributeValue   @relation(fields: [attribute_value_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_vav_value")
+
+  @@unique([variant_id, attribute_id], map: "uniq_variant_attribute")
+  @@index([attribute_id], map: "fk_vav_attribute")
+  @@index([attribute_value_id], map: "fk_vav_value")
+}
+
+/// Curates which attribute_values (under the "Size" product_attributes entry)
+/// are valid for a given category + gender, e.g. Men's T-Shirts -> S/M/L/XL/XXL,
+/// Kids' T-Shirts -> 2-3Y/4-5Y/6-7Y. The size values themselves are not
+/// duplicated here - they live once in attribute_values, the same row a
+/// variant's variant_attribute_values entry points at.
+model size_charts {
+  id                 BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
+  category_id        BigInt          @db.UnsignedBigInt
+  gender             products_gender
+  attribute_value_id BigInt          @db.UnsignedBigInt
+  sort_order         Int             @default(0)
+  is_active          Boolean         @default(true)
+  created_at         DateTime        @default(now()) @db.Timestamp(0)
+  updated_at         DateTime        @default(now()) @db.Timestamp(0)
+  product_categories ProductCategory @relation(fields: [category_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_sizechart_category")
+  attribute_values   AttributeValue  @relation(fields: [attribute_value_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_sizechart_attribute_value")
+
+  @@unique([category_id, gender, attribute_value_id], map: "uniq_sizechart_cat_gender_value")
+  @@index([category_id, gender], map: "idx_sizechart_cat_gender")
+  @@index([attribute_value_id], map: "idx_sizechart_attr_value")
+}
+
 model Cart {
-  id                            BigInt       @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid                          String?      @default("UUID()") @db.VarChar(255)
-  userId                        BigInt?      @map("user_id") @db.UnsignedBigInt
-  sessionId                     String?      @map("session_id") @db.VarChar(150)
-  coupon_id                     BigInt?      @db.UnsignedBigInt
-  status                        carts_status @default(active)
-  last_activity_at              DateTime?    @db.Timestamp(0)
-  createdAt                     DateTime     @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt                     DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-  is_active                     Boolean      @default(true)
-  created_by                    BigInt?      @db.UnsignedBigInt
-  updated_by                    BigInt?      @db.UnsignedBigInt
+  id                            BigInt                   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                          String?                  @default("UUID()") @db.VarChar(255)
+  userId                        BigInt?                  @map("user_id") @db.UnsignedBigInt
+  sessionId                     String?                  @map("session_id") @db.VarChar(150)
+  coupon_id                     BigInt?                  @db.UnsignedBigInt
+  status                        carts_status             @default(active)
+  last_activity_at              DateTime?                @db.Timestamp(0)
+  createdAt                     DateTime                 @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                     DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  is_active                     Boolean                  @default(true)
+  created_by                    BigInt?                  @db.UnsignedBigInt
+  updated_by                    BigInt?                  @db.UnsignedBigInt
   items                         CartItem[]
-  coupons                       Coupon?      @relation(fields: [coupon_id], references: [id], onUpdate: NoAction, map: "fk_cart_coupon")
-  user                          User?        @relation(fields: [userId], references: [id], onUpdate: NoAction, map: "fk_cart_user")
-  users_carts_created_byTousers User?        @relation("carts_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_carts_created_by")
-  users_carts_updated_byTousers User?        @relation("carts_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_carts_updated_by")
+  coupons                       Coupon?                  @relation(fields: [coupon_id], references: [id], onUpdate: NoAction, map: "fk_cart_coupon")
+  user                          User?                    @relation(fields: [userId], references: [id], onUpdate: NoAction, map: "fk_cart_user")
+  users_carts_created_byTousers User?                    @relation("carts_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_carts_created_by")
+  users_carts_updated_byTousers User?                    @relation("carts_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_carts_updated_by")
   orders                        Order[]
+  inventory_reservations        inventory_reservations[]
 
   @@index([coupon_id], map: "fk_cart_coupon")
   @@index([userId], map: "fk_cart_user")
@@ -651,41 +706,42 @@ model WishlistItem {
 }
 
 model Order {
-  id                             BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid                           String?                @default("UUID()") @db.VarChar(255)
-  orderNumber                    String                 @unique(map: "order_number") @map("order_number") @db.VarChar(50)
-  userId                         BigInt                 @map("user_id") @db.UnsignedBigInt
-  cart_id                        BigInt?                @db.UnsignedBigInt
-  couponId                       BigInt?                @map("coupon_id") @db.UnsignedBigInt
-  delivery_slot_id               BigInt?                @db.UnsignedBigInt
-  order_status                   orders_order_status    @default(pending)
-  payment_status                 orders_payment_status  @default(pending)
-  subtotal                       Decimal                @default(0.00) @db.Decimal(10, 2)
-  discountAmount                 Decimal                @default(0.00) @map("discount_amount") @db.Decimal(10, 2)
-  taxAmount                      Decimal                @default(0.00) @map("tax_amount") @db.Decimal(10, 2)
-  shipping_charge                Decimal                @default(0.00) @db.Decimal(10, 2)
-  totalAmount                    Decimal                @default(0.00) @map("total_amount") @db.Decimal(10, 2)
-  notes                          String?                @db.VarChar(500)
-  placed_at                      DateTime?              @db.Timestamp(0)
-  createdAt                      DateTime               @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt                      DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-  is_active                      Boolean                @default(true)
-  created_by                     BigInt?                @db.UnsignedBigInt
-  updated_by                     BigInt?                @db.UnsignedBigInt
+  id                             BigInt                   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                           String?                  @default("UUID()") @db.VarChar(255)
+  orderNumber                    String                   @unique(map: "order_number") @map("order_number") @db.VarChar(50)
+  userId                         BigInt                   @map("user_id") @db.UnsignedBigInt
+  cart_id                        BigInt?                  @db.UnsignedBigInt
+  couponId                       BigInt?                  @map("coupon_id") @db.UnsignedBigInt
+  delivery_slot_id               BigInt?                  @db.UnsignedBigInt
+  order_status                   orders_order_status      @default(pending)
+  payment_status                 orders_payment_status    @default(pending)
+  subtotal                       Decimal                  @default(0.00) @db.Decimal(10, 2)
+  discountAmount                 Decimal                  @default(0.00) @map("discount_amount") @db.Decimal(10, 2)
+  taxAmount                      Decimal                  @default(0.00) @map("tax_amount") @db.Decimal(10, 2)
+  shipping_charge                Decimal                  @default(0.00) @db.Decimal(10, 2)
+  totalAmount                    Decimal                  @default(0.00) @map("total_amount") @db.Decimal(10, 2)
+  notes                          String?                  @db.VarChar(500)
+  placed_at                      DateTime?                @db.Timestamp(0)
+  createdAt                      DateTime                 @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                      DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  is_active                      Boolean                  @default(true)
+  created_by                     BigInt?                  @db.UnsignedBigInt
+  updated_by                     BigInt?                  @db.UnsignedBigInt
   coupon_usage                   coupon_usage[]
   address                        OrderAddress[]
   items                          OrderItem[]
   order_status_history           order_status_history[]
-  carts                          Cart?                  @relation(fields: [cart_id], references: [id], onUpdate: NoAction, map: "fk_order_cart")
-  coupons                        Coupon?                @relation(fields: [couponId], references: [id], onUpdate: NoAction, map: "fk_order_coupon")
-  delivery_slots                 delivery_slots?        @relation(fields: [delivery_slot_id], references: [id], onUpdate: NoAction, map: "fk_order_slot")
-  user                           User                   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_order_user")
-  users_orders_created_byTousers User?                  @relation("orders_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_orders_created_by")
-  users_orders_updated_byTousers User?                  @relation("orders_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_orders_updated_by")
+  carts                          Cart?                    @relation(fields: [cart_id], references: [id], onUpdate: NoAction, map: "fk_order_cart")
+  coupons                        Coupon?                  @relation(fields: [couponId], references: [id], onUpdate: NoAction, map: "fk_order_coupon")
+  delivery_slots                 delivery_slots?          @relation(fields: [delivery_slot_id], references: [id], onUpdate: NoAction, map: "fk_order_slot")
+  user                           User                     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_order_user")
+  users_orders_created_byTousers User?                    @relation("orders_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_orders_created_by")
+  users_orders_updated_byTousers User?                    @relation("orders_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_orders_updated_by")
   payments                       Payment[]
   refunds                        refunds[]
   return_requests                return_requests[]
   shipments                      shipments[]
+  inventory_reservations         inventory_reservations[]
 
   @@index([cart_id], map: "fk_order_cart")
   @@index([couponId], map: "fk_order_coupon")
@@ -871,26 +927,28 @@ model ReviewImage {
 }
 
 model Coupon {
-  id                              BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid                            String?        @default("UUID()") @db.VarChar(255)
-  code                            String         @unique(map: "code") @db.VarChar(50)
+  id                              BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                            String?             @default("UUID()") @db.VarChar(255)
+  code                            String              @unique(map: "code") @db.VarChar(50)
   type                            coupons_type
-  value                           Decimal        @db.Decimal(10, 2)
-  minOrderAmount                  Decimal?       @default(0.00) @map("min_order_amount") @db.Decimal(10, 2)
-  max_discount_amount             Decimal?       @db.Decimal(10, 2)
-  usageLimit                      Int?           @map("usage_limit")
-  usage_limit_per_user            Int?           @default(1)
-  valid_from                      DateTime?      @db.Timestamp(0)
-  valid_to                        DateTime?      @db.Timestamp(0)
-  isActive                        Boolean        @default(true) @map("is_active")
-  createdAt                       DateTime       @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt                       DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-  created_by                      BigInt?        @db.UnsignedBigInt
-  updated_by                      BigInt?        @db.UnsignedBigInt
+  value                           Decimal             @db.Decimal(10, 2)
+  minOrderAmount                  Decimal?            @default(0.00) @map("min_order_amount") @db.Decimal(10, 2)
+  max_discount_amount             Decimal?            @db.Decimal(10, 2)
+  usageLimit                      Int?                @map("usage_limit")
+  usage_limit_per_user            Int?                @default(1)
+  valid_from                      DateTime?           @db.Timestamp(0)
+  valid_to                        DateTime?           @db.Timestamp(0)
+  isActive                        Boolean             @default(true) @map("is_active")
+  createdAt                       DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                       DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  created_by                      BigInt?             @db.UnsignedBigInt
+  updated_by                      BigInt?             @db.UnsignedBigInt
   carts                           Cart[]
   coupon_usage                    coupon_usage[]
-  users_coupons_created_byTousers User?          @relation("coupons_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_coupons_created_by")
-  users_coupons_updated_byTousers User?          @relation("coupons_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_coupons_updated_by")
+  coupon_categories               coupon_categories[]
+  coupon_products                 coupon_products[]
+  users_coupons_created_byTousers User?               @relation("coupons_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_coupons_created_by")
+  users_coupons_updated_byTousers User?               @relation("coupons_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_coupons_updated_by")
   orders                          Order[]
 
   @@index([created_by], map: "fk_coupons_created_by")
@@ -899,33 +957,35 @@ model Coupon {
 }
 
 model Offer {
-  id                             BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid                           String?          @default("UUID()") @db.VarChar(255)
-  name                           String           @db.VarChar(150)
-  code                           String?          @unique(map: "uq_offers_code") @db.VarChar(50)
-  level                          offers_level     @default(product)
+  id                             BigInt             @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                           String?            @default("UUID()") @db.VarChar(255)
+  name                           String             @db.VarChar(150)
+  code                           String?            @unique(map: "uq_offers_code") @db.VarChar(50)
+  level                          offers_level       @default(product)
   type                           offers_type
-  value                          Decimal          @default(0.00) @db.Decimal(10, 2)
+  value                          Decimal            @default(0.00) @db.Decimal(10, 2)
   buy_quantity                   Int?
   get_quantity                   Int?
-  min_quantity                   Int              @default(1)
+  min_quantity                   Int                @default(1)
   max_quantity                   Int?
-  minOrderAmount                 Decimal?         @default(0.00) @map("min_order_amount") @db.Decimal(10, 2)
-  max_discount_amount            Decimal?         @db.Decimal(10, 2)
-  priority                       Int              @default(0)
-  terms                          String?          @db.Text
-  startsAt                       DateTime?        @map("starts_at") @db.Timestamp(0)
-  ends_at                        DateTime?        @db.Timestamp(0)
-  isActive                       Boolean          @default(true) @map("is_active")
-  createdAt                      DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt                      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-  deleted_at                     DateTime?        @db.Timestamp(0)
-  created_by                     BigInt?          @db.UnsignedBigInt
-  updated_by                     BigInt?          @db.UnsignedBigInt
+  minOrderAmount                 Decimal?           @default(0.00) @map("min_order_amount") @db.Decimal(10, 2)
+  max_discount_amount            Decimal?           @db.Decimal(10, 2)
+  priority                       Int                @default(0)
+  terms                          String?            @db.Text
+  startsAt                       DateTime?          @map("starts_at") @db.Timestamp(0)
+  ends_at                        DateTime?          @db.Timestamp(0)
+  isActive                       Boolean            @default(true) @map("is_active")
+  createdAt                      DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                      DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  deleted_at                     DateTime?          @db.Timestamp(0)
+  created_by                     BigInt?            @db.UnsignedBigInt
+  updated_by                     BigInt?            @db.UnsignedBigInt
   offer_products                 offer_products[]
   offer_items                    offer_items[]
-  users_offers_created_byTousers User?            @relation("offers_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_offers_created_by")
-  users_offers_updated_byTousers User?            @relation("offers_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_offers_updated_by")
+  offer_categories               offer_categories[]
+  offer_brands                   offer_brands[]
+  users_offers_created_byTousers User?              @relation("offers_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_offers_created_by")
+  users_offers_updated_byTousers User?              @relation("offers_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_offers_updated_by")
 
   @@index([created_by], map: "fk_offers_created_by")
   @@index([updated_by], map: "fk_offers_updated_by")
@@ -1596,6 +1656,86 @@ model offer_items {
   @@index([created_by], map: "fk_offer_items_created_by")
   @@index([updated_by], map: "fk_offer_items_updated_by")
   @@index([variant_unit_price_id], map: "fk_offeritem_vup")
+}
+
+/// Applies an Offer to every product in a category (e.g. 10% off all "T-Shirts"),
+/// as an alternative to listing products one by one via offer_products.
+model offer_categories {
+  id                 BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
+  offer_id           BigInt          @db.UnsignedBigInt
+  category_id        BigInt          @db.UnsignedBigInt
+  created_at         DateTime        @default(now()) @db.Timestamp(0)
+  updated_at         DateTime        @default(now()) @db.Timestamp(0)
+  offers             Offer           @relation(fields: [offer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_offercat_offer")
+  product_categories ProductCategory @relation(fields: [category_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_offercat_category")
+
+  @@unique([offer_id, category_id], map: "uq_offer_category")
+  @@index([category_id], map: "fk_offercat_category")
+}
+
+/// Applies an Offer to every product of a brand (e.g. flat ₹200 off all "Titan" items).
+model offer_brands {
+  id             BigInt       @id @default(autoincrement()) @db.UnsignedBigInt
+  offer_id       BigInt       @db.UnsignedBigInt
+  brand_id       BigInt       @db.UnsignedBigInt
+  created_at     DateTime     @default(now()) @db.Timestamp(0)
+  updated_at     DateTime     @default(now()) @db.Timestamp(0)
+  offers         Offer        @relation(fields: [offer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_offerbrand_offer")
+  product_brands ProductBrand @relation(fields: [brand_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_offerbrand_brand")
+
+  @@unique([offer_id, brand_id], map: "uq_offer_brand")
+  @@index([brand_id], map: "fk_offerbrand_brand")
+}
+
+/// Restricts a Coupon to specific categories (e.g. code "FASHION10" only valid on Fashion).
+model coupon_categories {
+  id                 BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
+  coupon_id          BigInt          @db.UnsignedBigInt
+  category_id        BigInt          @db.UnsignedBigInt
+  created_at         DateTime        @default(now()) @db.Timestamp(0)
+  updated_at         DateTime        @default(now()) @db.Timestamp(0)
+  coupons            Coupon          @relation(fields: [coupon_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_couponcat_coupon")
+  product_categories ProductCategory @relation(fields: [category_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_couponcat_category")
+
+  @@unique([coupon_id, category_id], map: "uq_coupon_category")
+  @@index([category_id], map: "fk_couponcat_category")
+}
+
+/// Restricts a Coupon to specific products (e.g. code "WATCH500" only valid on watches).
+model coupon_products {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  coupon_id  BigInt   @db.UnsignedBigInt
+  product_id BigInt   @db.UnsignedBigInt
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @default(now()) @db.Timestamp(0)
+  coupons    Coupon   @relation(fields: [coupon_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_couponprod_coupon")
+  products   Product  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_couponprod_product")
+
+  @@unique([coupon_id, product_id], map: "uq_coupon_product")
+  @@index([product_id], map: "fk_couponprod_product")
+}
+
+/// Holds stock against a cart or order while checkout is in progress, so two shoppers
+/// can't both check out the last unit. Released back to Inventory.quantity_reserved on
+/// expiry, cart abandonment, or order cancellation; consumed on order confirmation.
+model inventory_reservations {
+  id                    BigInt                        @id @default(autoincrement()) @db.UnsignedBigInt
+  variant_unit_price_id BigInt                        @db.UnsignedBigInt
+  cart_id               BigInt?                       @db.UnsignedBigInt
+  order_id              BigInt?                       @db.UnsignedBigInt
+  quantity              Int
+  status                inventory_reservations_status @default(active)
+  expires_at            DateTime                      @db.Timestamp(0)
+  created_at            DateTime                      @default(now()) @db.Timestamp(0)
+  updated_at            DateTime                      @default(now()) @db.Timestamp(0)
+  variant_unit_price    VariantUnitPrice              @relation(fields: [variant_unit_price_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_invres_vup")
+  carts                 Cart?                         @relation(fields: [cart_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_invres_cart")
+  orders                Order?                        @relation(fields: [order_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_invres_order")
+
+  @@index([variant_unit_price_id], map: "fk_invres_vup")
+  @@index([cart_id], map: "fk_invres_cart")
+  @@index([order_id], map: "fk_invres_order")
+  @@index([status, expires_at], map: "idx_invres_status_expiry")
 }
 
 model order_status_history {
@@ -2367,6 +2507,13 @@ enum inventory_transactions_type {
   released
 }
 
+enum inventory_reservations_status {
+  active
+  confirmed
+  expired
+  released
+}
+
 enum notification_templates_channel {
   email
   sms
@@ -2547,6 +2694,13 @@ enum products_veg_type {
   nonveg
   vegan
   na
+}
+
+enum products_gender {
+  men
+  women
+  kids
+  unisex
 }
 
 model variant_price_history {
