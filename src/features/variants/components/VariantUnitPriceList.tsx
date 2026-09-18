@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, Star, Loader2, Tag, PackagePlus, PackageMinus, Boxes } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useUnits } from "@/features/units/hooks";
+import { useConfiguredAttributesForProduct } from "@/features/attributes/hooks/use-attributes";
+import { useSizeChart } from "@/features/size-charts/hooks/use-size-chart";
+import type { SizeChartGender } from "@/features/size-charts/types";
 import type { AdminUnitResponse } from "@/features/units/types";
 import { getMeasurementFieldConfig } from "../utils/measurement.util";
 import {
@@ -17,6 +20,7 @@ import {
 import type { VariantUnitPriceResponse, AdminVariantResponse } from "../types";
 
 interface UnitPriceRowFormState {
+  sizeValueId: string;
   unitId: string;
   unitValue: string;
   sku: string;
@@ -27,6 +31,7 @@ interface UnitPriceRowFormState {
 }
 
 const emptyRow: UnitPriceRowFormState = {
+  sizeValueId: "",
   unitId: "",
   unitValue: "",
   sku: "",
@@ -39,15 +44,30 @@ const emptyRow: UnitPriceRowFormState = {
 interface VariantUnitPriceListProps {
   productUuid: string;
   variantUuid: string;
+  /** The product's category - used to look up its dynamic "Size" attribute (or curated size chart), never hardcoded. When omitted, falls back to the legacy pack-size/unit flow (grocery-style items). */
+  categoryUuid?: string | null;
+  productGender?: SizeChartGender | null;
 }
 
 /**
- * Manages the (unit, price) combinations for a single item/variant, e.g.
- * "500g @ Rs.99" and "1kg @ Rs.180" under the same item. Selling price is not
- * collected here - the storefront computes it from basePrice minus any
- * active offer/discount.
+ * Manages the Size leaf level for one Color variant - each row is an
+ * independent Color+Size combination with its own price, stock, SKU and
+ * active status. Different Colors are free to carry entirely different sets
+ * of Sizes; nothing here assumes symmetry across Colors.
+ *
+ * The Size options offered are read from the category's dynamically
+ * configured "Size" attribute (or its curated size chart, when the category
+ * has one) - never a hardcoded list. Categories with no Size attribute at all
+ * fall back to the legacy pack-size/unit flow (grams/kg/ml), for grocery-style
+ * catalogs that still use this same table for pack sizes instead of clothing
+ * sizes.
  */
-function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceListProps) {
+function VariantUnitPriceList({
+  productUuid,
+  variantUuid,
+  categoryUuid = null,
+  productGender = null,
+}: VariantUnitPriceListProps) {
   const { data: unitPrices = [], isLoading } = useVariantUnitPrices(productUuid, variantUuid);
   const { data: unitsData } = useUnits({ pageSize: 100 });
   const units = unitsData?.data ?? [];
@@ -57,13 +77,38 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
     (variantResponse as unknown as AdminVariantResponse) ??
     null;
 
-  const colorAdjustment = Number(variant?.priceAdjustment ?? 0);
-  const sizeAttributeValue = variant?.attributeValues?.find(
-    (av) => av.attributeName.toLowerCase() === "size"
+  // Dynamic Size options for this Color, from the Product's configured Size
+  // attribute (curated by a size chart when one exists for the category+gender).
+  const { data: productAttributes = [] } = useConfiguredAttributesForProduct(productUuid);
+  const { data: sizeChart = [] } = useSizeChart(categoryUuid, productGender);
+  const sizeAttribute = productAttributes.find(
+    (a) => a.name.trim().toLowerCase() === "size"
   );
-  const sizeAdjustment = Number(sizeAttributeValue?.priceAdjustment ?? 0);
-  const autoCalcTotal = colorAdjustment + sizeAdjustment;
-  const hasAutoCalcInputs = colorAdjustment !== 0 || sizeAdjustment !== 0;
+  const sizeOptions = sizeChart.length > 0 ? sizeChart : (sizeAttribute?.values ?? []);
+  const hasDynamicSizes = sizeOptions.length > 0;
+
+  // When Sizes are dynamic, the underlying unit/pack-size dimension is not
+  // shown to the admin at all - silently default to the first active "count"
+  // unit (e.g. "Nos") so every row still satisfies the schema's required
+  // unit_id/unit_value without asking the admin to think about grams/kg.
+  const fallbackUnit =
+    units.find((u: AdminUnitResponse) => u.type === "count" && u.isActive) ??
+    units.find((u: AdminUnitResponse) => u.isActive) ??
+    null;
+
+  // Legacy manual "Color price add-on" field on the item itself, plus every
+  // attribute value this item has (Color, Fabric, ... whatever the product
+  // uses) - each configured independently under Catalog > Attributes.
+  const legacyColorAdjustment = Number(variant?.priceAdjustment ?? 0);
+  const attributeAdjustments = variant?.attributeValues ?? [];
+  const attributeAdjustmentsTotal = attributeAdjustments.reduce(
+    (sum, av) => sum + Number(av.priceAdjustment ?? 0),
+    0
+  );
+  const sizeValuePriceAdjustment = (sizeValueId: string): number => {
+    if (sizeChart.length > 0) return 0; // size chart entries don't carry a price add-on
+    return Number(sizeAttribute?.values.find((v) => v.id === sizeValueId)?.priceAdjustment ?? 0);
+  };
 
   const createMutation = useCreateVariantUnitPrice();
   const updateMutation = useUpdateVariantUnitPrice();
@@ -84,6 +129,35 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
   const selectedUnit = units.find((u: AdminUnitResponse) => u.id === form.unitId);
   const fieldConfig = getMeasurementFieldConfig(selectedUnit ?? null);
 
+  const autoCalcTotal =
+    legacyColorAdjustment +
+    attributeAdjustmentsTotal +
+    (hasDynamicSizes && form.sizeValueId ? sizeValuePriceAdjustment(form.sizeValueId) : 0);
+  const hasAutoCalcInputs = autoCalcTotal !== 0;
+  const autoCalcBreakdown = [
+    ...(legacyColorAdjustment !== 0 ? [`color +₹${legacyColorAdjustment}`] : []),
+    ...attributeAdjustments
+      .filter((av) => Number(av.priceAdjustment ?? 0) !== 0)
+      .map((av) => `${av.attributeName} +₹${av.priceAdjustment}`),
+  ].join(", ");
+
+  // Sizes already used by another row for this Color, excluded from the "add"
+  // dropdown so the same Size can't be picked twice (the server also rejects
+  // this, but filtering here keeps the picker honest about what's left).
+  const usedSizeValueIds = useMemo(
+    () =>
+      new Set(
+        unitPrices
+          .filter((u) => (editingId ? u.id !== editingId : true))
+          .map((u) => u.sizeValueId)
+          .filter((id): id is string => Boolean(id))
+      ),
+    [unitPrices, editingId]
+  );
+  const availableSizeOptions = sizeOptions.filter(
+    (s) => !usedSizeValueIds.has(s.id) || s.id === form.sizeValueId
+  );
+
   const resetForm = () => {
     setForm(emptyRow);
     setFormError(null);
@@ -100,6 +174,7 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
 
   const startEdit = (item: VariantUnitPriceResponse) => {
     setForm({
+      sizeValueId: item.sizeValueId || "",
       unitId: item.unitId,
       unitValue: String(item.unitValue ?? ""),
       sku: item.sku,
@@ -160,15 +235,31 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
   const handleSave = async () => {
     setFormError(null);
 
-    if (!form.unitId) {
-      setFormError("Please select a unit");
-      return;
+    let unitId = form.unitId;
+    let unitValue = Number(form.unitValue);
+
+    if (hasDynamicSizes) {
+      if (!form.sizeValueId) {
+        setFormError("Please select a Size");
+        return;
+      }
+      if (!fallbackUnit) {
+        setFormError("No active unit configured to attach this Size to - add one under Catalog > Units first");
+        return;
+      }
+      unitId = fallbackUnit.id;
+      unitValue = 1;
+    } else {
+      if (!unitId) {
+        setFormError("Please select a unit");
+        return;
+      }
+      if (!unitValue || unitValue <= 0) {
+        setFormError(fieldConfig.validationMessage);
+        return;
+      }
     }
-    const unitValue = Number(form.unitValue);
-    if (!unitValue || unitValue <= 0) {
-      setFormError(fieldConfig.validationMessage);
-      return;
-    }
+
     if (!form.sku.trim()) {
       setFormError("SKU is required");
       return;
@@ -194,8 +285,9 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
     }
 
     const payload = {
-      unitId: form.unitId,
+      unitId,
       unitValue,
+      ...(hasDynamicSizes ? { sizeValueId: form.sizeValueId } : {}),
       sku: form.sku.trim(),
       ...(basePrice !== undefined ? { basePrice } : {}),
       stock,
@@ -246,7 +338,7 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
       <div className="px-6 py-4.5 border-b border-cream-border flex items-center justify-between">
         <h2 className="text-[15px] font-bold text-neutral-900 tracking-tight flex items-center gap-2">
           <Tag className="w-4 h-4 text-secondary-600" />
-          <span>Units & Pricing</span>
+          <span>{hasDynamicSizes ? "Sizes & Pricing" : "Units & Pricing"}</span>
           <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-cream-200 text-neutral-600 border border-cream-border">
             {unitPrices.length}
           </span>
@@ -258,11 +350,11 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
             variant="ghost"
             size="sm"
             onClick={startAdd}
-            disabled={isBusy}
+            disabled={isBusy || (hasDynamicSizes && availableSizeOptions.length === 0)}
             className="h-8 text-xs font-semibold text-secondary-700 hover:text-secondary-900 hover:bg-secondary-50 cursor-pointer disabled:opacity-50"
           >
             <Plus className="w-3.5 h-3.5 mr-1" />
-            <span>Add unit + price</span>
+            <span>{hasDynamicSizes ? "Add size + price" : "Add unit + price"}</span>
           </Button>
         )}
       </div>
@@ -276,7 +368,9 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
           {unitPrices.length === 0 && !showForm && (
             <div className="py-7 px-6 text-center space-y-2">
               <p className="text-xs font-medium text-neutral-600">
-                No unit / price combinations yet. Add one to make this item purchasable.
+                {hasDynamicSizes
+                  ? "No sizes yet. Add one to make this color purchasable."
+                  : "No unit / price combinations yet. Add one to make this item purchasable."}
               </p>
               <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200/80 rounded-lg py-1.5 px-3 max-w-md mx-auto">
                 <span>⚠️ If price details are not entered, this item remains in the <strong>Inactive list</strong> and hidden from customers.</span>
@@ -293,7 +387,8 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-neutral-900">
-                      {item.measurement?.value} {item.unitCode || item.measurement?.unit}
+                      {item.sizeValue ||
+                        `${item.measurement?.value} ${item.unitCode || item.measurement?.unit}`}
                     </span>
                     {item.isDefault && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-bold">
@@ -386,14 +481,14 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
                     {stockAdjustMode === "in" ? (
                       <>
                         <PackagePlus className="w-3.5 h-3.5 text-emerald-600" /> Stock in for{" "}
-                        {item.measurement?.value} {item.unitCode || item.measurement?.unit} — currently{" "}
-                        {item.stock ?? 0}
+                        {item.sizeValue || `${item.measurement?.value} ${item.unitCode || item.measurement?.unit}`}{" "}
+                        — currently {item.stock ?? 0}
                       </>
                     ) : (
                       <>
                         <PackageMinus className="w-3.5 h-3.5 text-amber-600" /> Stock out for{" "}
-                        {item.measurement?.value} {item.unitCode || item.measurement?.unit} — currently{" "}
-                        {item.stock ?? 0}
+                        {item.sizeValue || `${item.measurement?.value} ${item.unitCode || item.measurement?.unit}`}{" "}
+                        — currently {item.stock ?? 0}
                       </>
                     )}
                   </p>
@@ -443,87 +538,113 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
           {showForm && (
             <div className="p-6 bg-cream-50/60 space-y-4">
               <p className="text-xs text-neutral-500 -mt-1">
-                Add one row for every option you sell this item in — e.g. 250 Grams, 500 Grams
-                and 1 Kilogram, or S, M and L for clothing — each with its own price, SKU and
-                stock.
+                {hasDynamicSizes
+                  ? "Add one row for every Size you sell this color in — e.g. S, M, L and XL — each with its own price, SKU and stock. Different colors can have different sizes."
+                  : "Add one row for every option you sell this item in — e.g. 250 Grams, 500 Grams and 1 Kilogram — each with its own price, SKU and stock."}
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {hasDynamicSizes ? (
                 <div>
                   <label className="block text-xs font-semibold text-neutral-800 mb-1.5">
-                    Unit <span className="text-red-500">*</span>
+                    Size <span className="text-red-500">*</span>
                   </label>
                   <select
-                    value={form.unitId}
-                    onChange={(e) => {
-                      const nextUnitId = e.target.value;
-                      const nextUnit = units.find((u: AdminUnitResponse) => u.id === nextUnitId);
-                      setForm((f) => ({
-                        ...f,
-                        unitId: nextUnitId,
-                        unitValue:
-                          nextUnit?.type === "size" && !f.unitValue ? "1" : f.unitValue,
-                      }));
-                    }}
-                    disabled={isBusy}
+                    value={form.sizeValueId}
+                    onChange={(e) => setForm((f) => ({ ...f, sizeValueId: e.target.value }))}
+                    disabled={isBusy || Boolean(editingId)}
                     className="w-full h-10 px-3 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 disabled:opacity-60 disabled:bg-neutral-100"
                   >
-                    <option value="">Select unit</option>
-                    {units.map((u: AdminUnitResponse) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name} ({u.code})
+                    <option value="">Select size</option>
+                    {availableSizeOptions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.value}
                       </option>
                     ))}
                   </select>
-                  <p className="text-[11px] text-neutral-400 mt-1">
-                    What is it measured in — Grams, Kilograms, Millilitres, or just a count.
-                  </p>
+                  {editingId && (
+                    <p className="text-[11px] text-neutral-400 mt-1">
+                      Size can&apos;t be changed after creation — delete this row and add a new one instead.
+                    </p>
+                  )}
                 </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-800 mb-1.5">
+                      Unit <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={form.unitId}
+                      onChange={(e) => {
+                        const nextUnitId = e.target.value;
+                        const nextUnit = units.find((u: AdminUnitResponse) => u.id === nextUnitId);
+                        setForm((f) => ({
+                          ...f,
+                          unitId: nextUnitId,
+                          unitValue:
+                            nextUnit?.type === "size" && !f.unitValue ? "1" : f.unitValue,
+                        }));
+                      }}
+                      disabled={isBusy}
+                      className="w-full h-10 px-3 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 disabled:opacity-60 disabled:bg-neutral-100"
+                    >
+                      <option value="">Select unit</option>
+                      {units.map((u: AdminUnitResponse) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.code})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-neutral-400 mt-1">
+                      What is it measured in — Grams, Kilograms, Millilitres, or just a count.
+                    </p>
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-800 mb-1.5">
-                    {fieldConfig.type === "size" ? "Size value" : "Pack Size"}{" "}
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={form.unitValue}
-                    onChange={(e) => setForm((f) => ({ ...f, unitValue: e.target.value }))}
-                    disabled={isBusy}
-                    placeholder={fieldConfig.type === "size" ? "1" : "e.g. 500"}
-                    className="w-full h-10 px-3 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 disabled:opacity-60 disabled:bg-neutral-100"
-                  />
-                  <p className="text-[11px] text-neutral-400 mt-1">
-                    {fieldConfig.type === "size"
-                      ? fieldConfig.helperText
-                      : "How much is in one pack — e.g. 500 for a 500 Gram pack."}
-                  </p>
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-800 mb-1.5">
+                      {fieldConfig.type === "size" ? "Size value" : "Pack Size"}{" "}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={form.unitValue}
+                      onChange={(e) => setForm((f) => ({ ...f, unitValue: e.target.value }))}
+                      disabled={isBusy}
+                      placeholder={fieldConfig.type === "size" ? "1" : "e.g. 500"}
+                      className="w-full h-10 px-3 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 disabled:opacity-60 disabled:bg-neutral-100"
+                    />
+                    <p className="text-[11px] text-neutral-400 mt-1">
+                      {fieldConfig.type === "size"
+                        ? fieldConfig.helperText
+                        : "How much is in one pack — e.g. 500 for a 500 Gram pack."}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-neutral-800 mb-1.5">
-                    SKU (pack code) <span className="text-red-500">*</span>
+                    SKU {hasDynamicSizes ? "" : "(pack code)"} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={form.sku}
                     onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
                     disabled={isBusy}
-                    placeholder="e.g. MIXTURE-500G"
+                    placeholder={hasDynamicSizes ? "e.g. TSHIRT-RED-M" : "e.g. MIXTURE-500G"}
                     className="w-full h-10 px-3 rounded-lg border border-neutral-200 text-sm font-mono bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 disabled:opacity-60 disabled:bg-neutral-100"
                   />
                   <p className="text-[11px] text-neutral-400 mt-1">
-                    A unique code just for this pack size.
+                    A unique code just for this {hasDynamicSizes ? "color + size" : "pack size"}.
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-neutral-800 mb-1.5">
-                    Price per pack (₹)
+                    Price {hasDynamicSizes ? "" : "per pack"} (₹)
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -548,7 +669,7 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
                           setForm((f) => ({ ...f, basePrice: String(autoCalcTotal) }))
                         }
                         className="h-10 shrink-0 text-xs font-semibold whitespace-nowrap"
-                        title="Fill from this item's color + size price add-ons"
+                        title="Fill from this item's attribute value price add-ons"
                       >
                         Auto-fill ₹{autoCalcTotal}
                       </Button>
@@ -556,8 +677,8 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
                   </div>
                   <p className="text-[11px] text-neutral-400 mt-1">
                     {hasAutoCalcInputs
-                      ? `Leave blank to auto-calculate from this item's price add-ons (color +₹${colorAdjustment}, size +₹${sizeAdjustment}, plus the product's base price).`
-                      : "What customer pays for this pack. Leave blank to use the product's base price as-is."}
+                      ? `Leave blank to auto-calculate from this color/size's price add-ons (${autoCalcBreakdown}, plus the product's base price).`
+                      : "What customer pays for this option. Leave blank to use the product's base price as-is."}
                   </p>
                 </div>
               </div>
@@ -580,7 +701,7 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
                   <p className="text-[11px] text-neutral-400 mt-1">
                     {editingId
                       ? "Sets the stock quantity directly. Use the stock in/out buttons on the row for quick adjustments instead."
-                      : "How many units of this pack are available right now."}
+                      : "How many units of this pack are available right now. 0 means only this Color + Size is out of stock — every other size stays unaffected."}
                   </p>
                 </div>
               </div>
@@ -638,8 +759,8 @@ function VariantUnitPriceList({ productUuid, variantUuid }: VariantUnitPriceList
         open={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        title="Delete Unit Price"
-        description={`Are you sure you want to delete the "${deleteTarget?.sku}" unit price? This action cannot be undone.`}
+        title="Delete Size"
+        description={`Are you sure you want to delete "${deleteTarget?.sizeValue || deleteTarget?.sku}"? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
         variant="destructive"

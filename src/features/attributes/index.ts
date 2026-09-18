@@ -1,12 +1,15 @@
 export {
   useAdminAttributes,
   useAdminAttribute,
-  useAttributesForCategory,
+  useAttributesForProduct,
+  useConfiguredAttributesForProduct,
+  useItemAttributeValues,
   useCreateAttribute,
   useUpdateAttribute,
   useDeleteAttribute,
   useAddAttributeValue,
   useUpdateAttributeValue,
   useDeleteAttributeValue,
-  useSetAttributeCategories,
+  useSetAttributesForProduct,
+  useSetAttributeValuesForItem,
 } from "./hooks";

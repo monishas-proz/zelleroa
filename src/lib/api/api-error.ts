@@ -4,18 +4,21 @@ export class ApiError extends Error {
   public readonly statusCode: HttpStatusCode;
   public readonly errors?: string[];
   public readonly isOperational: boolean;
+  public readonly details?: unknown;
 
   constructor(
     message: string,
     statusCode: HttpStatusCode = HTTP_STATUS.INTERNAL_SERVER_ERROR,
     errors?: string[],
-    isOperational = true
+    isOperational = true,
+    details?: unknown
   ) {
     super(message);
     this.name = "ApiError";
     this.statusCode = statusCode;
     this.errors = errors;
     this.isOperational = isOperational;
+    this.details = details;
     Object.setPrototypeOf(this, new.target.prototype);
     Error.captureStackTrace(this, this.constructor);
   }
@@ -36,8 +39,8 @@ export class ApiError extends Error {
     return new ApiError(message, HTTP_STATUS.NOT_FOUND);
   }
 
-  static conflict(message = "Resource already exists") {
-    return new ApiError(message, HTTP_STATUS.CONFLICT);
+  static conflict(message = "Resource already exists", details?: unknown) {
+    return new ApiError(message, HTTP_STATUS.CONFLICT, undefined, true, details);
   }
 
   static tooManyRequests(message = "Too many requests. Please try again later.") {

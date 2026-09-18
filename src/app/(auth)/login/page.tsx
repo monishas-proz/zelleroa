@@ -39,14 +39,17 @@ function LoginForm() {
         password: data.password,
       },
       {
-        onSuccess: async () => {
+        onSuccess: async (response) => {
           // Sync NextAuth session and redirect
           await signIn("credentials", {
             email: data.email.trim(),
             password: data.password,
             redirect: false,
           });
-          router.push(callbackUrl);
+          const userRole = response?.data?.user?.role;
+          const destination =
+            callbackUrl === "/" && userRole === "AGENT" ? "/agent/dashboard" : callbackUrl;
+          router.push(destination);
           router.refresh();
         },
       }

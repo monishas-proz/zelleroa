@@ -18,7 +18,8 @@ export const POST = createApiHandler(
 
       const { order, accessToken, refreshToken } = await orderService.createGuestOrder(
         body,
-        guestSessionId
+        guestSessionId,
+        request
       );
 
       const cookieStore = await cookies();

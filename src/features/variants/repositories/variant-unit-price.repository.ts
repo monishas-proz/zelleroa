@@ -21,12 +21,15 @@ export const variantUnitPriceInclude = Prisma.validator<Prisma.VariantUnitPriceI
       quantity_reserved: true,
     },
   },
+  attribute_value: {
+    select: { uuid: true, value: true },
+  },
   variant: {
     select: {
       id: true,
       uuid: true,
       variant_name: true,
-      productId: true,
+      itemId: true,
     },
   },
 });
@@ -75,6 +78,21 @@ export const variantUnitPriceRepository = {
         variant_id: variantId,
         unit_id: unitId,
         unit_value: unitValue,
+        deleted_at: null,
+        ...(excludeUuid ? { uuid: { not: excludeUuid } } : {}),
+      },
+    });
+  },
+
+  async findByVariantAndSize(
+    variantId: bigint,
+    attributeValueId: bigint | null,
+    excludeUuid?: string
+  ) {
+    return db.variantUnitPrice.findFirst({
+      where: {
+        variant_id: variantId,
+        attribute_value_id: attributeValueId,
         deleted_at: null,
         ...(excludeUuid ? { uuid: { not: excludeUuid } } : {}),
       },
@@ -293,6 +311,63 @@ export const variantUnitPriceRepository = {
       }
 
       return updated;
+    });
+  },
+
+  /**
+   * "Same price for all sizes" - sets base_price uniformly across every unit
+   * price row under one variant, then applies any per-row overrides on top in
+   * the same transaction, tracking price history for every row that actually
+   * changed.
+   */
+  async bulkSetSamePrice(
+    variantId: bigint,
+    basePrice: number,
+    perSizeOverrides: Array<{ id: string; basePrice?: number; sku?: string }>,
+    adminId?: bigint | null
+  ) {
+    return db.$transaction(async (tx) => {
+      const rows = await tx.variantUnitPrice.findMany({
+        where: { variant_id: variantId, deleted_at: null },
+      });
+
+      const overrideByUuid = new Map(perSizeOverrides.map((o) => [o.id, o]));
+
+      for (const row of rows) {
+        const override = overrideByUuid.get(row.uuid);
+        const effectiveBasePrice = override?.basePrice ?? basePrice;
+        const oldBasePrice = Number(row.base_price);
+
+        if (effectiveBasePrice !== oldBasePrice) {
+          await tx.variant_price_history.create({
+            data: {
+              uuid: crypto.randomUUID(),
+              variant_unit_price_id: row.id,
+              old_base_price: oldBasePrice,
+              new_base_price: effectiveBasePrice,
+              changed_at: new Date(),
+              is_active: true,
+              created_by: adminId ?? null,
+              updated_by: adminId ?? null,
+            },
+          });
+        }
+
+        await tx.variantUnitPrice.update({
+          where: { id: row.id },
+          data: {
+            base_price: effectiveBasePrice,
+            ...(override?.sku ? { sku: override.sku } : {}),
+            updated_by: adminId ?? null,
+          },
+        });
+      }
+
+      return tx.variantUnitPrice.findMany({
+        where: { variant_id: variantId, deleted_at: null },
+        include: variantUnitPriceInclude,
+        orderBy: [{ is_default: "desc" }, { createdAt: "asc" }],
+      });
     });
   },
 

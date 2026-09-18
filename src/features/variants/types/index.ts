@@ -50,6 +50,9 @@ export interface VariantUnitPriceResponse {
   unitValue?: number;
   unitName?: string;
   unitCode?: string;
+  /** The Size this row represents (e.g. "M"), if the Item/Color has a Size axis. */
+  sizeValueId?: string; // Public AttributeValue UUID
+  sizeValue?: string;
   isDefault: boolean;
   isActive: boolean;
   stock?: number;
@@ -67,19 +70,18 @@ export interface AdminVariantAttributeValueResponse {
 }
 
 export interface AdminVariantResponse {
-  id: string; // Public Variant UUID
-  productId: string; // Public Product UUID
+  id: string; // Public Variant UUID (Color level)
+  itemId: string; // Public Item UUID
+  itemName: string;
+  itemSlug: string;
+  /** @deprecated use itemId - kept for callers not yet migrated off the old Product-scoped naming */
+  productId: string;
+  /** @deprecated use itemName */
   productName: string;
+  /** @deprecated use itemSlug */
   productSlug: string;
-  variantName: string; // Stored DB variant_name e.g. "Classic Mixture"
+  variantName: string; // Stored DB variant_name e.g. "Red"
   slug: string;
-  shortDescription: string | null;
-  description: string | null;
-  ingredients: string | null;
-  isReadyToMix: boolean;
-  cookingRecipe: string | null;
-  shelfLife: string | null;
-  vegType: "veg" | "nonveg" | "vegan" | "na";
   colorName: string | null;
   colorHex: string | null;
   /** Amount added to the product base price whenever this color is picked. */
@@ -129,8 +131,8 @@ export interface GetAdminVariantsParams {
   page?: number;
   pageSize?: number;
   search?: string;
-  productId?: string;
-  productUuid?: string;
+  itemId?: string;
+  itemUuid?: string;
   isActive?: boolean;
 }
 
@@ -210,7 +212,41 @@ export interface AdminVariantsCountResponse {
   all: number;
 }
 
-export type { BulkEditVariantsInput, BulkEditVariantItemInput } from "../validations/admin-variant.schema";
+export interface GenerateVariantsResponse {
+  created: number;
+  skipped: number;
+  variants: AdminVariantResponse[];
+}
+
+/** Dry-run report for generateVariants - see variantService.previewGenerateVariants. */
+export interface PreviewGenerateVariantsResponse {
+  toAdd: {
+    colorCount: number;
+    sizeCount: number;
+  };
+  toRemove: {
+    /** Existing Colors (ProductVariant) whose attribute combination is no longer
+     * part of the selection - removing one implicitly removes every Size under it. */
+    colors: Array<{ variantUuid: string; label: string }>;
+    /** Existing Sizes (VariantUnitPrice) under a Color that IS kept, whose own
+     * Size value is no longer part of the selection. */
+    sizes: Array<{ variantUuid: string; unitPriceUuid: string; label: string }>;
+  };
+}
+
+export interface ApplyVariantRemovalsResponse {
+  deactivatedVariants: number;
+  deactivatedUnitPrices: number;
+}
+
+export type {
+  BulkEditVariantsInput,
+  BulkEditVariantItemInput,
+  GenerateVariantsInput,
+  GenerateVariantOptionInput,
+  PreviewGenerateVariantsInput,
+  ApplyVariantRemovalsInput,
+} from "../validations/admin-variant.schema";
 export type {
   CreateVariantUnitPriceInput,
   UpdateVariantUnitPriceInput,

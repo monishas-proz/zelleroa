@@ -30,6 +30,15 @@ export const cartItemInclude = Prisma.validator<Prisma.CartItemInclude>()({
       },
     },
   },
+  item: {
+    select: {
+      id: true,
+      uuid: true,
+      name: true,
+      isActive: true,
+      deleted_at: true,
+    },
+  },
   variant_unit_price: {
     select: {
       id: true,
@@ -136,6 +145,8 @@ export const cartRepository = {
   async addItemToCart(params: {
     owner: CartOwner;
     productId: bigint;
+    styleId: bigint;
+    itemId?: bigint | null;
     variantId: bigint;
     variantUnitPriceId?: bigint | null;
     quantity: number;
@@ -154,6 +165,7 @@ export const cartRepository = {
       const existingItem = await tx.cartItem.findFirst({
         where: {
           cartId: cart.id,
+          styleId: params.styleId,
           variantId: params.variantId,
           ...(params.variantUnitPriceId ? { variantUnitPriceId: params.variantUnitPriceId } : {}),
         },
@@ -198,6 +210,8 @@ export const cartRepository = {
             uuid: crypto.randomUUID(),
             cartId: cart.id,
             productId: params.productId,
+            styleId: params.styleId,
+            itemId: params.itemId ?? null,
             variantId: params.variantId,
             variantUnitPriceId: params.variantUnitPriceId ?? null,
             quantity: params.quantity,

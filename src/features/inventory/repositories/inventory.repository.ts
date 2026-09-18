@@ -16,8 +16,22 @@ const inventoryVariantSelect = {
   id: true,
   variant_name: true,
   color_name: true,
-  product: {
-    select: { id: true, uuid: true, name: true, slug: true },
+  item: {
+    select: {
+      id: true,
+      uuid: true,
+      name: true,
+      slug: true,
+      style: {
+        select: {
+          id: true,
+          uuid: true,
+          name: true,
+          slug: true,
+          product: { select: { id: true, uuid: true, name: true, slug: true } },
+        },
+      },
+    },
   },
 } as const;
 
@@ -45,7 +59,7 @@ export const inventoryRepository = {
       productWhere.uuid = productUuid;
     }
     if (Object.keys(productWhere).length > 0) {
-      variantWhere.product = productWhere;
+      variantWhere.item = { style: { product: productWhere } };
     }
     if (color) {
       variantWhere.color_name = { contains: color };
@@ -109,8 +123,20 @@ export const inventoryRepository = {
               select: {
                 id: true,
                 variant_name: true,
-                product: {
-                  select: { id: true, name: true, slug: true },
+                item: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    style: {
+                      select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        product: { select: { id: true, name: true, slug: true } },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -161,7 +187,7 @@ export const inventoryRepository = {
             include: {
               variant: {
                 select: {
-                  product: { select: { name: true } },
+                  item: { select: { style: { select: { product: { select: { name: true } } } } } },
                 },
               },
             },

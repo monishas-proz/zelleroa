@@ -22,7 +22,8 @@ export const POST = createApiHandler(
         uuid,
         body.value,
         adminEmail,
-        body.priceAdjustment
+        body.priceAdjustment,
+        body.colorHex
       );
       return apiCreated(attribute, "Attribute value added successfully");
     },

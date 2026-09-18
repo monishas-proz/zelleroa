@@ -13,7 +13,6 @@ const brandDetailInclude = Prisma.validator<Prisma.ProductBrandInclude>()({
       id: true,
       name: true,
       slug: true,
-      base_price: true,
       isActive: true,
     },
   },

@@ -8,23 +8,23 @@ import { Button } from "@/components/ui/button";
 import { FilterSidebar } from "@/components/storefront/filters/FilterSidebar";
 import { CustomerProductGrid } from "@/features/customers/components/catalog/CustomerProductGrid";
 import {
-  useCustomerGlobalVariants,
+  useCustomerStyles,
   useCustomerCategories,
 } from "@/features/customers/hooks/use-customer-catalog";
-import type { CustomerVariantListItemDto } from "@/features/customers/types/catalog.types";
-import type { CustomerGlobalVariantListInput } from "@/features/customers/validations/catalog.schema";
+import type { CustomerProductListItemDto } from "@/features/customers/types/catalog.types";
+import type { CustomerProductListInput } from "@/features/customers/validations/catalog.schema";
 
 const SORT_OPTIONS: {
   value: string;
   label: string;
-  sortBy: CustomerGlobalVariantListInput["sortBy"];
-  sortOrder: CustomerGlobalVariantListInput["sortOrder"];
+  sortBy: CustomerProductListInput["sortBy"];
+  sortOrder: CustomerProductListInput["sortOrder"];
 }[] = [
   { value: "createdAt_desc", label: "Newest First", sortBy: "createdAt", sortOrder: "desc" },
-  { value: "price_asc", label: "Price: Low to High", sortBy: "basePrice", sortOrder: "asc" },
-  { value: "price_desc", label: "Price: High to Low", sortBy: "basePrice", sortOrder: "desc" },
-  { value: "name_asc", label: "Name: A to Z", sortBy: "variantName", sortOrder: "asc" },
-  { value: "name_desc", label: "Name: Z to A", sortBy: "variantName", sortOrder: "desc" },
+  { value: "price_asc", label: "Price: Low to High", sortBy: "price", sortOrder: "asc" },
+  { value: "price_desc", label: "Price: High to Low", sortBy: "price", sortOrder: "desc" },
+  { value: "name_asc", label: "Name: A to Z", sortBy: "name", sortOrder: "asc" },
+  { value: "name_desc", label: "Name: Z to A", sortBy: "name", sortOrder: "desc" },
 ];
 
 function ProductCatalogSkeleton() {
@@ -83,8 +83,8 @@ export default function ShopAllPage() {
   const [maxPrice, setMaxPrice] = useState(1000);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
-  // Accumulated variants for Infinite Scroll
-  const [accumulatedVariants, setAccumulatedVariants] = useState<CustomerVariantListItemDto[]>([]);
+  // Accumulated styles for Infinite Scroll
+  const [accumulatedVariants, setAccumulatedVariants] = useState<CustomerProductListItemDto[]>([]);
 
   // Fetch all categories (supports 250 categories)
   const { data: categoriesData, isLoading: isLoadingCategories } = useCustomerCategories({ pageSize: 250 });
@@ -117,14 +117,14 @@ export default function ShopAllPage() {
       ? ("vegan" as const)
       : undefined;
 
-  // Query variants with filters (Postman: POST /api/customer/variants)
+  // Query the listing as Styles - one card per Style (Postman: POST /api/customer/styles)
   const {
     data: variantsResponse,
     isLoading,
     isFetching,
     error,
     refetch,
-  } = useCustomerGlobalVariants({
+  } = useCustomerStyles({
     page,
     pageSize: 18,
     search: search.trim() ? search.trim() : undefined,
@@ -449,7 +449,7 @@ export default function ShopAllPage() {
               ) : (
                 <div className={isFetching && page === 1 ? "opacity-60 transition-opacity duration-200" : "transition-opacity duration-200"}>
                   <CustomerProductGrid
-                    variants={displayedVariants}
+                    styles={displayedVariants}
                     columns={3}
                     onResetFilters={hasActiveFilters ? handleResetFilters : undefined}
                   />

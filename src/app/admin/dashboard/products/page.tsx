@@ -31,6 +31,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { AdminProductResponse } from "@/features/products/types";
 import { ProductForm } from "@/features/products/components/ProductForm";
+import { ProductAttributesPanel } from "@/features/products/components/ProductAttributesPanel";
 
 export default function AdminProductsPage() {
   const [search, setSearch] = useState("");
@@ -44,6 +45,11 @@ export default function AdminProductsPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] =
     useState<AdminProductResponse | null>(null);
+  // Once a new product is created, the modal switches to letting the admin
+  // pick its Attributes (Color, Size...) right away - product_attribute_configs
+  // needs an existing product row, so this can't happen before creation.
+  const [createdProductId, setCreatedProductId] = useState<string | null>(null);
+  const [createdProductName, setCreatedProductName] = useState<string>("");
 
   // Main Products Query (filtered by search and selected category)
   const { data, isLoading, error, refetch } = useAdminProducts({
@@ -306,36 +312,70 @@ export default function AdminProductsPage() {
       {/* CREATE MODAL */}
       <FormModal
         open={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        title="Add Product"
-        description="Create a new product"
+        onClose={() => {
+          setIsCreateOpen(false);
+          setCreatedProductId(null);
+          setCreatedProductName("");
+          refetch();
+        }}
+        title={createdProductId ? "Choose Attributes" : "Add Product"}
+        description={
+          createdProductId
+            ? `Pick which attributes (Color, Size, Material...) apply to "${createdProductName}". You can change this anytime from the product's page.`
+            : "Create a new product"
+        }
         size="lg"
       >
-        <ProductForm
-          categories={categoryOptions}
-          brands={brandOptions}
-          hsnCodes={hsnOptions}
-          isLoading={createMutation.isPending}
-          submitLabel="Create Product"
-          onSubmit={async (formData) => {
-            const payload = {
-              name: formData.name,
-              slug: formData.slug,
-              categoryId: formData.categoryId,
-              brandId: formData.brandId,
-              hsnCodeId: formData.hsnCodeId,
-              gender: formData.gender,
-            };
+        {createdProductId ? (
+          <div className="space-y-5">
+            <ProductAttributesPanel productUuid={createdProductId} />
+            <div className="flex justify-end pt-2 border-t border-neutral-100">
+              <Button
+                type="button"
+                onClick={() => {
+                  setIsCreateOpen(false);
+                  setCreatedProductId(null);
+                  setCreatedProductName("");
+                  refetch();
+                }}
+                className="h-10 rounded-xl bg-[var(--color-secondary-600)] px-5 text-sm font-semibold text-white hover:bg-[var(--color-secondary-700)]"
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <ProductForm
+            categories={categoryOptions}
+            brands={brandOptions}
+            hsnCodes={hsnOptions}
+            isLoading={createMutation.isPending}
+            submitLabel="Next: Attributes"
+            onSubmit={async (formData) => {
+              const payload = {
+                name: formData.name,
+                slug: formData.slug,
+                categoryId: formData.categoryId,
+                brandId: formData.brandId,
+                hsnCodeId: formData.hsnCodeId,
+                gender: formData.gender,
+              };
 
-            const created = await createMutation.mutateAsync(payload);
-            setIsCreateOpen(false);
+              const created = await createMutation.mutateAsync(payload);
 
-            if (formData.productImage && created?.data?.id) {
-              await saveProductPrimaryImage(created.data.id, formData.productImage);
-            }
-            refetch();
-          }}
-        />
+              if (formData.productImage && created?.data?.id) {
+                await saveProductPrimaryImage(created.data.id, formData.productImage);
+              }
+              if (created?.data?.id) {
+                setCreatedProductId(created.data.id);
+                setCreatedProductName(formData.name);
+              } else {
+                setIsCreateOpen(false);
+                refetch();
+              }
+            }}
+          />
+        )}
       </FormModal>
 
       {/* EDIT MODAL */}
@@ -399,6 +439,13 @@ export default function AdminProductsPage() {
               refetch();
             }}
           />
+        )}
+
+        {selectedProduct && (
+          <div className="mt-8 pt-6 border-t border-neutral-100">
+            <h3 className="text-sm font-bold text-neutral-900 mb-3">Attributes</h3>
+            <ProductAttributesPanel productUuid={selectedProduct.id} />
+          </div>
         )}
       </FormModal>
 

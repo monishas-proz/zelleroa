@@ -48,7 +48,7 @@ async function validateProductAndVariant(productUuid: string, variantUuid: strin
   }
 
   const variant = await variantRepository.findByUuid(variantUuid);
-  if (!variant || variant.productId !== product.id) {
+  if (!variant || variant.item.style.productId !== product.id) {
     throw ApiError.notFound("Variant not found for this product");
   }
 

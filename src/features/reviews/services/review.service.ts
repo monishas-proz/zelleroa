@@ -150,7 +150,7 @@ export const reviewService = {
         }
       } else if (input.productId) {
         const product = await reviewRepository.findProductByIdentifier(input.productId);
-        const firstVariant = (product as any)?.product_variants?.[0] || (product as any)?.variants?.[0];
+        const firstVariant = (product as any)?.styles?.[0]?.items?.[0]?.variants?.[0];
         if (firstVariant && firstVariant.variant_unit_prices?.length > 0) {
           unitPrice = await reviewRepository.findVariantUnitPriceByIdentifier(
             firstVariant.variant_unit_prices[0].uuid || String(firstVariant.variant_unit_prices[0].id)
@@ -164,7 +164,7 @@ export const reviewService = {
         );
       }
 
-      productId = unitPrice.variant.productId;
+      productId = unitPrice.variant.item.style.productId;
       variantUnitPriceId = unitPrice.id;
 
       // Duplicate prevention: 1 review per customer per variant pack
@@ -343,9 +343,9 @@ export const reviewService = {
         sku: defaultSku,
         slug: variant.slug,
         product: {
-          id: variant.product.uuid || String(variant.product.id),
-          name: variant.product.name,
-          slug: variant.product.slug,
+          id: variant.item.style.product.uuid || String(variant.item.style.product.id),
+          name: variant.item.style.product.name,
+          slug: variant.item.style.product.slug,
         },
       },
       reviews: publicReviews,

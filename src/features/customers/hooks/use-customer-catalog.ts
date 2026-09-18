@@ -15,6 +15,8 @@ export const CUSTOMER_CATALOG_QUERY_KEYS = {
   all: ["customer", "catalog"] as const,
   products: (params?: CustomerProductListInput) =>
     [...CUSTOMER_CATALOG_QUERY_KEYS.all, "products", params ?? {}] as const,
+  styles: (params?: CustomerProductListInput) =>
+    [...CUSTOMER_CATALOG_QUERY_KEYS.all, "styles", params ?? {}] as const,
   product: (uuid: string) =>
     [...CUSTOMER_CATALOG_QUERY_KEYS.all, "product", uuid] as const,
   productVariants: (uuid: string, params?: CustomerVariantListInput) =>
@@ -49,6 +51,23 @@ export function useCustomerProducts(
     queryFn: () => customerCatalogApi.getProducts(params),
     placeholderData: keepPreviousData,
     staleTime: 1000 * 60, // 1 minute
+    ...options,
+  });
+}
+
+/**
+ * Fetch the storefront listing as Styles - one card per Style, never per
+ * Item or per Color.
+ */
+export function useCustomerStyles(
+  params?: CustomerProductListInput,
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: CUSTOMER_CATALOG_QUERY_KEYS.styles(params),
+    queryFn: () => customerCatalogApi.getStyles(params),
+    placeholderData: keepPreviousData,
+    staleTime: 1000 * 60,
     ...options,
   });
 }

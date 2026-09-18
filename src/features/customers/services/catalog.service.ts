@@ -48,6 +48,14 @@ export const catalogService = {
     return result;
   },
 
+  // Storefront listing is Style-based: one card per Style, never per Item or
+  // per Color, no matter how many Items/Colors that Style has.
+  async getStyles(params: CustomerProductListInput) {
+    const result = await catalogRepository.findCustomerStyleListItems(params);
+    await catalogOffers.decorateProducts(result.data);
+    return result;
+  },
+
   async getProductByUuid(uuid: string) {
     const product = await catalogRepository.findCustomerProductByUuid(uuid);
     if (!product) {

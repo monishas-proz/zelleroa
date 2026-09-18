@@ -1,5 +1,22 @@
 import { z } from "zod";
 
+export const attributeTypeSchema = z.enum(["text", "color"]);
+
+export type AttributeTypeInput = z.infer<typeof attributeTypeSchema>;
+
+const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
+
+const initialAttributeValueSchema = z
+  .object({
+    value: z.string().trim().min(1).max(150),
+    colorHex: z
+      .string()
+      .trim()
+      .regex(HEX_COLOR_REGEX, "Color code must be a valid hex value like #000000")
+      .optional(),
+  })
+  .strict();
+
 export const createAdminAttributeSchema = z
   .object({
     name: z
@@ -16,11 +33,10 @@ export const createAdminAttributeSchema = z
         /^[A-Za-z0-9_]+$/,
         "Attribute code can only contain letters, numbers, and underscores"
       ),
-    categoryIds: z.array(z.string().trim().min(1)).optional().default([]),
+    type: attributeTypeSchema.optional().default("text"),
     values: z
-      .array(z.string().trim().min(1).max(150))
-      .optional()
-      .default([]),
+      .array(initialAttributeValueSchema)
+      .min(1, "At least one value is required"),
   })
   .strict();
 
@@ -46,6 +62,7 @@ export const updateAdminAttributeSchema = z
         "Attribute code can only contain letters, numbers, and underscores"
       )
       .optional(),
+    type: attributeTypeSchema.optional(),
   })
   .strict();
 
@@ -57,7 +74,6 @@ export const adminAttributesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).default(10).optional(),
   search: z.string().trim().optional(),
-  categoryId: z.string().trim().optional(),
 });
 
 export type AdminAttributesQueryInput = z.infer<
@@ -71,6 +87,12 @@ export const createAttributeValueSchema = z
       .trim()
       .min(1, "Value is required")
       .max(150, "Value cannot exceed 150 characters"),
+    colorHex: z
+      .string()
+      .trim()
+      .regex(HEX_COLOR_REGEX, "Color code must be a valid hex value like #000000")
+      .optional(),
+    /** Amount added to the base price whenever this value is picked. */
     priceAdjustment: z.coerce.number().min(0).optional().default(0),
   })
   .strict();
@@ -83,14 +105,4 @@ export const updateAttributeValueSchema = createAttributeValueSchema.partial().s
 
 export type UpdateAttributeValueInput = z.infer<
   typeof updateAttributeValueSchema
->;
-
-export const setAttributeCategoriesSchema = z
-  .object({
-    categoryIds: z.array(z.string().trim().min(1)),
-  })
-  .strict();
-
-export type SetAttributeCategoriesInput = z.infer<
-  typeof setAttributeCategoriesSchema
 >;

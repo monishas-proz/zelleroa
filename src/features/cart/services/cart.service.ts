@@ -54,11 +54,15 @@ async function formatCartResponse(
   type PricedCartRow = CartRow & {
     variant_unit_price: NonNullable<CartRow["variant_unit_price"]>;
     product: NonNullable<CartRow["product"]>;
+    item: NonNullable<CartRow["item"]>;
   };
 
   const rows = cart.items.filter(
     (item): item is PricedCartRow =>
-      Boolean(item.variant_unit_price) && Boolean(item.product) && item.is_active
+      Boolean(item.variant_unit_price) &&
+      Boolean(item.product) &&
+      Boolean(item.item) &&
+      item.is_active
   );
 
   if (rows.length === 0) {
@@ -81,6 +85,7 @@ async function formatCartResponse(
     const unitPrice = item.variant_unit_price;
     const variant = unitPrice.variant;
     const product = item.product;
+    const cartItem = item.item;
     const line = pricing.lines[index];
 
     const basePrice = calculateVariantPrice(unitPrice);
@@ -104,9 +109,11 @@ async function formatCartResponse(
     return {
       id: item.uuid || String(item.id),
       productId: product.uuid || String(product.id),
+      itemId: cartItem.uuid || String(cartItem.id),
       variantId: variant.uuid || String(variant.id),
       variantUnitPriceId: unitPrice.uuid || String(unitPrice.id),
       productName: product.name,
+      itemName: cartItem.name,
       variantName,
       measurement,
       primaryImage: primaryImg,
@@ -176,7 +183,7 @@ export const cartService = {
             deleted_at: null,
           },
           include: {
-            variant: { include: { product: true } },
+            variant: { include: { item: { include: { style: { include: { product: true } } } } } },
           },
         })
       : null;
@@ -193,7 +200,7 @@ export const cartService = {
           },
           orderBy: [{ is_default: "desc" }, { createdAt: "asc" }],
           include: {
-            variant: { include: { product: true } },
+            variant: { include: { item: { include: { style: { include: { product: true } } } } } },
           },
         });
       }
@@ -210,9 +217,13 @@ export const cartService = {
       !variant ||
       !variant.isActive ||
       variant.deleted_at !== null ||
-      !variant.product ||
-      !variant.product.isActive ||
-      variant.product.deleted_at !== null
+      !variant.item ||
+      !variant.item.isActive ||
+      variant.item.deleted_at !== null ||
+      !variant.item.style ||
+      !variant.item.style.product ||
+      !variant.item.style.product.isActive ||
+      variant.item.style.product.deleted_at !== null
     ) {
       throw ApiError.badRequest("Product variant is unavailable");
     }
@@ -222,7 +233,9 @@ export const cartService = {
     // 2. Add to cart in transaction
     const updatedCart = await cartRepository.addItemToCart({
       owner,
-      productId: variant.productId,
+      productId: variant.item.style.productId,
+      styleId: variant.item.styleId,
+      itemId: variant.itemId,
       variantId: variant.id,
       variantUnitPriceId: unitPrice.id,
       quantity: input.quantity,
@@ -251,6 +264,7 @@ export const cartService = {
     const unitPrice = item.variant_unit_price;
     const variant = unitPrice?.variant;
     const product = item.product;
+    const cartItem = item.item;
 
     const basePrice = unitPrice
       ? calculateVariantPrice(unitPrice)
@@ -290,9 +304,11 @@ export const cartService = {
     return {
       id: item.uuid || String(item.id),
       productId: product?.uuid || String(item.productId),
+      itemId: cartItem?.uuid || String(item.itemId),
       variantId: variant?.uuid || "",
       variantUnitPriceId: unitPrice?.uuid || String(item.variantUnitPriceId),
       productName: product?.name || "",
+      itemName: cartItem?.name || "",
       variantName,
       measurement,
       primaryImage: primaryImg,

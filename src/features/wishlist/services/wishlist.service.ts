@@ -28,7 +28,7 @@ async function validateActiveVariantUnitPrice(identifier: string) {
     },
     include: {
       variant: {
-        include: { product: true },
+        include: { item: { include: { style: { include: { product: true } } } } },
       },
     },
   });
@@ -43,7 +43,7 @@ async function validateActiveVariantUnitPrice(identifier: string) {
       orderBy: [{ is_default: "desc" }, { createdAt: "asc" }],
       include: {
         variant: {
-          include: { product: true },
+          include: { item: { include: { style: { include: { product: true } } } } },
         },
       },
     });
@@ -60,9 +60,13 @@ async function validateActiveVariantUnitPrice(identifier: string) {
     !variant ||
     !variant.isActive ||
     variant.deleted_at !== null ||
-    !variant.product ||
-    !variant.product.isActive ||
-    variant.product.deleted_at !== null
+    !variant.item ||
+    !variant.item.isActive ||
+    variant.item.deleted_at !== null ||
+    !variant.item.style ||
+    !variant.item.style.product ||
+    !variant.item.style.product.isActive ||
+    variant.item.style.product.deleted_at !== null
   ) {
     throw ApiError.badRequest("Product variant is inactive or unavailable");
   }
@@ -92,7 +96,9 @@ export const wishlistService = {
 
     return wishlistRepository.addOrReactivateWishlistItem({
       userId: BigInt(user.internalId),
-      productId: unitPrice.variant.productId,
+      productId: unitPrice.variant.item.style.productId,
+      styleId: unitPrice.variant.item.styleId,
+      itemId: unitPrice.variant.itemId,
       variantId: unitPrice.variant_id,
       variantUnitPriceId: unitPrice.id,
       userInternalId: BigInt(user.internalId),

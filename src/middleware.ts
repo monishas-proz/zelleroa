@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/lib/auth/auth.config";
+import { captureReferralCookie } from "@/lib/referral/cookie";
 
 const { auth } = NextAuth(authConfig);
 
@@ -57,7 +58,7 @@ export default auth(async (req) => {
     rawAccessToken?.role ||
     (nextAuthUser as { role?: string })?.role;
 
-  const applyCookies = (res: NextResponse) => res;
+  const applyCookies = (res: NextResponse) => captureReferralCookie(req, res);
 
   if (pathname.startsWith("/admin")) {
     // /admin or /admin/ direct navigation
@@ -92,6 +93,16 @@ export default auth(async (req) => {
     return applyCookies(NextResponse.next());
   }
 
+  if (pathname.startsWith("/agent")) {
+    if (!isAuthenticated || userRole !== "AGENT") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = `?callbackUrl=${encodeURIComponent(pathname)}`;
+      return applyCookies(NextResponse.redirect(url));
+    }
+    return applyCookies(NextResponse.next());
+  }
+
   // /cart and /checkout intentionally left off this list: guest checkout
   // means anonymous visitors can shop and place an order without an account.
   const protectedCustomerRoutes = [
@@ -115,6 +126,8 @@ export default auth(async (req) => {
     url.search = "";
     if (userRole === "ADMIN" || userRole === "STAFF") {
       url.pathname = "/admin/dashboard";
+    } else if (userRole === "AGENT") {
+      url.pathname = "/agent/dashboard";
     } else {
       url.pathname = "/";
     }
@@ -126,15 +139,9 @@ export default auth(async (req) => {
 
 export const config = {
   matcher: [
-    "/admin",
-    "/admin/:path*",
-    "/cart",
-    "/checkout/:path*",
-    "/orders/:path*",
-    "/profile",
-    "/profile/:path*",
-    "/wishlist",
-    "/login",
-    "/register",
+    // Broad catch-all so `?ref=<code>` is captured into the referral_agent
+    // cookie no matter which page a shared link lands on, while still
+    // skipping static assets and API routes.
+    "/((?!_next/static|_next/image|favicon.ico|api/).*)",
   ],
 };

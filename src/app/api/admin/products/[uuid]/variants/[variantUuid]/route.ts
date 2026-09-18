@@ -16,10 +16,8 @@ export const GET = createApiHandler(
         throw ApiError.badRequest("Product UUID and Variant UUID are required");
       }
 
-      const variant = await variantService.getAdminVariantByUuid(
-        productUuid,
-        variantUuid
-      );
+      void productUuid;
+      const variant = await variantService.getVariantByUuid(variantUuid);
       return apiSuccess(variant, "Variant fetched successfully");
     },
   },
@@ -38,11 +36,11 @@ export const PUT = createApiHandler(
         throw ApiError.badRequest("Product UUID and Variant UUID are required");
       }
 
+      void productUuid;
       const body = context.body as UpdateAdminVariantInput;
       const adminEmail = context.session?.user?.email ?? undefined;
 
-      const variant = await variantService.updateAdminVariant(
-        productUuid,
+      const variant = await variantService.updateVariantByUuid(
         variantUuid,
         body,
         adminEmail
@@ -68,12 +66,9 @@ export const DELETE = createApiHandler(
         throw ApiError.badRequest("Product UUID and Variant UUID are required");
       }
 
+      void productUuid;
       const adminEmail = context.session?.user?.email ?? undefined;
-      const result = await variantService.deleteAdminVariant(
-        productUuid,
-        variantUuid,
-        adminEmail
-      );
+      const result = await variantService.deleteVariantByUuid(variantUuid, adminEmail);
 
       return apiSuccess(null, result.message);
     },

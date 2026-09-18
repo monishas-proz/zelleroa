@@ -123,7 +123,7 @@ export function VariantPriceHistoryCard({
                   : "bg-white text-neutral-600 border-cream-border hover:bg-cream-50"
               }`}
             >
-              {up.measurement?.value} {up.unitCode || up.measurement?.unit}
+              {up.sizeValue || `${up.measurement?.value} ${up.unitCode || up.measurement?.unit}`}
             </button>
           ))}
         </div>

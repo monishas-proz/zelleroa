@@ -30,6 +30,15 @@ export async function requireCustomer() {
   return session;
 }
 
+export async function requireAgent() {
+  const session = await requireAuth();
+  const userRole = session.user.role;
+  if (userRole !== ROLES.AGENT) {
+    redirect("/unauthorized");
+  }
+  return session;
+}
+
 export async function requireRole(roles: string[]) {
   const session = await requireAuth();
   const userRole = session.user.role;
@@ -105,6 +114,10 @@ export function isAdmin(session: { user?: { role?: string } } | null): boolean {
 
 export function isCustomer(session: { user?: { role?: string } } | null): boolean {
   return session?.user?.role === ROLES.CUSTOMER;
+}
+
+export function isAgent(session: { user?: { role?: string } } | null): boolean {
+  return session?.user?.role === ROLES.AGENT;
 }
 
 export function isAuthenticated(session: { user?: { id?: string } } | null): boolean {

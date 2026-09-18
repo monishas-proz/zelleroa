@@ -8,14 +8,15 @@ export const GET = createApiHandler(
     GET: async (_request, context) => {
       const uuid = context.params?.uuid;
       if (!uuid) {
-        throw ApiError.badRequest("Category UUID is required");
+        throw ApiError.badRequest("Product UUID is required");
       }
 
-      const attributes = await attributeService.getAttributesForCategory(uuid);
-      return apiSuccess(attributes, "Category attributes fetched successfully");
+      const attributes = await attributeService.getConfiguredAttributesForProduct(uuid);
+      return apiSuccess(attributes, "Configured product attributes fetched successfully");
     },
   },
   {
+    method: "GET",
     requireAuth: true,
     requiredRole: ["ADMIN"],
   }

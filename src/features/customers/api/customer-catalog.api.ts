@@ -113,6 +113,24 @@ export const customerCatalogApi = {
   },
 
   /**
+   * Fetch the storefront listing as Styles: one card per Style, never per
+   * Item or per Color.
+   * Postman: POST /api/customer/styles
+   */
+  async getStyles(
+    params?: CustomerProductListInput
+  ): Promise<PaginatedResponse<CustomerProductListItemDto>> {
+    const response = await apiClient.post<CustomerProductListItemDto[]>(
+      "/api/customer/styles",
+      params || {}
+    );
+    return {
+      data: response.data ?? [],
+      meta: response.meta as PaginationMeta | undefined,
+    };
+  },
+
+  /**
    * Fetch customer product detail by product UUID
    * Postman: GET /api/customer/products/:productUuid
    */

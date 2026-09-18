@@ -1,0 +1,133 @@
+import { db } from "@/lib/db/prisma";
+import { Prisma } from "@/generated/prisma";
+import type { GetAdminItemsParams } from "../types";
+
+export const itemInclude = Prisma.validator<Prisma.ItemInclude>()({
+  style: {
+    select: {
+      id: true,
+      uuid: true,
+      name: true,
+      slug: true,
+      isActive: true,
+      deleted_at: true,
+      productId: true,
+    },
+  },
+  variants: {
+    where: { deleted_at: null },
+    select: {
+      id: true,
+      color_name: true,
+      variant_unit_prices: {
+        where: { deleted_at: null },
+        select: {
+          base_price: true,
+          inventories: { select: { quantity_available: true } },
+        },
+      },
+    },
+  },
+});
+
+export const itemRepository = {
+  async findByUuid(uuid: string) {
+    return db.item.findFirst({
+      where: { uuid, deleted_at: null },
+      include: itemInclude,
+    });
+  },
+
+  async findById(id: number | bigint) {
+    return db.item.findFirst({
+      where: { id: BigInt(id), deleted_at: null },
+      include: itemInclude,
+    });
+  },
+
+  async findBySlug(slug: string, excludeUuid?: string) {
+    return db.item.findFirst({
+      where: {
+        slug,
+        deleted_at: null,
+        ...(excludeUuid ? { uuid: { not: excludeUuid } } : {}),
+      },
+    });
+  },
+
+  async findAllByStyleId(styleId: bigint, params: GetAdminItemsParams = {}) {
+    const page = params.page ?? 1;
+    const pageSize = params.pageSize ?? 20;
+
+    const where: Prisma.ItemWhereInput = {
+      styleId,
+      deleted_at: null,
+    };
+
+    if (typeof params.isActive === "boolean") {
+      where.isActive = params.isActive;
+    }
+
+    if (params.search) {
+      where.name = { contains: params.search };
+    }
+
+    const [data, total] = await Promise.all([
+      db.item.findMany({
+        where,
+        include: itemInclude,
+        orderBy: [{ is_default: "desc" }, { createdAt: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      db.item.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        page,
+        limit: pageSize,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    };
+  },
+
+  async create(data: Prisma.ItemUncheckedCreateInput) {
+    return db.item.create({
+      data,
+      include: itemInclude,
+    });
+  },
+
+  async updateByUuid(uuid: string, data: Prisma.ItemUncheckedUpdateInput) {
+    const existing = await db.item.findFirst({ where: { uuid, deleted_at: null } });
+    if (!existing) return null;
+
+    return db.item.update({
+      where: { id: existing.id },
+      data,
+      include: itemInclude,
+    });
+  },
+
+  async softDeleteByUuid(uuid: string, adminId?: bigint | null) {
+    const existing = await this.findByUuid(uuid);
+    if (!existing) return null;
+
+    return db.item.update({
+      where: { id: existing.id },
+      data: {
+        isActive: false,
+        deleted_at: new Date(),
+        ...(adminId ? { updated_by: adminId } : {}),
+      },
+    });
+  },
+
+  async countActiveByStyleId(styleId: bigint): Promise<number> {
+    return db.item.count({ where: { styleId, deleted_at: null } });
+  },
+};

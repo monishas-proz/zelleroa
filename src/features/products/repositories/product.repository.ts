@@ -138,7 +138,6 @@ export const productRepository = {
       where.OR = [
         { name: { contains: search } },
         { slug: { contains: search } },
-        { sku: { contains: search } },
       ];
     }
 
@@ -176,7 +175,6 @@ export const productRepository = {
       where.OR = [
         { name: { contains: search } },
         { slug: { contains: search } },
-        { sku: { contains: search } },
       ];
     }
 

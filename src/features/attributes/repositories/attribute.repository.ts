@@ -5,7 +5,6 @@ import type { GetAdminAttributesParams } from "../types";
 
 const attributeInclude = Prisma.validator<Prisma.ProductAttributeInclude>()({
   values: { where: { is_active: true }, orderBy: { value: "asc" } },
-  category_attributes: { select: { category_id: true } },
 });
 
 export const attributeRepository = {
@@ -54,22 +53,6 @@ export const attributeRepository = {
         { name: { contains: params.search } },
         { slug: { contains: params.search } },
       ];
-    }
-
-    if (params.categoryId) {
-      const numericId = Number(params.categoryId);
-      const category = await db.productCategory.findFirst({
-        where: {
-          OR: [
-            { uuid: params.categoryId },
-            ...(Number.isFinite(numericId) ? [{ id: BigInt(numericId) }] : []),
-          ],
-        },
-        select: { id: true },
-      });
-      if (category) {
-        where.category_attributes = { some: { category_id: category.id } };
-      }
     }
 
     const [data, total] = await Promise.all([
@@ -133,13 +116,15 @@ export const attributeRepository = {
     attributeId: bigint,
     value: string,
     adminId?: bigint | null,
-    priceAdjustment?: number
+    priceAdjustment?: number,
+    colorHex?: string | null
   ) {
     return db.attributeValue.create({
       data: {
         uuid: crypto.randomUUID(),
         attributeId,
         value,
+        color_hex: colorHex ?? null,
         price_adjustment: priceAdjustment ?? 0,
         created_by: adminId ?? undefined,
         updated_by: adminId ?? undefined,
@@ -155,7 +140,8 @@ export const attributeRepository = {
     uuid: string,
     value: string | undefined,
     adminId?: bigint | null,
-    priceAdjustment?: number
+    priceAdjustment?: number,
+    colorHex?: string | null
   ) {
     const existing = await db.attributeValue.findFirst({ where: { uuid } });
     if (!existing) return null;
@@ -165,6 +151,7 @@ export const attributeRepository = {
       data: {
         ...(value !== undefined ? { value } : {}),
         ...(priceAdjustment !== undefined ? { price_adjustment: priceAdjustment } : {}),
+        ...(colorHex !== undefined ? { color_hex: colorHex } : {}),
         updated_by: adminId ?? undefined,
       },
     });
@@ -180,15 +167,27 @@ export const attributeRepository = {
     });
   },
 
-  async setCategoriesForAttribute(attributeId: bigint, categoryInternalIds: bigint[]) {
+  async findAllActive() {
+    return db.productAttribute.findMany({
+      where: { is_active: true },
+      orderBy: { name: "asc" },
+    });
+  },
+
+  async setAttributesForProduct(
+    productId: bigint,
+    entries: { attributeId: bigint; isRequired: boolean; sortOrder: number }[]
+  ) {
     await db.$transaction([
-      db.category_attributes.deleteMany({ where: { attribute_id: attributeId } }),
-      ...(categoryInternalIds.length
+      db.product_attribute_configs.deleteMany({ where: { product_id: productId } }),
+      ...(entries.length
         ? [
-            db.category_attributes.createMany({
-              data: categoryInternalIds.map((category_id) => ({
-                category_id,
-                attribute_id: attributeId,
+            db.product_attribute_configs.createMany({
+              data: entries.map((e) => ({
+                product_id: productId,
+                attribute_id: e.attributeId,
+                is_required: e.isRequired,
+                sort_order: e.sortOrder,
               })),
             }),
           ]
@@ -196,9 +195,9 @@ export const attributeRepository = {
     ]);
   },
 
-  async findCategoryAttributesForCategory(categoryInternalId: bigint) {
-    return db.category_attributes.findMany({
-      where: { category_id: categoryInternalId },
+  async findAttributeConfigsForProduct(productId: bigint) {
+    return db.product_attribute_configs.findMany({
+      where: { product_id: productId },
       orderBy: { sort_order: "asc" },
       include: {
         product_attributes: {
@@ -207,6 +206,54 @@ export const attributeRepository = {
           },
         },
       },
+    });
+  },
+
+  async countProductAttributeUsage(productId: bigint, attributeId: bigint) {
+    const [itemCount, variantCount] = await Promise.all([
+      db.item.count({
+        where: {
+          style: { productId },
+          isActive: true,
+          deleted_at: null,
+          item_attribute_values: { some: { attribute_id: attributeId } },
+        },
+      }),
+      db.productVariant.count({
+        where: {
+          item: { style: { productId } },
+          isActive: true,
+          variant_attribute_values: { some: { attribute_id: attributeId } },
+        },
+      }),
+    ]);
+    return { itemCount, variantCount };
+  },
+
+  async setAttributeValuesForItem(
+    itemId: bigint,
+    entries: { attributeId: bigint; attributeValueId: bigint }[]
+  ) {
+    await db.$transaction([
+      db.item_attribute_values.deleteMany({ where: { item_id: itemId } }),
+      ...(entries.length
+        ? [
+            db.item_attribute_values.createMany({
+              data: entries.map((e) => ({
+                item_id: itemId,
+                attribute_id: e.attributeId,
+                attribute_value_id: e.attributeValueId,
+              })),
+            }),
+          ]
+        : []),
+    ]);
+  },
+
+  async findAttributeValuesForItem(itemId: bigint) {
+    return db.item_attribute_values.findMany({
+      where: { item_id: itemId },
+      include: { attribute_values: true, product_attributes: true },
     });
   },
 };

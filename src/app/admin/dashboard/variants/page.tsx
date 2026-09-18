@@ -133,6 +133,8 @@ export default function AdminVariantsPage() {
       value: p.id,
       label: p.name,
       slug: p.slug,
+      categoryId: p.categoryId,
+      gender: p.gender,
     }));
   }, [products]);
 
@@ -759,12 +761,9 @@ export default function AdminVariantsPage() {
               const payload = {
                 variantName: formData.variantName,
                 slug: formData.slug,
-                shortDescription: formData.shortDescription || null,
-                description: formData.description || null,
-                colorName: formData.colorName || null,
-                colorHex: formData.colorHex || null,
                 priceAdjustment: formData.priceAdjustment ?? 0,
                 isFeatured: formData.isFeatured,
+                attributeValueIds: formData.attributeValueIds || [],
               };
 
               const res = await createMutation.mutateAsync({
@@ -973,12 +972,11 @@ export default function AdminVariantsPage() {
                   productId: selectedVariant.productId,
                   variantName: selectedVariant.variantName,
                   slug: selectedVariant.slug || "",
-                  shortDescription: selectedVariant.shortDescription || "",
-                  description: selectedVariant.description || "",
-                  colorName: selectedVariant.colorName || "",
-                  colorHex: selectedVariant.colorHex || "",
                   priceAdjustment: selectedVariant.priceAdjustment ?? 0,
                   isFeatured: selectedVariant.isFeatured ?? false,
+                  attributeValueIds: (selectedVariant.attributeValues || []).map(
+                    (av) => av.valueId
+                  ),
                 }}
                 isEditing
                 fixedProductId={selectedVariant.productId}
@@ -989,12 +987,9 @@ export default function AdminVariantsPage() {
                   const payload = {
                     variantName: formData.variantName,
                     slug: formData.slug,
-                    shortDescription: formData.shortDescription || null,
-                    description: formData.description || null,
-                    colorName: formData.colorName || null,
-                    colorHex: formData.colorHex || null,
                     priceAdjustment: formData.priceAdjustment ?? 0,
                     isFeatured: formData.isFeatured,
+                    attributeValueIds: formData.attributeValueIds || [],
                   };
 
                   await updateMutation.mutateAsync({

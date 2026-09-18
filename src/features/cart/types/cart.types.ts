@@ -6,9 +6,11 @@ export type { VariantMeasurement };
 export interface CartItemResponse {
   id: string; // Public Cart Item UUID
   productId: string; // Public Product UUID
-  variantId: string; // Public Variant UUID (item-level)
-  variantUnitPriceId: string; // Public Variant Unit Price UUID (pack size)
+  itemId: string; // Public Item UUID
+  variantId: string; // Public Variant UUID (Color level)
+  variantUnitPriceId: string; // Public Variant Unit Price UUID (Size/pack)
   productName: string;
+  itemName: string;
   variantName: string;
   measurement: VariantMeasurement;
   primaryImage: string | null;

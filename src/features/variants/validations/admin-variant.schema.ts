@@ -15,47 +15,6 @@ export const createAdminVariantSchema = z
       .trim()
       .min(1, "Slug cannot be empty")
       .max(255, "Slug cannot exceed 255 characters"),
-    shortDescription: z
-      .string()
-      .trim()
-      .max(500, "Short description cannot exceed 500 characters")
-      .optional()
-      .nullable(),
-    description: z
-      .string()
-      .trim()
-      .optional()
-      .nullable(),
-    ingredients: z
-      .string()
-      .trim()
-      .optional()
-      .nullable(),
-    isReadyToMix: z.boolean().optional().default(false),
-    cookingRecipe: z
-      .string()
-      .trim()
-      .optional()
-      .nullable(),
-    shelfLife: z
-      .string()
-      .trim()
-      .max(100, "Best before cannot exceed 100 characters")
-      .optional()
-      .nullable(),
-    vegType: vegTypeEnum.optional(),
-    colorName: z
-      .string()
-      .trim()
-      .max(50, "Color name cannot exceed 50 characters")
-      .optional()
-      .nullable(),
-    colorHex: z
-      .string()
-      .trim()
-      .regex(/^#[0-9A-Fa-f]{6}$/, "Enter a valid hex color, e.g. #FF5733")
-      .optional()
-      .nullable(),
     /** Amount added to the product base price whenever this color is picked. */
     priceAdjustment: z.coerce.number().optional().default(0),
     isFeatured: z.boolean().optional().default(false),
@@ -84,47 +43,6 @@ export const updateAdminVariantSchema = z
       .min(1, "Slug cannot be empty")
       .max(255, "Slug cannot exceed 255 characters")
       .optional(),
-    shortDescription: z
-      .string()
-      .trim()
-      .max(500, "Short description cannot exceed 500 characters")
-      .optional()
-      .nullable(),
-    description: z
-      .string()
-      .trim()
-      .optional()
-      .nullable(),
-    ingredients: z
-      .string()
-      .trim()
-      .optional()
-      .nullable(),
-    isReadyToMix: z.boolean().optional(),
-    cookingRecipe: z
-      .string()
-      .trim()
-      .optional()
-      .nullable(),
-    shelfLife: z
-      .string()
-      .trim()
-      .max(100, "Best before cannot exceed 100 characters")
-      .optional()
-      .nullable(),
-    vegType: vegTypeEnum.optional(),
-    colorName: z
-      .string()
-      .trim()
-      .max(50, "Color name cannot exceed 50 characters")
-      .optional()
-      .nullable(),
-    colorHex: z
-      .string()
-      .trim()
-      .regex(/^#[0-9A-Fa-f]{6}$/, "Enter a valid hex color, e.g. #FF5733")
-      .optional()
-      .nullable(),
     /** Amount added to the product base price whenever this color is picked. */
     priceAdjustment: z.coerce.number().optional(),
     isFeatured: z.boolean().optional(),
@@ -173,6 +91,100 @@ export const bulkEditVariantsSchema = z
 export type BulkEditVariantItemInput = z.infer<typeof bulkEditVariantItemSchema>;
 export type BulkEditVariantsInput = z.infer<typeof bulkEditVariantsSchema>;
 
+/**
+ * One variation option (e.g. "Color") plus the specific values to generate
+ * combinations from (e.g. Black, White) - not necessarily every value the
+ * attribute has, since an admin may only be stocking some of them.
+ */
+export const generateVariantOptionSchema = z
+  .object({
+    attributeId: z.string().trim().uuid("Invalid attribute UUID format"),
+    valueIds: z
+      .array(z.string().trim().uuid("Invalid attribute value UUID format"))
+      .min(1, "Select at least one value for each variation option"),
+  })
+  .strict();
+
+export const generateVariantsSchema = z
+  .object({
+    options: z
+      .array(generateVariantOptionSchema)
+      .min(1, "Select at least one variation option (e.g. Color, Size)"),
+    unitId: z.string().trim().uuid("Invalid unit UUID format"),
+    /** Applied to every generated combination unless overridden per-row afterwards. */
+    defaultPrice: z.coerce.number().min(0, "Price cannot be negative").optional(),
+    defaultStock: z.coerce
+      .number()
+      .int("Stock must be an integer")
+      .min(0, "Stock cannot be negative")
+      .optional()
+      .default(0),
+    activate: z.boolean().optional().default(true),
+  })
+  .strict()
+  .refine(
+    (data) => {
+      const ids = data.options.map((o) => o.attributeId);
+      return new Set(ids).size === ids.length;
+    },
+    { message: "Each variation option can only be added once", path: ["options"] }
+  );
+
+export type GenerateVariantOptionInput = z.infer<typeof generateVariantOptionSchema>;
+export type GenerateVariantsInput = z.infer<typeof generateVariantsSchema>;
+
+/** Same option shape as generateVariantsSchema, without the row-level defaults -
+ * a preview only needs to know which attribute values are selected. */
+export const previewGenerateVariantsSchema = z
+  .object({
+    options: z
+      .array(generateVariantOptionSchema)
+      .min(1, "Select at least one variation option (e.g. Color, Size)"),
+  })
+  .strict()
+  .refine(
+    (data) => {
+      const ids = data.options.map((o) => o.attributeId);
+      return new Set(ids).size === ids.length;
+    },
+    { message: "Each variation option can only be added once", path: ["options"] }
+  );
+
+export type PreviewGenerateVariantsInput = z.infer<typeof previewGenerateVariantsSchema>;
+
+/** Item-driven generation: attribute values come from item_attribute_values,
+ * so only the pricing/unit defaults need to be supplied here. */
+export const generateVariantsFromItemSchema = z
+  .object({
+    unitId: z.string().trim().uuid("Invalid unit UUID format"),
+    defaultPrice: z.coerce.number().min(0, "Price cannot be negative").optional(),
+    defaultStock: z.coerce
+      .number()
+      .int("Stock must be an integer")
+      .min(0, "Stock cannot be negative")
+      .optional()
+      .default(0),
+    activate: z.boolean().optional().default(true),
+  })
+  .strict();
+
+export type GenerateVariantsFromItemInput = z.infer<typeof generateVariantsFromItemSchema>;
+
+export const applyVariantRemovalsSchema = z
+  .object({
+    variantUuids: z.array(z.string().trim().uuid("Invalid variant UUID format")).optional(),
+    unitPriceUuids: z
+      .array(z.string().trim().uuid("Invalid unit price UUID format"))
+      .optional(),
+  })
+  .strict()
+  .refine(
+    (data) => (data.variantUuids?.length ?? 0) + (data.unitPriceUuids?.length ?? 0) > 0,
+    { message: "Select at least one variant or unit price to remove" }
+  );
+
+export type ApplyVariantRemovalsInput = z.infer<typeof applyVariantRemovalsSchema>;
+
 export const priceHistoryChartQuerySchema = z.object({
   period: z.enum(["1m", "3m", "6m", "1y", "all"]).default("1y").optional(),
 });
@@ -185,8 +197,8 @@ export const adminVariantsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).default(10).optional(),
   search: z.string().trim().optional(),
-  productId: z.string().trim().uuid("Invalid Product UUID format").optional(),
-  productUuid: z.string().trim().uuid("Invalid Product UUID format").optional(),
+  itemId: z.string().trim().uuid("Invalid Item UUID format").optional(),
+  itemUuid: z.string().trim().uuid("Invalid Item UUID format").optional(),
   isActive: z.coerce.boolean().optional(),
 });
 

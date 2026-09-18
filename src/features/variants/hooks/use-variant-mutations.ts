@@ -7,8 +7,10 @@ import {
   updateAdminVariant,
   deleteAdminVariant,
   bulkEditVariants,
+  generateAdminVariants,
+  generateAdminVariantsFromItem,
 } from "../api/get-variants";
-import type { BulkEditVariantsInput } from "../types";
+import type { BulkEditVariantsInput, GenerateVariantsInput } from "../types";
 
 export function useCreateVariant() {
   const queryClient = useQueryClient();
@@ -17,10 +19,13 @@ export function useCreateVariant() {
     mutationFn: ({
       productUuid,
       data,
+      itemUuid,
     }: {
       productUuid: string;
       data: Record<string, unknown>;
-    }) => createAdminVariant(productUuid, data),
+      /** Which Item (Product's style) the new Color variant belongs to; defaults to the Product's default Item when omitted. */
+      itemUuid?: string;
+    }) => createAdminVariant(productUuid, data, itemUuid),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: variantKeys.all });
     },
@@ -45,6 +50,44 @@ export function useUpdateVariant() {
       queryClient.invalidateQueries({
         queryKey: variantKeys.detail(variables.variantUuid),
       });
+    },
+  });
+}
+
+export function useGenerateVariants() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      productUuid,
+      data,
+      itemUuid,
+    }: {
+      productUuid: string;
+      data: GenerateVariantsInput;
+      itemUuid?: string;
+    }) => generateAdminVariants(productUuid, data, itemUuid),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: variantKeys.all });
+    },
+  });
+}
+
+export function useGenerateVariantsFromItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      productUuid,
+      itemUuid,
+      data,
+    }: {
+      productUuid: string;
+      itemUuid: string;
+      data: { unitId: string; defaultPrice?: number; defaultStock?: number; activate?: boolean };
+    }) => generateAdminVariantsFromItem(productUuid, itemUuid, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: variantKeys.all });
     },
   });
 }

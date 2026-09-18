@@ -8,7 +8,9 @@ export const createVariantUnitPriceSchema = z
     unitValue: z
       .number({ message: "Unit value is required" })
       .gt(0, "Unit value must be greater than 0"),
-    /** Auto-generated from the product code + the variant's Size/Color when omitted. */
+    /** The Size attribute value (e.g. "M") this price row represents, if any. */
+    sizeValueId: z.string().trim().uuid("Invalid attribute value UUID format").optional().nullable(),
+    /** Auto-generated from the item code + the variant's Size/Color when omitted. */
     sku: z
       .string()
       .trim()
@@ -36,6 +38,7 @@ export const updateVariantUnitPriceSchema = z
   .object({
     unitId: z.string().uuid("Invalid Unit UUID format").optional(),
     unitValue: z.number().gt(0, "Unit value must be greater than 0").optional(),
+    sizeValueId: z.string().trim().uuid("Invalid attribute value UUID format").optional().nullable(),
     sku: z
       .string()
       .trim()
@@ -82,3 +85,25 @@ export const bulkEditUnitPricesSchema = z
 
 export type BulkEditUnitPriceItemInput = z.infer<typeof bulkEditUnitPriceItemSchema>;
 export type BulkEditUnitPricesInput = z.infer<typeof bulkEditUnitPricesSchema>;
+
+/**
+ * "Same price for all sizes": basePrice is applied to every unit price row
+ * under the variant, then any per-row entries in perSizeOverrides win.
+ */
+export const bulkSetSamePriceSchema = z
+  .object({
+    basePrice: z.number().min(0, "Base price cannot be negative"),
+    perSizeOverrides: z
+      .array(
+        z.object({
+          id: z.string().trim().uuid("Invalid Variant Unit Price UUID format"),
+          basePrice: z.number().min(0, "Base price cannot be negative").optional(),
+          sku: z.string().trim().min(1).max(100).optional(),
+        })
+      )
+      .optional()
+      .default([]),
+  })
+  .strict();
+
+export type BulkSetSamePriceInput = z.infer<typeof bulkSetSamePriceSchema>;

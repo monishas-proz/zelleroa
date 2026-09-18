@@ -7,7 +7,7 @@ import type {
 } from "../types";
 
 export const variantInclude = Prisma.validator<Prisma.ProductVariantInclude>()({
-  product: {
+  item: {
     select: {
       id: true,
       uuid: true,
@@ -16,6 +16,28 @@ export const variantInclude = Prisma.validator<Prisma.ProductVariantInclude>()({
       isActive: true,
       deleted_at: true,
       base_price: true,
+      style: {
+        select: {
+          id: true,
+          uuid: true,
+          name: true,
+          slug: true,
+          productId: true,
+          isActive: true,
+          deleted_at: true,
+          veg_type: true,
+          product: {
+            select: {
+              id: true,
+              uuid: true,
+              name: true,
+              slug: true,
+              isActive: true,
+              deleted_at: true,
+            },
+          },
+        },
+      },
     },
   },
   product_variant_images: {
@@ -40,6 +62,9 @@ export const variantInclude = Prisma.validator<Prisma.ProductVariantInclude>()({
           type: true,
           is_active: true,
         },
+      },
+      attribute_value: {
+        select: { uuid: true, value: true },
       },
       inventories: {
         select: {
@@ -87,15 +112,15 @@ export const variantRepository = {
 
   async findAdminAll(
     params: GetAdminVariantsParams = {},
-    productId?: bigint
+    itemId?: bigint
   ) {
     const page = params.page ?? 1;
     const pageSize = params.pageSize ?? 10;
 
     const where: Prisma.ProductVariantWhereInput = {
       deleted_at: null,
-      ...(productId ? { productId } : {}),
-      product: {
+      ...(itemId ? { itemId } : {}),
+      item: {
         deleted_at: null,
       },
     };
@@ -108,7 +133,7 @@ export const variantRepository = {
       where.OR = [
         { variant_name: { contains: params.search } },
         { variant_unit_prices: { some: { sku: { contains: params.search } } } },
-        { product: { name: { contains: params.search } } },
+        { item: { name: { contains: params.search } } },
       ];
     }
 
@@ -140,12 +165,13 @@ export const variantRepository = {
   ): Promise<Prisma.ProductVariantWhereInput> {
     const where: Prisma.ProductVariantWhereInput = {
       deleted_at: null,
-      product: {
+      item: {
         deleted_at: null,
       },
     };
 
-    // Filter by Product UUIDs
+    // Filter by Product UUIDs (traverses item.product, since these params
+    // still carry Product uuids the way they did before the Item level existed)
     const allProductIds = [...(params.productIds || [])];
     if (params.productId && !allProductIds.includes(params.productId)) {
       allProductIds.push(params.productId);
@@ -155,8 +181,16 @@ export const variantRepository = {
         where: { uuid: { in: allProductIds }, deleted_at: null },
         select: { id: true },
       });
-      where.productId = { in: matchingProducts.map((p) => p.id) };
+      where.item = {
+        ...(where.item as Prisma.ItemWhereInput),
+        style: { productId: { in: matchingProducts.map((p) => p.id) } },
+      };
     }
+
+    const itemStyleWhere = (): Prisma.StyleWhereInput =>
+      ((where.item as Prisma.ItemWhereInput)?.style as Prisma.StyleWhereInput) ?? {};
+    const itemStyleProductWhere = (): Prisma.ProductWhereInput =>
+      (itemStyleWhere().product as Prisma.ProductWhereInput) ?? {};
 
     // Filter by Brand UUIDs
     if (params.brandIds && params.brandIds.length > 0) {
@@ -164,9 +198,12 @@ export const variantRepository = {
         where: { uuid: { in: params.brandIds }, deleted_at: null },
         select: { id: true },
       });
-      where.product = {
-        ...(where.product as Prisma.ProductWhereInput),
-        brandId: { in: matchingBrands.map((b) => b.id) },
+      where.item = {
+        ...(where.item as Prisma.ItemWhereInput),
+        style: {
+          ...itemStyleWhere(),
+          product: { ...itemStyleProductWhere(), brandId: { in: matchingBrands.map((b) => b.id) } },
+        },
       };
     }
 
@@ -176,9 +213,15 @@ export const variantRepository = {
         where: { uuid: { in: params.categoryIds }, deleted_at: null },
         select: { id: true },
       });
-      where.product = {
-        ...(where.product as Prisma.ProductWhereInput),
-        categoryId: { in: matchingCategories.map((c) => c.id) },
+      where.item = {
+        ...(where.item as Prisma.ItemWhereInput),
+        style: {
+          ...itemStyleWhere(),
+          product: {
+            ...itemStyleProductWhere(),
+            categoryId: { in: matchingCategories.map((c) => c.id) },
+          },
+        },
       };
     }
 
@@ -212,12 +255,13 @@ export const variantRepository = {
       };
     }
 
-    // Search filter across variantName, SKU (via unit prices), and productName
+    // Search filter across variantName, SKU (via unit prices), and item/product name
     if (params.search) {
       where.OR = [
         { variant_name: { contains: params.search } },
         { variant_unit_prices: { some: { sku: { contains: params.search } } } },
-        { product: { name: { contains: params.search } } },
+        { item: { name: { contains: params.search } } },
+        { item: { style: { product: { name: { contains: params.search } } } } },
       ];
     }
 
@@ -258,7 +302,13 @@ export const variantRepository = {
     }
 
     if (params.vegType) {
-      where.veg_type = params.vegType;
+      where.item = {
+        ...(where.item as Prisma.ItemWhereInput),
+        style: {
+          ...((where.item as Prisma.ItemWhereInput)?.style as Prisma.StyleWhereInput),
+          veg_type: params.vegType,
+        },
+      };
     }
 
     return where;
@@ -268,6 +318,16 @@ export const variantRepository = {
     params: AdminVariantListParams
   ): Promise<AdminVariantsCountResponse> {
     const baseWhere = await this.buildAdminVariantsBaseWhere(params);
+    const withItemVegType = (vegType: string): Prisma.ProductVariantWhereInput => ({
+      ...baseWhere,
+      item: {
+        ...(baseWhere.item as Prisma.ItemWhereInput),
+        style: {
+          ...((baseWhere.item as Prisma.ItemWhereInput)?.style as Prisma.StyleWhereInput),
+          veg_type: vegType as never,
+        },
+      },
+    });
 
     const [
       active,
@@ -284,10 +344,10 @@ export const variantRepository = {
       db.productVariant.count({ where: { ...baseWhere, isActive: false } }),
       db.productVariant.count({ where: { ...baseWhere, out_of_stock: false } }),
       db.productVariant.count({ where: { ...baseWhere, out_of_stock: true } }),
-      db.productVariant.count({ where: { ...baseWhere, veg_type: "veg" } }),
-      db.productVariant.count({ where: { ...baseWhere, veg_type: "nonveg" } }),
-      db.productVariant.count({ where: { ...baseWhere, veg_type: "vegan" } }),
-      db.productVariant.count({ where: { ...baseWhere, veg_type: "na" } }),
+      db.productVariant.count({ where: withItemVegType("veg") }),
+      db.productVariant.count({ where: withItemVegType("nonveg") }),
+      db.productVariant.count({ where: withItemVegType("vegan") }),
+      db.productVariant.count({ where: withItemVegType("na") }),
       db.productVariant.count({ where: baseWhere }),
     ]);
 
@@ -317,7 +377,7 @@ export const variantRepository = {
     if (params.sortBy === "variantName") {
       orderBy = { variant_name: sortOrder };
     } else if (params.sortBy === "productName") {
-      orderBy = { product: { name: sortOrder } };
+      orderBy = { item: { name: sortOrder } };
     } else if (params.sortBy === "createdAt") {
       orderBy = { createdAt: sortOrder };
     } else if (params.sortBy === "updatedAt") {
@@ -351,11 +411,11 @@ export const variantRepository = {
     };
   },
 
-  async findAdminAllByProductId(
-    productId: bigint,
+  async findAdminAllByItemId(
+    itemId: bigint,
     params: GetAdminVariantsParams = {}
   ) {
-    return this.findAdminAll(params, productId);
+    return this.findAdminAll(params, itemId);
   },
 
   async create(data: Prisma.ProductVariantUncheckedCreateInput) {
@@ -397,17 +457,18 @@ export const variantRepository = {
   },
 
   /**
-   * Every other active variant of this product, each with its sorted set of
+   * Every other active Color variant of this Item, each with its sorted set of
    * attribute_value ids - used to reject a new/edited variant that would
-   * duplicate an existing attribute combination (e.g. two "Red, M" variants).
+   * duplicate an existing attribute combination (e.g. two "Red" variants).
+   * Two different Items of the same Product may legitimately share a color.
    */
-  async findAttributeSetsForProduct(
-    productId: bigint,
+  async findAttributeSetsForItem(
+    itemId: bigint,
     excludeVariantId?: bigint
   ): Promise<Array<{ variantId: bigint; attributeValueIds: bigint[] }>> {
     const variants = await db.productVariant.findMany({
       where: {
-        productId,
+        itemId,
         deleted_at: null,
         ...(excludeVariantId ? { id: { not: excludeVariantId } } : {}),
       },
@@ -426,9 +487,9 @@ export const variantRepository = {
   },
 
   /**
-   * Replaces this variant's attribute values (Color=Red, Size=M, ...) with the given
-   * set. One attribute can hold only one value per variant, enforced by resolving
-   * each value's parent attribute and replacing the whole set atomically.
+   * Replaces this variant's non-Size attribute values (e.g. Fabric=Cotton) with the
+   * given set. One attribute can hold only one value per variant, enforced by
+   * resolving each value's parent attribute and replacing the whole set atomically.
    */
   async setAttributeValuesForVariant(
     variantId: bigint,

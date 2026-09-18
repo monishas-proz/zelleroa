@@ -101,7 +101,7 @@ export const catalogOffers = {
   async decorateProductDetail(
     product: CustomerProductDetailDto
   ): Promise<CustomerProductDetailDto> {
-    await this.decorateVariants(product.variants);
+    await this.decorateVariants(product.items.flatMap((item) => item.variants));
     return product;
   },
 

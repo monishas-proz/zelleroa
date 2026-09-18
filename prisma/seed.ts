@@ -44,6 +44,7 @@ async function main() {
   const adminRole = await getOrCreateRole("ADMIN", "admin", "Administrator with full access");
   const staffRole = await getOrCreateRole("STAFF", "staff", "Staff member with limited access");
   const customerRole = await getOrCreateRole("CUSTOMER", "customer", "Regular customer");
+  const agentRole = await getOrCreateRole("AGENT", "agent", "Referral agent credited for attributed signups and orders");
 
   console.log("Roles created");
 

@@ -49,12 +49,14 @@ import { useHsnCodes } from "@/features/hsn-codes/hooks";
 import { useUnits } from "@/features/units/hooks";
 import { ProductPriceEditModal } from "@/features/products/components/ProductPriceEditModal";
 import { ProductForm, type ProductFormValues } from "@/features/products/components/ProductForm";
+import { ProductAttributesPanel } from "@/features/products/components/ProductAttributesPanel";
 import {
   VariantForm,
   VariantImageUploader,
   VariantCard,
   VariantCustomerPreviewModal,
   VariantUnitPriceList,
+  VariantGenerator,
   type VariantFormValues,
   type UnitFormItem,
 } from "@/features/variants/components";
@@ -64,6 +66,12 @@ import { ErrorState } from "@/components/ui/error-state";
 import { FormModal } from "@/components/common/FormModal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { AdminVariantResponse } from "@/features/variants/types";
+import { useStyles, useCreateStyle, useUpdateStyle, useDeleteStyle } from "@/features/styles/hooks";
+import { StyleForm, StyleCard, type StyleFormValues } from "@/features/styles/components";
+import type { AdminStyleResponse } from "@/features/styles/types";
+import { useItems, useCreateItem, useUpdateItem, useDeleteItem } from "@/features/items/hooks";
+import { ItemForm, ItemCard, ItemAttributesPanel, type ItemFormValues } from "@/features/items/components";
+import type { AdminItemResponse } from "@/features/items/types";
 
 type VariantFilter = "active" | "inactive";
 
@@ -150,13 +158,128 @@ export default function AdminProductDetailsPage() {
     { enabled: !!productUuid }
   );
 
-  const variants = React.useMemo<AdminVariantResponse[]>(() => {
+  const allVariants = React.useMemo<AdminVariantResponse[]>(() => {
     return (variantsResponse?.data as AdminVariantResponse[]) ?? [];
   }, [variantsResponse]);
+
+  // 2b. Styles under this Product - e.g. "V Neck T-Shirt" vs "Solo T-Shirt"
+  // under Product "T-Shirt". Most products migrated from the old flat
+  // catalog have exactly one, auto-selected below so nothing changes for
+  // them; products with more than one let the admin switch between them.
+  const { data: stylesResponse, isLoading: isLoadingStyles } = useStyles(
+    productUuid || null,
+    { pageSize: 100 }
+  );
+  const styles = React.useMemo<AdminStyleResponse[]>(
+    () => stylesResponse?.data ?? [],
+    [stylesResponse]
+  );
+
+  const [selectedStyleUuid, setSelectedStyleUuid] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (selectedStyleUuid && styles.some((s) => s.id === selectedStyleUuid)) return;
+    const fallback = styles.find((s) => s.isDefault) ?? styles[0] ?? null;
+    setSelectedStyleUuid(fallback?.id ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [styles]);
+
+  const [isAddStyleOpen, setIsAddStyleOpen] = React.useState(false);
+  const [editingStyle, setEditingStyle] = React.useState<AdminStyleResponse | null>(null);
+  const [deletingStyle, setDeletingStyle] = React.useState<AdminStyleResponse | null>(null);
+
+  const createStyleMutation = useCreateStyle();
+  const updateStyleMutation = useUpdateStyle();
+  const deleteStyleMutation = useDeleteStyle();
+
+  // 2c. Items under the selected Style - the admin-only "Regular Fit / Slim
+  // Fit / Oversized" sub-variants. Never shown to customers; only used here
+  // to scope which Colors/Sizes show below.
+  const { data: itemsResponse, isLoading: isLoadingItems } = useItems(
+    productUuid || null,
+    selectedStyleUuid || null,
+    { pageSize: 100 }
+  );
+  const items = React.useMemo<AdminItemResponse[]>(
+    () => itemsResponse?.data ?? [],
+    [itemsResponse]
+  );
+
+  const [selectedItemUuid, setSelectedItemUuid] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (selectedItemUuid && items.some((i) => i.id === selectedItemUuid)) return;
+    const fallback = items.find((i) => i.isDefault) ?? items[0] ?? null;
+    setSelectedItemUuid(fallback?.id ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
+
+  const [isAddItemOpen, setIsAddItemOpen] = React.useState(false);
+  const [newlyCreatedItem, setNewlyCreatedItem] = React.useState<AdminItemResponse | null>(null);
+  const [editingItem, setEditingItem] = React.useState<AdminItemResponse | null>(null);
+  const [deletingItem, setDeletingItem] = React.useState<AdminItemResponse | null>(null);
+  const [isPreparingItemForm, setIsPreparingItemForm] = React.useState(false);
+
+  const createItemMutation = useCreateItem();
+  const updateItemMutation = useUpdateItem();
+  const deleteItemMutation = useDeleteItem();
+
+  // Items always need a parent Style in the database. Most products only
+  // ever need one, so "Add Item" silently creates a hidden default Style
+  // the first time it's needed - the admin only ever sees "Item".
+  const handleAddItemClick = async () => {
+    if (selectedStyleUuid) {
+      setIsAddItemOpen(true);
+      return;
+    }
+    setIsPreparingItemForm(true);
+    try {
+      const res = await createStyleMutation.mutateAsync({
+        productUuid: canonicalProductId,
+        data: {
+          name: product.name,
+          slug: `${product.slug}-default`,
+          sku: null,
+          shortDescription: null,
+          description: null,
+          ingredients: null,
+          isReadyToMix: false,
+          cookingRecipe: null,
+          shelfLife: null,
+          vegType: "na",
+          basePrice: 0,
+          isFeatured: false,
+          isDefault: true,
+          isActive: true,
+        },
+      });
+      const created = (res as any)?.data as AdminStyleResponse | undefined;
+      if (created) {
+        setSelectedStyleUuid(created.id);
+        setIsAddItemOpen(true);
+      }
+    } catch (err: any) {
+      console.error("Failed to prepare product for Items", err);
+      toast.error("Failed to add item", err?.message || "Please try again.");
+    } finally {
+      setIsPreparingItemForm(false);
+    }
+  };
+
+  // The Colors/Sizes section below is scoped to whichever Item is selected
+  // above - with only one Item under the Style (the common case) this is
+  // every variant belonging to that Style, exactly as before.
+  const itemIds = React.useMemo(() => new Set(items.map((i) => i.id)), [items]);
+  const variants = React.useMemo<AdminVariantResponse[]>(() => {
+    if (items.length <= 1) {
+      return allVariants.filter((v) => itemIds.has(v.itemId));
+    }
+    if (!selectedItemUuid) return allVariants.filter((v) => itemIds.has(v.itemId));
+    return allVariants.filter((v) => v.itemId === selectedItemUuid);
+  }, [allVariants, items.length, itemIds, selectedItemUuid]);
 
   // Reference queries for modal form dropdowns (lazy-loaded when modals open)
   const [isEditProductOpen, setIsEditProductOpen] = React.useState(false);
   const [isAddVariantOpen, setIsAddVariantOpen] = React.useState(false);
+  const [isGenerateVariantsOpen, setIsGenerateVariantsOpen] = React.useState(false);
   const [newlyCreatedVariant, setNewlyCreatedVariant] = React.useState<AdminVariantResponse | null>(null);
   const [editingVariant, setEditingVariant] = React.useState<AdminVariantResponse | null>(null);
   const [editVariantTab, setEditVariantTab] = React.useState<"details" | "pricing">("details");
@@ -272,7 +395,8 @@ export default function AdminProductDetailsPage() {
       : null) ||
     (typeof product?.hsnCode === "string" ? product.hsnCode : null);
 
-  const currentTabCount = variantsResponse?.meta?.total ?? variants.length;
+  const currentTabCount =
+    items.length > 1 ? variants.length : (variantsResponse?.meta?.total ?? variants.length);
 
   // Selection helpers
   const selectedIds = React.useMemo(
@@ -619,6 +743,152 @@ export default function AdminProductDetailsPage() {
           </div>
         </section> */}
 
+        {/* Section 3.4: Product Attributes - which attributes (Color, Size,
+            Material...) apply to this product. Items below only ever offer
+            value-selection for whatever is checked here. */}
+        <section className="bg-white border border-cream-border rounded-lg overflow-hidden">
+          <div className="p-3.5 sm:p-4 border-b border-cream-border flex items-center gap-2.5">
+            <h2 className="text-base font-bold text-neutral-900 tracking-tight">Attributes</h2>
+          </div>
+          <div className="p-4">
+            <ProductAttributesPanel productUuid={canonicalProductId} />
+          </div>
+        </section>
+
+        {/* Section 3.5: Product Styles - only shown once a product actually has
+            more than one Style to manage (e.g. "V Neck T-Shirt" vs "Solo
+            T-Shirt"). Single-style products (the common case) skip this
+            entirely - Items below are added directly via a hidden default
+            Style, created on demand by "Add Item". */}
+        {styles.length > 1 && (
+          <section className="bg-white border border-cream-border rounded-lg overflow-hidden">
+            <div className="p-3.5 sm:p-4 border-b border-cream-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-base font-bold text-neutral-900 tracking-tight">Styles</h2>
+                <span className="px-2.5 py-0.5 rounded-full bg-cream-200 border border-cream-border text-xs font-bold text-neutral-500">
+                  {styles.length}
+                </span>
+                <span className="text-xs text-neutral-400 hidden sm:inline">
+                  Each Style (e.g. &ldquo;V Neck&rdquo;, &ldquo;Solo&rdquo;) gets its own Items, Colors &amp; Sizes below.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddStyleOpen(true)}
+                className="px-3.5 py-1.5 rounded-md border border-secondary-700 bg-secondary-600 hover:bg-secondary-700 text-cream-white text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Style</span>
+              </button>
+            </div>
+
+            <div className="p-4">
+              {isLoadingStyles ? (
+                <AdminTableSkeleton bare rows={1} columns={4} />
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {styles.map((style) => (
+                    <StyleCard
+                      key={style.id}
+                      item={style}
+                      isSelected={style.id === selectedStyleUuid}
+                      onSelect={(s) => setSelectedStyleUuid(s.id)}
+                      onEdit={(s) => setEditingStyle(s)}
+                      onDelete={(s) => setDeletingStyle(s)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Section 3.6: Items - admin-only sub-variant (e.g. "Regular Fit",
+            "Slim Fit", "Oversized"). Never shown to customers; only used to
+            scope which Colors/Sizes show below. Clicking "Add Item" with no
+            Style yet creates a hidden default Style automatically. */}
+        <section className="bg-white border border-cream-border rounded-lg overflow-hidden">
+          <div className="p-3.5 sm:p-4 border-b border-cream-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-base font-bold text-neutral-900 tracking-tight">Items</h2>
+              <span className="px-2.5 py-0.5 rounded-full bg-cream-200 border border-cream-border text-xs font-bold text-neutral-500">
+                {items.length}
+              </span>
+              <span className="text-xs text-neutral-400 hidden sm:inline">
+                Admin-only sub-variants (e.g. Regular/Slim/Oversized Fit) - never shown to customers.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleAddItemClick}
+              disabled={isPreparingItemForm}
+              className="px-3.5 py-1.5 rounded-md border border-secondary-700 bg-secondary-600 hover:bg-secondary-700 text-cream-white text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{isPreparingItemForm ? "Preparing..." : "+ Add Item"}</span>
+            </button>
+          </div>
+
+          <div className="p-4">
+            {isLoadingItems && selectedStyleUuid ? (
+              <AdminTableSkeleton bare rows={1} columns={4} />
+            ) : items.length === 0 ? (
+              <div className="text-center py-10 px-4">
+                <Layers className="mx-auto h-8 w-8 text-neutral-300" />
+                <h3 className="mt-2 text-sm font-semibold text-neutral-900">No items yet</h3>
+                <p className="mt-1 text-xs text-neutral-500 max-w-sm mx-auto">
+                  Add at least one Item before creating Colors and Sizes for this product.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleAddItemClick}
+                  disabled={isPreparingItemForm}
+                  className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-secondary-600 text-cream-white text-xs font-semibold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{isPreparingItemForm ? "Preparing..." : "Add first Item"}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {items.map((item) => (
+                  <ItemCard
+                    key={item.id}
+                    item={item}
+                    isSelected={item.id === selectedItemUuid}
+                    onSelect={(i) => setSelectedItemUuid(i.id)}
+                    onEdit={(i) => setEditingItem(i)}
+                    onDelete={(i) => setDeletingItem(i)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Section 3.7: Attribute values for the selected Item - which Color/Size/etc.
+            values (from the attributes configured on the product above) this specific
+            Item comes in, plus the trigger to generate its Colors/Sizes from that selection. */}
+        {selectedItemUuid && (
+          <section className="bg-white border border-cream-border rounded-lg overflow-hidden">
+            <div className="p-3.5 sm:p-4 border-b border-cream-border flex items-center gap-2.5">
+              <h2 className="text-base font-bold text-neutral-900 tracking-tight">
+                Item Attributes
+              </h2>
+              <span className="text-xs text-neutral-400 hidden sm:inline">
+                For &ldquo;{items.find((i) => i.id === selectedItemUuid)?.name || "this item"}&rdquo;
+              </span>
+            </div>
+            <div className="p-4">
+              <ItemAttributesPanel
+                productUuid={canonicalProductId}
+                itemUuid={selectedItemUuid}
+                onGenerated={() => refetchVariants()}
+              />
+            </div>
+          </section>
+        )}
+
         {/* Section 4: Product Variants Section with FIXED ACTION COLUMN */}
         <section className="bg-white border border-cream-border rounded-lg overflow-hidden">
           {/* Header & Controls */}
@@ -711,6 +981,16 @@ export default function AdminProductDetailsPage() {
               >
                 <IndianRupee className="w-3.5 h-3.5" />
                 <span>Edit prices</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsGenerateVariantsOpen(true)}
+                className="px-3.5 py-1.5 rounded-md border border-secondary-200 bg-secondary-50 hover:bg-secondary-100 text-secondary-600 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Bulk-create Items from Color/Size/etc. combinations"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Generate Variants</span>
               </button>
 
               <button
@@ -1213,6 +1493,24 @@ export default function AdminProductDetailsPage() {
         />
       </FormModal>
 
+      {/* 4b. Generate Variants Modal (bulk Cartesian combination generation) */}
+      <FormModal
+        open={isGenerateVariantsOpen}
+        onClose={() => {
+          setIsGenerateVariantsOpen(false);
+          refetchVariants();
+        }}
+        title="Generate Variants"
+        description={`Create every combination of Color, Size, etc. for ${product.name} in one go`}
+        size="lg"
+      >
+        <VariantGenerator
+          productUuid={canonicalProductId}
+          itemUuid={items.length > 1 ? selectedItemUuid || undefined : undefined}
+          onGenerated={() => refetchVariants()}
+        />
+      </FormModal>
+
       {/* 5. Add Variant Modal */}
       <FormModal
         open={isAddVariantOpen}
@@ -1240,13 +1538,10 @@ export default function AdminProductDetailsPage() {
               try {
                 const res = await createVariantMutation.mutateAsync({
                   productUuid: canonicalProductId,
+                  itemUuid: items.length > 1 ? selectedItemUuid || undefined : undefined,
                   data: {
                     variantName: formData.variantName,
                     slug: formData.slug,
-                    shortDescription: formData.shortDescription || null,
-                    description: formData.description || null,
-                    colorName: formData.colorName || null,
-                    colorHex: formData.colorHex || null,
                     priceAdjustment: formData.priceAdjustment ?? 0,
                     isFeatured: formData.isFeatured,
                     attributeValueIds: formData.attributeValueIds || [],
@@ -1269,6 +1564,8 @@ export default function AdminProductDetailsPage() {
             <VariantUnitPriceList
               productUuid={canonicalProductId}
               variantUuid={newlyCreatedVariant.id}
+              categoryUuid={product.categoryId || null}
+              productGender={product.gender || null}
             />
             <div className="flex justify-end gap-2">
               {!hasNewlyCreatedPrices ? (
@@ -1352,10 +1649,6 @@ export default function AdminProductDetailsPage() {
                 initialData={{
                   variantName: editingVariant.variantName,
                   slug: editingVariant.slug || "",
-                  shortDescription: editingVariant.shortDescription || "",
-                  description: editingVariant.description || "",
-                  colorName: editingVariant.colorName || "",
-                  colorHex: editingVariant.colorHex || "",
                   priceAdjustment: editingVariant.priceAdjustment ?? 0,
                   isFeatured: editingVariant.isFeatured ?? false,
                   attributeValueIds: (editingVariant.attributeValues || []).map(
@@ -1377,10 +1670,6 @@ export default function AdminProductDetailsPage() {
                       data: {
                         variantName: formData.variantName,
                         slug: formData.slug,
-                        shortDescription: formData.shortDescription || null,
-                        description: formData.description || null,
-                        colorName: formData.colorName || null,
-                        colorHex: formData.colorHex || null,
                         priceAdjustment: formData.priceAdjustment ?? 0,
                         isFeatured: formData.isFeatured,
                         attributeValueIds: formData.attributeValueIds || [],
@@ -1396,6 +1685,8 @@ export default function AdminProductDetailsPage() {
               <VariantUnitPriceList
                 productUuid={canonicalProductId}
                 variantUuid={editingVariant.id}
+                categoryUuid={product.categoryId || null}
+                productGender={product.gender || null}
               />
             )}
           </div>
@@ -1488,6 +1779,301 @@ export default function AdminProductDetailsPage() {
         variant={previewVariant}
         isOpen={Boolean(previewVariant)}
         onClose={() => setPreviewVariant(null)}
+      />
+
+      {/* 12. Add Style Modal */}
+      <FormModal
+        open={isAddStyleOpen}
+        onClose={() => setIsAddStyleOpen(false)}
+        title="Add Style"
+        description={`Create a new sellable style for ${product.name} (e.g. "V Neck", "Solo")`}
+        size="lg"
+      >
+        <StyleForm
+          isLoading={createStyleMutation.isPending}
+          submitLabel="Create Style"
+          onSubmit={async (formData: StyleFormValues) => {
+            try {
+              const res = await createStyleMutation.mutateAsync({
+                productUuid: canonicalProductId,
+                data: {
+                  name: formData.name,
+                  slug: formData.slug,
+                  sku: formData.sku || null,
+                  shortDescription: formData.shortDescription || null,
+                  description: formData.description || null,
+                  ingredients: null,
+                  isReadyToMix: false,
+                  cookingRecipe: formData.cookingRecipe || null,
+                  shelfLife: null,
+                  vegType: "na",
+                  basePrice: 0,
+                  isFeatured: formData.isFeatured,
+                  isDefault: formData.isDefault ?? false,
+                  isActive: formData.isActive,
+                },
+              });
+              const created = (res as any)?.data as AdminStyleResponse | undefined;
+              if (created) {
+                setSelectedStyleUuid(created.id);
+              }
+              setIsAddStyleOpen(false);
+              toast.success("Style created", `"${formData.name}" is ready for Items, Colors & Sizes.`);
+            } catch (err: any) {
+              console.error("Failed to create style", err);
+              toast.error("Failed to create style", err?.message || "Please try again.");
+            }
+          }}
+        />
+      </FormModal>
+
+      {/* 13. Edit Style Modal */}
+      <FormModal
+        open={Boolean(editingStyle)}
+        onClose={() => setEditingStyle(null)}
+        title="Edit Style"
+        description={`Update information for ${editingStyle?.name || ""}`}
+        size="lg"
+      >
+        {editingStyle && (
+          <StyleForm
+            isEditing
+            initialData={{
+              name: editingStyle.name,
+              slug: editingStyle.slug,
+              sku: editingStyle.sku || "",
+              shortDescription: editingStyle.shortDescription || "",
+              description: editingStyle.description || "",
+              cookingRecipe: editingStyle.cookingRecipe || "",
+              isFeatured: editingStyle.isFeatured,
+              isDefault: editingStyle.isDefault,
+              isActive: editingStyle.isActive,
+            }}
+            isLoading={updateStyleMutation.isPending}
+            submitLabel="Save Changes"
+            onSubmit={async (formData: StyleFormValues) => {
+              if (!editingStyle) return;
+              try {
+                await updateStyleMutation.mutateAsync({
+                  productUuid: canonicalProductId,
+                  styleUuid: editingStyle.id,
+                  data: {
+                    name: formData.name,
+                    slug: formData.slug,
+                    sku: formData.sku || null,
+                    shortDescription: formData.shortDescription || null,
+                    description: formData.description || null,
+                    ingredients: editingStyle.ingredients || null,
+                    isReadyToMix: editingStyle.isReadyToMix ?? false,
+                    cookingRecipe: formData.cookingRecipe || null,
+                    shelfLife: editingStyle.shelfLife || null,
+                    vegType: editingStyle.vegType || "na",
+                    basePrice: editingStyle.basePrice ?? 0,
+                    isFeatured: formData.isFeatured,
+                    isDefault: formData.isDefault ?? false,
+                    isActive: formData.isActive,
+                  },
+                });
+                setEditingStyle(null);
+                toast.success("Style updated", `"${formData.name}" was saved.`);
+              } catch (err: any) {
+                console.error("Failed to update style", err);
+                toast.error("Failed to update style", err?.message || "Please try again.");
+              }
+            }}
+          />
+        )}
+      </FormModal>
+
+      {/* 14. Delete Style Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!deletingStyle}
+        onClose={() => setDeletingStyle(null)}
+        onConfirm={async () => {
+          if (!deletingStyle) return;
+          const target = deletingStyle;
+          setDeletingStyle(null);
+          try {
+            await deleteStyleMutation.mutateAsync({
+              productUuid: canonicalProductId,
+              styleUuid: target.id,
+            });
+            if (selectedStyleUuid === target.id) {
+              setSelectedStyleUuid(null);
+            }
+            toast.success("Style deleted", `"${target.name}" was removed.`);
+          } catch (err: any) {
+            console.error("Failed to delete style", err);
+            toast.error("Failed to delete style", err?.message || "Please try again.");
+          }
+        }}
+        title="Delete Style"
+        description={`Are you sure you want to delete the style "${deletingStyle?.name}"? Its Items, Colors and Sizes will no longer be manageable. This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+        isLoading={deleteStyleMutation.isPending}
+      />
+
+      {/* 15. Add Item Modal (admin-only sub-variant under the selected Style).
+           Two steps like Add Item's own "Add Variant" flow: create the Item,
+           then immediately pick which attribute values (Color, Size, etc.)
+           it comes in, right here, instead of hunting for it below later. */}
+      <FormModal
+        open={isAddItemOpen}
+        onClose={() => {
+          setIsAddItemOpen(false);
+          setNewlyCreatedItem(null);
+        }}
+        title={newlyCreatedItem ? "Choose Attribute Values" : "Add Item"}
+        description={
+          newlyCreatedItem
+            ? `Pick which Color/Size/etc. values "${newlyCreatedItem.name}" comes in`
+            : `Create a new sub-variant under "${styles.find((s) => s.id === selectedStyleUuid)?.name || "this style"}" (e.g. "Regular Fit", "Slim Fit")`
+        }
+        size="lg"
+      >
+        {!newlyCreatedItem ? (
+          selectedStyleUuid && (
+            <ItemForm
+              isLoading={createItemMutation.isPending}
+              submitLabel="Next: Attribute Values"
+              onSubmit={async (formData: ItemFormValues) => {
+                try {
+                  const res = await createItemMutation.mutateAsync({
+                    productUuid: canonicalProductId,
+                    styleUuid: selectedStyleUuid,
+                    data: {
+                      name: formData.name,
+                      slug: formData.slug,
+                      sku: formData.sku || null,
+                      shortDescription: formData.shortDescription || null,
+                      description: formData.description || null,
+                      basePrice: formData.basePrice ?? 0,
+                      isFeatured: formData.isFeatured,
+                      isDefault: formData.isDefault ?? false,
+                      isActive: formData.isActive,
+                    },
+                  });
+                  const created = (res as any)?.data as AdminItemResponse | undefined;
+                  if (created) {
+                    setSelectedItemUuid(created.id);
+                    setNewlyCreatedItem(created);
+                  }
+                  toast.success("Item created", `"${formData.name}" is ready for Colors & Sizes.`);
+                } catch (err: any) {
+                  console.error("Failed to create item", err);
+                  toast.error("Failed to create item", err?.message || "Please try again.");
+                }
+              }}
+            />
+          )
+        ) : (
+          <div className="space-y-4">
+            <ItemAttributesPanel
+              productUuid={canonicalProductId}
+              itemUuid={newlyCreatedItem.id}
+              onGenerated={() => refetchVariants()}
+            />
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                onClick={() => {
+                  setIsAddItemOpen(false);
+                  setNewlyCreatedItem(null);
+                }}
+                className="h-10 rounded-xl bg-neutral-100 text-neutral-800 border border-neutral-300 hover:bg-neutral-200 px-5 text-sm font-semibold cursor-pointer"
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        )}
+      </FormModal>
+
+      {/* 16. Edit Item Modal */}
+      <FormModal
+        open={Boolean(editingItem)}
+        onClose={() => setEditingItem(null)}
+        title="Edit Item"
+        description={`Update information for ${editingItem?.name || ""}`}
+        size="lg"
+      >
+        {editingItem && (
+          <ItemForm
+            isEditing
+            initialData={{
+              name: editingItem.name,
+              slug: editingItem.slug,
+              sku: editingItem.sku || "",
+              shortDescription: editingItem.shortDescription || "",
+              description: editingItem.description || "",
+              basePrice: editingItem.basePrice ?? 0,
+              isFeatured: editingItem.isFeatured,
+              isDefault: editingItem.isDefault,
+              isActive: editingItem.isActive,
+            }}
+            isLoading={updateItemMutation.isPending}
+            submitLabel="Save Changes"
+            onSubmit={async (formData: ItemFormValues) => {
+              if (!editingItem || !selectedStyleUuid) return;
+              try {
+                await updateItemMutation.mutateAsync({
+                  productUuid: canonicalProductId,
+                  styleUuid: selectedStyleUuid,
+                  itemUuid: editingItem.id,
+                  data: {
+                    name: formData.name,
+                    slug: formData.slug,
+                    sku: formData.sku || null,
+                    shortDescription: formData.shortDescription || null,
+                    description: formData.description || null,
+                    basePrice: formData.basePrice ?? 0,
+                    isFeatured: formData.isFeatured,
+                    isDefault: formData.isDefault ?? false,
+                    isActive: formData.isActive,
+                  },
+                });
+                setEditingItem(null);
+                toast.success("Item updated", `"${formData.name}" was saved.`);
+              } catch (err: any) {
+                console.error("Failed to update item", err);
+                toast.error("Failed to update item", err?.message || "Please try again.");
+              }
+            }}
+          />
+        )}
+      </FormModal>
+
+      {/* 17. Delete Item Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!deletingItem}
+        onClose={() => setDeletingItem(null)}
+        onConfirm={async () => {
+          if (!deletingItem || !selectedStyleUuid) return;
+          const target = deletingItem;
+          setDeletingItem(null);
+          try {
+            await deleteItemMutation.mutateAsync({
+              productUuid: canonicalProductId,
+              styleUuid: selectedStyleUuid,
+              itemUuid: target.id,
+            });
+            if (selectedItemUuid === target.id) {
+              setSelectedItemUuid(null);
+            }
+            toast.success("Item deleted", `"${target.name}" was removed.`);
+          } catch (err: any) {
+            console.error("Failed to delete item", err);
+            toast.error("Failed to delete item", err?.message || "Please try again.");
+          }
+        }}
+        title="Delete Item"
+        description={`Are you sure you want to delete the item "${deletingItem?.name}"? Its Colors and Sizes will no longer be manageable. This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+        isLoading={deleteItemMutation.isPending}
       />
     </div>
   );

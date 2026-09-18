@@ -76,13 +76,25 @@ export const reviewRepository = {
         isActive: true,
       },
       include: {
-        variants: {
-          where: { deleted_at: null, isActive: true },
+        styles: {
+          where: { deleted_at: null },
           include: {
-            variant_unit_prices: {
-              where: { deleted_at: null, isActive: true },
-              select: { id: true, uuid: true, sku: true },
-              orderBy: [{ is_default: "desc" as const }, { createdAt: "asc" as const }],
+            items: {
+              where: { deleted_at: null },
+              include: {
+                variants: {
+                  where: { deleted_at: null, isActive: true },
+                  include: {
+                    variant_unit_prices: {
+                      where: { deleted_at: null, isActive: true },
+                      select: { id: true, uuid: true, sku: true },
+                      orderBy: [{ is_default: "desc" as const }, { createdAt: "asc" as const }],
+                      take: 1,
+                    },
+                  },
+                  take: 1,
+                },
+              },
               take: 1,
             },
           },
@@ -113,12 +125,28 @@ export const reviewRepository = {
         deleted_at: null,
       },
       include: {
-        product: {
+        item: {
           select: {
             id: true,
             uuid: true,
             name: true,
             slug: true,
+            style: {
+              select: {
+                id: true,
+                uuid: true,
+                name: true,
+                slug: true,
+                product: {
+                  select: {
+                    id: true,
+                    uuid: true,
+                    name: true,
+                    slug: true,
+                  },
+                },
+              },
+            },
           },
         },
         variant_unit_prices: {
@@ -154,12 +182,20 @@ export const reviewRepository = {
       include: {
         variant: {
           include: {
-            product: {
-              select: {
-                id: true,
-                uuid: true,
-                name: true,
-                slug: true,
+            item: {
+              include: {
+                style: {
+                  include: {
+                    product: {
+                      select: {
+                        id: true,
+                        uuid: true,
+                        name: true,
+                        slug: true,
+                      },
+                    },
+                  },
+                },
               },
             },
           },

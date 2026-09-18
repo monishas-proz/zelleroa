@@ -15,12 +15,14 @@ function getBaseUrl(): string {
 export class ApiClientError extends Error {
   public readonly status: number;
   public readonly errors?: string[];
+  public readonly details?: unknown;
 
-  constructor(message: string, status: number, errors?: string[]) {
+  constructor(message: string, status: number, errors?: string[], details?: unknown) {
     super(message);
     this.name = "ApiClientError";
     this.status = status;
     this.errors = errors;
+    this.details = details;
   }
 }
 
@@ -176,7 +178,8 @@ async function fetchApi<T>(
     throw new ApiClientError(
       data.message || "Something went wrong",
       response.status,
-      data.errors
+      data.errors,
+      data.details
     );
   }
 

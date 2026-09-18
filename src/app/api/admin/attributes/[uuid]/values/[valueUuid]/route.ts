@@ -17,7 +17,11 @@ export const PUT = createApiHandler(
       }
 
       const body = context.body as UpdateAttributeValueInput;
-      if (body.value === undefined && body.priceAdjustment === undefined) {
+      if (
+        body.value === undefined &&
+        body.priceAdjustment === undefined &&
+        body.colorHex === undefined
+      ) {
         throw ApiError.badRequest("Nothing to update");
       }
       const adminEmail = context.session?.user?.email ?? undefined;
@@ -27,7 +31,8 @@ export const PUT = createApiHandler(
         valueUuid,
         body.value,
         adminEmail,
-        body.priceAdjustment
+        body.priceAdjustment,
+        body.colorHex
       );
       return apiSuccess(attribute, "Attribute value updated successfully");
     },

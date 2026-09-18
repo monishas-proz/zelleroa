@@ -7,12 +7,10 @@ import { z } from "zod";
 import { Info } from "lucide-react";
 import type { UnitOption } from "../types";
 import { FormInput } from "@/components/forms/form-input";
-import { FormTextarea } from "@/components/forms/form-textarea";
-import { FormRichText } from "@/components/forms/form-rich-text";
 import { FormSelect } from "@/components/forms/form-select";
 import { FormCheckbox } from "@/components/forms/form-checkbox";
 import { FormSubmitButton } from "@/components/forms/form-submit-button";
-import { useAttributesForCategory } from "@/features/attributes/hooks/use-attributes";
+import { useConfiguredAttributesForProduct } from "@/features/attributes/hooks/use-attributes";
 import { useSizeChart } from "@/features/size-charts/hooks/use-size-chart";
 import type { SizeChartGender } from "@/features/size-charts/types";
 
@@ -34,23 +32,6 @@ const variantFormSchema = z.object({
     .trim()
     .min(1, "Item code cannot be empty")
     .max(255, "Item code cannot exceed 255 characters"),
-  shortDescription: z
-    .string()
-    .trim()
-    .max(500, "Short description cannot exceed 500 characters")
-    .optional(),
-  description: z.string().trim().optional(),
-  colorName: z
-    .string()
-    .trim()
-    .max(50, "Color name cannot exceed 50 characters")
-    .optional(),
-  colorHex: z
-    .string()
-    .trim()
-    .regex(/^#[0-9A-Fa-f]{6}$/, "Enter a valid hex color, e.g. #FF5733")
-    .optional()
-    .or(z.literal("")),
   priceAdjustment: z.number().optional(),
   isFeatured: z.boolean(),
   attributeValueIds: z.array(z.string().uuid()).optional(),
@@ -62,6 +43,8 @@ export interface SelectOption {
   value: string;
   label: string;
   slug?: string; // Product Code
+  categoryId?: string | null;
+  gender?: SizeChartGender | null;
 }
 
 export type UnitFormItem = UnitOption | (SelectOption & {
@@ -99,8 +82,6 @@ function VariantForm({
   isLoading = false,
   submitLabel = "Save Item",
 }: VariantFormProps) {
-  const { data: categoryAttributes = [] } = useAttributesForCategory(categoryUuid || null);
-  const { data: sizeChart = [] } = useSizeChart(categoryUuid || null, productGender || null);
   // Helper to compute prefix from Product Code / Slug
   const computePrefix = (prodId?: string): string => {
     if (fixedProductSlug) {
@@ -155,10 +136,6 @@ function VariantForm({
       productId: fixedProductId || initialData?.productId || "",
       variantName: initialData?.variantName || "",
       slug: initialData?.slug || "",
-      shortDescription: initialData?.shortDescription || "",
-      description: initialData?.description || "",
-      colorName: initialData?.colorName || "",
-      colorHex: initialData?.colorHex || "",
       priceAdjustment: initialData?.priceAdjustment ?? 0,
       isFeatured: initialData?.isFeatured ?? false,
       attributeValueIds: initialData?.attributeValueIds || [],
@@ -167,8 +144,23 @@ function VariantForm({
 
   const selectedProductId = methods.watch("productId");
   const watchedVariantName = methods.watch("variantName");
-  const watchedColorHex = methods.watch("colorHex");
   const watchedAttributeValueIds = methods.watch("attributeValueIds") || [];
+
+  // categoryUuid/productGender come from the caller when the product is fixed
+  // (e.g. adding an Item from within a Product's own page); otherwise fall
+  // back to whichever product the admin just picked in the dropdown above.
+  const selectedProduct = products.find(
+    (item) => item.value === (fixedProductId || selectedProductId)
+  );
+  const effectiveProductId = fixedProductId || selectedProductId || null;
+  const effectiveCategoryUuid = categoryUuid ?? selectedProduct?.categoryId ?? null;
+  const effectiveProductGender = productGender ?? selectedProduct?.gender ?? null;
+
+  // Attribute values come from the Product's own configured attributes (Color,
+  // Size, Material...) - never from the category - so Color is just another
+  // attribute here, entirely driven by the Attribute Master.
+  const { data: productAttributes = [] } = useConfiguredAttributesForProduct(effectiveProductId);
+  const { data: sizeChart = [] } = useSizeChart(effectiveCategoryUuid, effectiveProductGender);
 
   const handleAttributeValueChange = (
     attributeValueIdsForAttribute: string[],
@@ -217,10 +209,6 @@ function VariantForm({
         productId: fixedProductId || initialData.productId || "",
         variantName: initialData.variantName || "",
         slug: initialData.slug || "",
-        shortDescription: initialData.shortDescription || "",
-        description: initialData.description || "",
-        colorName: initialData.colorName || "",
-        colorHex: initialData.colorHex || "",
         priceAdjustment: initialData.priceAdjustment ?? 0,
         isFeatured: initialData.isFeatured ?? false,
         attributeValueIds: initialData.attributeValueIds || [],
@@ -410,34 +398,10 @@ function VariantForm({
           </div>
         </div>
 
-        {/* Color & Featured Item */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           <div>
             <label className="block text-xs font-semibold text-[var(--color-neutral-800)] mb-1.5">
-              Color
-            </label>
-            <div className="flex items-stretch gap-2">
-              <input
-                type="color"
-                value={/^#[0-9A-Fa-f]{6}$/.test(watchedColorHex || "") ? watchedColorHex : "#000000"}
-                onChange={(e) => methods.setValue("colorHex", e.target.value, { shouldValidate: true })}
-                className="h-11 w-11 shrink-0 cursor-pointer rounded-lg border border-neutral-200 p-1"
-                aria-label="Pick swatch color"
-              />
-              <div className="flex-1">
-                <FormInput name="colorName" placeholder="e.g. Maroon Red" />
-              </div>
-            </div>
-            {methods.formState.errors.colorHex && (
-              <p className="mt-1 text-xs text-red-500 font-medium">
-                {methods.formState.errors.colorHex.message}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[var(--color-neutral-800)] mb-1.5">
-              Color price add-on (₹)
+              Price add-on (₹)
             </label>
             <FormInput
               name="priceAdjustment"
@@ -446,13 +410,10 @@ function VariantForm({
               placeholder="e.g. 100"
             />
             <p className="mt-1 text-[11px] text-neutral-500">
-              Added on top of the product&apos;s base price whenever this color is picked. Leave
-              as 0 if this color doesn&apos;t change the price.
+              Added on top of the product&apos;s base price whenever this combination is picked.
+              Leave as 0 if it doesn&apos;t change the price.
             </p>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           <FormCheckbox
             name="isFeatured"
             label="Featured Item"
@@ -460,21 +421,32 @@ function VariantForm({
           />
         </div>
 
-        {/* Attribute Values (e.g. Size, Material) — set per category via Catalog > Attributes.
-            The Size attribute's options come from the category+gender size chart instead of
-            its full value list, and the field disappears entirely when that chart is empty
-            (category isn't size-applicable, or no chart configured for this gender yet). */}
+        {/* Attribute Values (e.g. Color, Size, Material) — driven entirely by
+            what's configured on the Product (Catalog > Products > Attributes),
+            never by category. Color is just another attribute here: its hex
+            code comes straight from the Attribute Master, never typed by hand.
+            The Size attribute prefers the category+gender size chart (curated
+            order/subset) when one has been configured, but falls back to its
+            full value list otherwise. */}
         {(() => {
-          const visibleAttributes = categoryAttributes
+          const visibleAttributes = productAttributes
             .map((attribute) => {
               if (attribute.name.trim().toLowerCase() === "size") {
-                return { ...attribute, values: sizeChart };
+                return { ...attribute, values: sizeChart.length > 0 ? sizeChart : attribute.values };
               }
               return attribute;
             })
             .filter((attribute) => attribute.values.length > 0);
 
-          if (visibleAttributes.length === 0) return null;
+          if (visibleAttributes.length === 0) {
+            return (
+              <p className="text-xs text-neutral-400 italic">
+                {effectiveProductId
+                  ? "This product has no attributes configured yet. Configure Color, Size, etc. under the product's Attributes section first."
+                  : "Select a product to see its configured attributes."}
+              </p>
+            );
+          }
 
           return (
           <div>
@@ -488,6 +460,12 @@ function VariantForm({
                   watchedAttributeValueIds.find((id) =>
                     valueIdsForAttribute.includes(id)
                   ) || "";
+                const isColor = attribute.type === "color";
+                // The Size branch above swaps in size-chart entries (no colorHex field) -
+                // Size is never color-type, so this cast only ever matters when isColor is true.
+                const selectedValue = attribute.values.find((v) => v.id === selectedValueId) as
+                  | { colorHex?: string | null }
+                  | undefined;
 
                 return (
                   <div key={attribute.id}>
@@ -495,20 +473,29 @@ function VariantForm({
                       {attribute.name}
                       {attribute.isRequired && <span className="text-red-500"> *</span>}
                     </label>
-                    <select
-                      value={selectedValueId}
-                      onChange={(e) =>
-                        handleAttributeValueChange(valueIdsForAttribute, e.target.value)
-                      }
-                      className="w-full h-10 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-900 outline-none focus:border-secondary-600 focus:ring-2 focus:ring-secondary-600/20"
-                    >
-                      <option value="">Select {attribute.name}</option>
-                      {attribute.values.map((value) => (
-                        <option key={value.id} value={value.id}>
-                          {value.value}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-2">
+                      {isColor && (
+                        <span
+                          className="h-6 w-6 shrink-0 rounded-full border border-neutral-200"
+                          style={{ backgroundColor: selectedValue?.colorHex || "#e5e5e5" }}
+                          title={selectedValue?.colorHex || undefined}
+                        />
+                      )}
+                      <select
+                        value={selectedValueId}
+                        onChange={(e) =>
+                          handleAttributeValueChange(valueIdsForAttribute, e.target.value)
+                        }
+                        className="w-full h-10 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-900 outline-none focus:border-secondary-600 focus:ring-2 focus:ring-secondary-600/20"
+                      >
+                        <option value="">Select {attribute.name}</option>
+                        {attribute.values.map((value) => (
+                          <option key={value.id} value={value.id}>
+                            {value.value}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 );
               })}
@@ -516,21 +503,6 @@ function VariantForm({
           </div>
           );
         })()}
-
-        {/* Short Description */}
-        <FormTextarea
-          name="shortDescription"
-          label="Short Description"
-          placeholder="Brief summary of the item (max 500 characters)"
-          rows={2}
-        />
-
-        {/* Description */}
-        <FormRichText
-          name="description"
-          label="Description"
-          placeholder="Detailed item information and description"
-        />
 
         <div className="flex justify-end pt-2">
           <FormSubmitButton

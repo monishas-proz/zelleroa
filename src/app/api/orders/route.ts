@@ -38,11 +38,11 @@ export const GET = createApiHandler(
 
 export const POST = createApiHandler(
   {
-    POST: async (_request, context) => {
+    POST: async (request, context) => {
       try {
         const userId = getUserId(context);
         const body = context.body as PlaceOrderSchemaInput;
-        const order = await orderService.placeOrder(userId, body);
+        const order = await orderService.placeOrder(userId, body, request);
         return apiCreated(order, "Order placed successfully");
       } catch (error) {
         return apiFromError(error);

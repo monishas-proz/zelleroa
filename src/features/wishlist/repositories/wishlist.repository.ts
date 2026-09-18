@@ -158,6 +158,8 @@ export const wishlistRepository = {
   async addOrReactivateWishlistItem(params: {
     userId: bigint;
     productId: bigint;
+    styleId?: bigint | null;
+    itemId?: bigint | null;
     variantId?: bigint | null;
     variantUnitPriceId: bigint;
     userInternalId: bigint;
@@ -176,6 +178,8 @@ export const wishlistRepository = {
         where: { id: existing.id },
         data: {
           is_active: true,
+          styleId: params.styleId ?? existing.styleId,
+          itemId: params.itemId ?? existing.itemId,
           variantId: params.variantId ?? existing.variantId,
           variant_unit_price_id: params.variantUnitPriceId,
           updated_at: new Date(),
@@ -193,6 +197,8 @@ export const wishlistRepository = {
         uuid: crypto.randomUUID(),
         userId: params.userId,
         productId: params.productId,
+        styleId: params.styleId ?? null,
+        itemId: params.itemId ?? null,
         variantId: params.variantId ?? null,
         variant_unit_price_id: params.variantUnitPriceId,
         is_active: true,

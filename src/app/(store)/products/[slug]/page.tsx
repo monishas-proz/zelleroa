@@ -59,6 +59,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   const { slug } = await params;
   const product = await getProductForSeo(slug);
 
+  const allVariants = product?.items.flatMap((item) => item.variants) ?? [];
+
   const jsonLd = product
     ? {
         "@context": "https://schema.org",
@@ -67,16 +69,16 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         description: product.description || undefined,
         image: product.image ? [product.image] : undefined,
         brand: product.brand ? { "@type": "Brand", name: product.brand.name } : undefined,
-        sku: product.variants[0]?.sku,
+        sku: allVariants[0]?.sku,
         offers:
-          product.variants.length > 0
+          allVariants.length > 0
             ? {
                 "@type": "AggregateOffer",
                 priceCurrency: "INR",
-                lowPrice: Math.min(...product.variants.map((v) => v.salePrice)),
-                highPrice: Math.max(...product.variants.map((v) => v.salePrice)),
-                offerCount: product.variants.length,
-                availability: product.variants.some((v) => !v.outOfStock)
+                lowPrice: Math.min(...allVariants.map((v) => v.salePrice)),
+                highPrice: Math.max(...allVariants.map((v) => v.salePrice)),
+                offerCount: allVariants.length,
+                availability: allVariants.some((v) => !v.outOfStock)
                   ? "https://schema.org/InStock"
                   : "https://schema.org/OutOfStock",
               }

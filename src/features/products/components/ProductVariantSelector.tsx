@@ -18,6 +18,8 @@ interface ProductVariantSelectorProps {
   variants: CustomerVariantListItemDto[];
   selectedVariantId: string | null;
   onSelect: (variantId: string) => void;
+  /** The Product UUID these variants (Colors) belong to - all link back here. */
+  productId?: string;
   productName?: string;
   categoryName?: string;
   className?: string;
@@ -27,6 +29,7 @@ export function ProductVariantSelector({
   variants,
   selectedVariantId: _selectedVariantId,
   onSelect: _onSelect,
+  productId,
   productName,
   categoryName,
   className,
@@ -226,7 +229,7 @@ export function ProductVariantSelector({
                   name={variant.variantName}
                   subtitle={categoryName || productName || "Authentic Snack"}
                   image={variant.primaryImage || resolveSnackFallbackImage(variant.variantName)}
-                  href={`/products/${variant.productId || variant.id}?variant=${variant.id}`}
+                  href={`/products/${productId || variant.productId || variant.id}?variant=${variant.id}`}
                   variants={cardVariants}
                   discountPercent={discountPercent}
                   isWishlisted={isWishlisted}

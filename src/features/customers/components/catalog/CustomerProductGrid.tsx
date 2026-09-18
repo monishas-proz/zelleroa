@@ -2,6 +2,7 @@
 
 import { CustomerProductCard } from "./CustomerProductCard";
 import { CustomerVariantCard } from "./CustomerVariantCard";
+import { CustomerStyleCard } from "./CustomerStyleCard";
 import { Sparkles } from "lucide-react";
 import type {
   CustomerProductListItemDto,
@@ -11,6 +12,8 @@ import type {
 interface CustomerProductGridProps {
   products?: CustomerProductListItemDto[];
   variants?: CustomerVariantListItemDto[];
+  /** One card per Style - the storefront listing's default mode. */
+  styles?: CustomerProductListItemDto[];
   onResetFilters?: () => void;
   columns?: 3 | 4;
 }
@@ -18,13 +21,15 @@ interface CustomerProductGridProps {
 export function CustomerProductGrid({
   products,
   variants,
+  styles,
   onResetFilters,
   columns = 3,
 }: CustomerProductGridProps) {
   const hasVariants = Boolean(variants && variants.length > 0);
   const hasProducts = Boolean(products && products.length > 0);
+  const hasStyles = Boolean(styles && styles.length > 0);
 
-  if (!hasVariants && !hasProducts) {
+  if (!hasVariants && !hasProducts && !hasStyles) {
     return (
       <div className="rounded-3xl border border-theme-border bg-theme-surface p-12 text-center max-w-md mx-auto my-8">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-theme-surface-alt text-theme-text-muted">
@@ -56,13 +61,15 @@ export function CustomerProductGrid({
 
   return (
     <div className={`grid ${gridColsClass} gap-5 sm:gap-6`}>
-      {hasVariants
-        ? variants!.map((variant) => (
-            <CustomerVariantCard key={variant.id} variant={variant} />
-          ))
-        : products!.map((product) => (
-            <CustomerProductCard key={product.id} product={product} />
-          ))}
+      {hasStyles
+        ? styles!.map((style) => <CustomerStyleCard key={style.id} style={style} />)
+        : hasVariants
+          ? variants!.map((variant) => (
+              <CustomerVariantCard key={variant.id} variant={variant} />
+            ))
+          : products!.map((product) => (
+              <CustomerProductCard key={product.id} product={product} />
+            ))}
     </div>
   );
 }

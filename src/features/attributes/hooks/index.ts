@@ -1,4 +1,10 @@
-export { useAdminAttributes, useAdminAttribute, useAttributesForCategory } from "./use-attributes";
+export {
+  useAdminAttributes,
+  useAdminAttribute,
+  useAttributesForProduct,
+  useConfiguredAttributesForProduct,
+  useItemAttributeValues,
+} from "./use-attributes";
 export {
   useCreateAttribute,
   useUpdateAttribute,
@@ -6,5 +12,6 @@ export {
   useAddAttributeValue,
   useUpdateAttributeValue,
   useDeleteAttributeValue,
-  useSetAttributeCategories,
+  useSetAttributesForProduct,
+  useSetAttributeValuesForItem,
 } from "./use-attribute-mutations";

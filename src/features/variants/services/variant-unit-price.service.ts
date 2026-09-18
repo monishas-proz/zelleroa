@@ -17,6 +17,7 @@ import type {
 import type {
   CreateVariantUnitPriceInput,
   UpdateVariantUnitPriceInput,
+  BulkSetSamePriceInput,
 } from "../validations/admin-variant-unit-price.schema";
 
 function formatVariantPriceHistory(
@@ -65,35 +66,25 @@ function skuPart(text: string): string {
 }
 
 /**
- * Builds a SKU as {product code}-{Size}-{Color}, skipping whichever parts the
+ * Builds a SKU as {item code}-{Color}-{Size}, skipping whichever parts the
  * variant doesn't have (e.g. no Size on a Watch). Falls back to appending a
  * numeric suffix if the generated code collides with an existing SKU.
  */
-async function generateSku(variant: {
-  product?: { slug?: string | null } | null;
-  color_name?: string | null;
-  variant_attribute_values?: Array<{
-    product_attributes: { name: string };
-    attribute_values: { value: string };
-  }> | null;
-}): Promise<string> {
+async function generateSku(
+  variant: {
+    item?: { slug?: string | null } | null;
+    color_name?: string | null;
+  },
+  sizeValue?: string | null
+): Promise<string> {
   const parts: string[] = [];
 
-  if (variant.product?.slug) {
-    parts.push(skuPart(variant.product.slug));
+  if (variant.item?.slug) {
+    parts.push(skuPart(variant.item.slug));
   }
 
-  const sizeValue = variant.variant_attribute_values?.find(
-    (vav) => vav.product_attributes.name.toLowerCase() === "size"
-  )?.attribute_values.value;
+  if (variant.color_name) parts.push(skuPart(variant.color_name));
   if (sizeValue) parts.push(skuPart(sizeValue));
-
-  const colorValue =
-    variant.color_name ||
-    variant.variant_attribute_values?.find(
-      (vav) => vav.product_attributes.name.toLowerCase() === "color"
-    )?.attribute_values.value;
-  if (colorValue) parts.push(skuPart(colorValue));
 
   const base = parts.filter(Boolean).join("-") || `ITEM-${Date.now()}`;
 
@@ -108,26 +99,33 @@ async function generateSku(variant: {
 }
 
 /**
- * base_price + this variant's color add-on + its linked Size attribute
- * value's add-on (if any) — used when an admin leaves "Price per pack"
- * blank instead of typing a fully independent price for every combination.
+ * Item.base_price + this variant's legacy manual color add-on + every one of
+ * its (non-Size) attribute values' own price add-on + the picked Size value's
+ * own price add-on — used when an admin leaves "Price" blank instead of
+ * typing a fully independent price.
  */
-function computeAutoPrice(variant: {
-  product?: { base_price?: Prisma.Decimal | number | null } | null;
-  price_adjustment?: Prisma.Decimal | number | null;
-  variant_attribute_values?: Array<{
-    product_attributes: { name: string };
-    attribute_values: { price_adjustment?: Prisma.Decimal | number | null };
-  }> | null;
-}): number {
-  const productBase = Number(variant.product?.base_price ?? 0);
-  const colorAdjustment = Number(variant.price_adjustment ?? 0);
-  const sizeAdjustment = Number(
-    variant.variant_attribute_values?.find(
-      (vav) => vav.product_attributes.name.toLowerCase() === "size"
-    )?.attribute_values.price_adjustment ?? 0
+function computeAutoPrice(
+  variant: {
+    item?: { base_price?: Prisma.Decimal | number | null } | null;
+    price_adjustment?: Prisma.Decimal | number | null;
+    variant_attribute_values?: Array<{
+      attribute_values: { price_adjustment?: Prisma.Decimal | number | null };
+    }> | null;
+  },
+  sizeValuePriceAdjustment?: Prisma.Decimal | number | null
+): number {
+  const itemBase = Number(variant.item?.base_price ?? 0);
+  const legacyColorAdjustment = Number(variant.price_adjustment ?? 0);
+  const attributeAdjustmentsTotal = (variant.variant_attribute_values ?? []).reduce(
+    (sum, vav) => sum + Number(vav.attribute_values.price_adjustment ?? 0),
+    0
   );
-  return productBase + colorAdjustment + sizeAdjustment;
+  return (
+    itemBase +
+    legacyColorAdjustment +
+    attributeAdjustmentsTotal +
+    Number(sizeValuePriceAdjustment ?? 0)
+  );
 }
 
 export const variantUnitPriceService = {
@@ -158,6 +156,28 @@ export const variantUnitPriceService = {
       throw ApiError.badRequest("Invalid or inactive unit");
     }
 
+    let sizeValueInternalId: bigint | null = null;
+    let sizeValue: { value: string; price_adjustment: Prisma.Decimal | number } | null = null;
+    if (data.sizeValueId) {
+      const resolved = await db.attributeValue.findFirst({
+        where: { uuid: data.sizeValueId, is_active: true },
+        select: { id: true, value: true, price_adjustment: true },
+      });
+      if (!resolved) {
+        throw ApiError.badRequest("Invalid size attribute value");
+      }
+      sizeValueInternalId = resolved.id;
+      sizeValue = resolved;
+    }
+
+    const duplicateSize = await variantUnitPriceRepository.findByVariantAndSize(
+      variant.id,
+      sizeValueInternalId
+    );
+    if (duplicateSize) {
+      throw ApiError.conflict("This item/color already has a price for that size");
+    }
+
     let sku = data.sku;
     if (sku) {
       const existingSku = await variantUnitPriceRepository.findBySku(sku);
@@ -165,7 +185,7 @@ export const variantUnitPriceService = {
         throw ApiError.conflict(`An active unit price with SKU '${sku}' already exists`);
       }
     } else {
-      sku = await generateSku(variant);
+      sku = await generateSku(variant, sizeValue?.value ?? null);
     }
 
     const duplicateUnit = await variantUnitPriceRepository.findByVariantAndUnit(
@@ -173,7 +193,7 @@ export const variantUnitPriceService = {
       unit.id,
       data.unitValue
     );
-    if (duplicateUnit) {
+    if (duplicateUnit && !data.sizeValueId) {
       throw ApiError.conflict("This item already has a price for that unit and measurement");
     }
 
@@ -183,7 +203,7 @@ export const variantUnitPriceService = {
 
     let basePrice = data.basePrice;
     if (basePrice === undefined) {
-      basePrice = computeAutoPrice(variant);
+      basePrice = computeAutoPrice(variant, sizeValue?.price_adjustment);
       if (basePrice <= 0) {
         throw ApiError.badRequest(
           "Enter a price, or set a base price / color add-on / size add-on to auto-calculate one"
@@ -196,6 +216,7 @@ export const variantUnitPriceService = {
       variant_id: variant.id,
       unit_id: unit.id,
       unit_value: data.unitValue,
+      attribute_value_id: sizeValueInternalId,
       sku,
       base_price: basePrice,
       is_default: data.isDefault ?? false,
@@ -291,6 +312,29 @@ export const variantUnitPriceService = {
       updateData.unit_value = data.unitValue;
     }
 
+    if (data.sizeValueId !== undefined) {
+      let sizeValueInternalId: bigint | null = null;
+      if (data.sizeValueId) {
+        const resolved = await db.attributeValue.findFirst({
+          where: { uuid: data.sizeValueId, is_active: true },
+          select: { id: true },
+        });
+        if (!resolved) {
+          throw ApiError.badRequest("Invalid size attribute value");
+        }
+        sizeValueInternalId = resolved.id;
+      }
+      const duplicateSize = await variantUnitPriceRepository.findByVariantAndSize(
+        variant.id,
+        sizeValueInternalId,
+        unitPriceUuid
+      );
+      if (duplicateSize) {
+        throw ApiError.conflict("This item/color already has a price for that size");
+      }
+      updateData.attribute_value_id = sizeValueInternalId;
+    }
+
     if (data.sku !== undefined && data.sku !== existing.sku) {
       const skuConflict = await variantUnitPriceRepository.findBySku(data.sku, unitPriceUuid);
       if (skuConflict) {
@@ -346,6 +390,33 @@ export const variantUnitPriceService = {
     await variantUnitPriceRepository.softDeleteByUuid(unitPriceUuid, adminId);
 
     return { success: true, message: "Unit price deleted successfully" };
+  },
+
+  /**
+   * "Same price for all sizes" - sets base_price uniformly across every unit
+   * price row under a variant, then applies any per-row overrides in the same
+   * request (spec: admin enters one price, can still tweak individual sizes).
+   */
+  async bulkSetSamePriceForVariant(
+    variantUuid: string,
+    data: BulkSetSamePriceInput,
+    adminEmail?: string
+  ): Promise<VariantUnitPriceResponse[]> {
+    const adminId = await getAdminInternalId(adminEmail);
+
+    const variant = await variantRepository.findByUuid(variantUuid);
+    if (!variant || variant.deleted_at !== null) {
+      throw ApiError.notFound("Variant not found");
+    }
+
+    const updated = await variantUnitPriceRepository.bulkSetSamePrice(
+      variant.id,
+      data.basePrice,
+      data.perSizeOverrides,
+      adminId
+    );
+
+    return updated.map((item) => formatUnitPriceResponse(variantUuid, item));
   },
 
   async bulkUpdateUnitPrices(

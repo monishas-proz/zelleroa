@@ -9,7 +9,8 @@ import {
   addAttributeValue,
   updateAttributeValue,
   deleteAttributeValue,
-  setAttributeCategories,
+  setAttributesForProduct,
+  setAttributeValuesForItem,
 } from "../api/get-attributes";
 
 export function useCreateAttribute() {
@@ -51,11 +52,13 @@ export function useAddAttributeValue() {
       attributeUuid,
       value,
       priceAdjustment,
+      colorHex,
     }: {
       attributeUuid: string;
       value: string;
       priceAdjustment?: number;
-    }) => addAttributeValue(attributeUuid, value, priceAdjustment),
+      colorHex?: string;
+    }) => addAttributeValue(attributeUuid, value, priceAdjustment, colorHex),
     onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: attributeKeys.all });
       queryClient.invalidateQueries({ queryKey: attributeKeys.detail(variables.attributeUuid) });
@@ -71,12 +74,14 @@ export function useUpdateAttributeValue() {
       valueUuid,
       value,
       priceAdjustment,
+      colorHex,
     }: {
       attributeUuid: string;
       valueUuid: string;
       value: string;
       priceAdjustment?: number;
-    }) => updateAttributeValue(attributeUuid, valueUuid, value, priceAdjustment),
+      colorHex?: string;
+    }) => updateAttributeValue(attributeUuid, valueUuid, value, priceAdjustment, colorHex),
     onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: attributeKeys.all });
       queryClient.invalidateQueries({ queryKey: attributeKeys.detail(variables.attributeUuid) });
@@ -96,14 +101,42 @@ export function useDeleteAttributeValue() {
   });
 }
 
-export function useSetAttributeCategories() {
+export function useSetAttributesForProduct() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ attributeUuid, categoryIds }: { attributeUuid: string; categoryIds: string[] }) =>
-      setAttributeCategories(attributeUuid, categoryIds),
+    mutationFn: ({
+      productUuid,
+      attributeIds,
+      force,
+    }: {
+      productUuid: string;
+      attributeIds: string[];
+      force?: boolean;
+    }) => setAttributesForProduct(productUuid, attributeIds, force),
     onSuccess: (_result, variables) => {
-      queryClient.invalidateQueries({ queryKey: attributeKeys.all });
-      queryClient.invalidateQueries({ queryKey: attributeKeys.detail(variables.attributeUuid) });
+      queryClient.invalidateQueries({
+        queryKey: [...attributeKeys.all, "by-product", variables.productUuid],
+      });
+    },
+  });
+}
+
+export function useSetAttributeValuesForItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      productUuid,
+      itemUuid,
+      attributeValueIds,
+    }: {
+      productUuid: string;
+      itemUuid: string;
+      attributeValueIds: string[];
+    }) => setAttributeValuesForItem(productUuid, itemUuid, attributeValueIds),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [...attributeKeys.all, "item-values", variables.productUuid, variables.itemUuid],
+      });
     },
   });
 }

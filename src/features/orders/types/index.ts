@@ -14,11 +14,13 @@ export interface OrderCustomerDto {
 }
 
 export interface OrderItemResponse {
-  id: string; // item.uuid
+  id: string; // order_item.uuid
   productId: string; // product.uuid
-  variantId: string; // variant.uuid (item-level)
-  variantUnitPriceId: string; // variant_unit_price.uuid (pack size)
+  itemId: string; // item.uuid
+  variantId: string; // variant.uuid (Color level)
+  variantUnitPriceId: string; // variant_unit_price.uuid (Size/pack)
   productName: string; // snapshot
+  itemName: string; // snapshot
   variantName: string; // snapshot
   sku: string; // snapshot
   measurement: VariantMeasurement;

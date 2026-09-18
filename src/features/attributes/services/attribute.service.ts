@@ -2,12 +2,13 @@ import crypto from "crypto";
 import { ApiError } from "@/lib/api/api-error";
 import { attributeRepository } from "../repositories/attribute.repository";
 import { userRepository } from "@/features/users/repositories/user.repository";
+import { productRepository } from "@/features/products/repositories/product.repository";
+import { itemRepository } from "@/features/items/repositories/item.repository";
 import { db } from "@/lib/db/prisma";
 import type { AttributeListItem, GetAdminAttributesParams } from "../types";
 import type {
   CreateAdminAttributeInput,
   UpdateAdminAttributeInput,
-  SetAttributeCategoriesInput,
 } from "../validations/admin-attribute.schema";
 
 type AttributeWithRelations = {
@@ -15,37 +16,19 @@ type AttributeWithRelations = {
   uuid: string | null;
   name: string;
   slug: string;
+  type: string;
   is_active: boolean;
   createdAt: Date;
   values: {
     id: bigint;
     uuid: string | null;
     value: string;
+    color_hex: string | null;
     is_active: boolean;
     createdAt: Date;
     price_adjustment: unknown;
   }[];
-  category_attributes: { category_id: bigint }[];
 };
-
-async function resolveCategoryInternalIds(categoryIds: string[]): Promise<bigint[]> {
-  if (!categoryIds.length) return [];
-  const numericIds = categoryIds
-    .map((id) => Number(id))
-    .filter((id) => Number.isFinite(id));
-
-  const categories = await db.productCategory.findMany({
-    where: {
-      OR: [
-        { uuid: { in: categoryIds } },
-        ...(numericIds.length ? [{ id: { in: numericIds.map((n) => BigInt(n)) } }] : []),
-      ],
-    },
-    select: { id: true },
-  });
-
-  return categories.map((c) => c.id);
-}
 
 function formatAttribute(attribute: AttributeWithRelations): AttributeListItem {
   const attributeUuid = attribute.uuid || String(attribute.id);
@@ -53,16 +36,17 @@ function formatAttribute(attribute: AttributeWithRelations): AttributeListItem {
     id: attributeUuid,
     name: attribute.name,
     slug: attribute.slug,
+    type: (attribute.type as "text" | "color") ?? "text",
     isActive: Boolean(attribute.is_active),
     createdAt: attribute.createdAt,
     values: attribute.values.map((v) => ({
       id: v.uuid || String(v.id),
       value: v.value,
+      colorHex: v.color_hex,
       isActive: Boolean(v.is_active),
       createdAt: v.createdAt,
       priceAdjustment: Number(v.price_adjustment ?? 0),
     })),
-    categoryIds: attribute.category_attributes.map((ca) => String(ca.category_id)),
     _count: { values: attribute.values.length },
   };
 }
@@ -95,23 +79,24 @@ export const attributeService = {
       uuid: crypto.randomUUID(),
       name: data.name,
       slug: data.slug,
+      type: data.type ?? "text",
       is_active: true,
       created_by: adminId,
       updated_by: adminId,
     });
 
-    if (data.values?.length) {
-      await Promise.all(
-        data.values.map((value) =>
-          attributeRepository.createValue(created.id, value, adminId)
+    const attributeType = data.type ?? "text";
+    await Promise.all(
+      data.values.map((v) =>
+        attributeRepository.createValue(
+          created.id,
+          v.value,
+          adminId,
+          undefined,
+          attributeType === "color" ? v.colorHex ?? null : undefined
         )
-      );
-    }
-
-    if (data.categoryIds?.length) {
-      const categoryInternalIds = await resolveCategoryInternalIds(data.categoryIds);
-      await attributeRepository.setCategoriesForAttribute(created.id, categoryInternalIds);
-    }
+      )
+    );
 
     const withRelations = await attributeRepository.findByUuid(created.uuid!);
     return formatAttribute(withRelations as AttributeWithRelations);
@@ -163,6 +148,10 @@ export const attributeService = {
       updateData.name = data.name;
     }
 
+    if (data.type !== undefined) {
+      updateData.type = data.type;
+    }
+
     const updated = await attributeRepository.updateByUuid(uuid, updateData);
     if (!updated) {
       throw ApiError.notFound("Attribute not found");
@@ -187,7 +176,8 @@ export const attributeService = {
     attributeUuid: string,
     value: string,
     adminEmail?: string,
-    priceAdjustment?: number
+    priceAdjustment?: number,
+    colorHex?: string
   ) {
     const attribute = await attributeRepository.findByUuid(attributeUuid);
     if (!attribute) {
@@ -202,7 +192,17 @@ export const attributeService = {
       throw ApiError.conflict(`Value '${value}' already exists for this attribute`);
     }
 
-    await attributeRepository.createValue(attribute.id, value, adminId, priceAdjustment);
+    if ((attribute as AttributeWithRelations).type === "color" && !colorHex) {
+      throw ApiError.badRequest("Color code is required for a Color attribute value");
+    }
+
+    await attributeRepository.createValue(
+      attribute.id,
+      value,
+      adminId,
+      priceAdjustment,
+      colorHex ?? null
+    );
     const refreshed = await attributeRepository.findByUuid(attributeUuid);
     return formatAttribute(refreshed as AttributeWithRelations);
   },
@@ -212,11 +212,16 @@ export const attributeService = {
     valueUuid: string,
     value: string | undefined,
     adminEmail?: string,
-    priceAdjustment?: number
+    priceAdjustment?: number,
+    colorHex?: string
   ) {
     const attribute = await attributeRepository.findByUuid(attributeUuid);
     if (!attribute) {
       throw ApiError.notFound("Attribute not found");
+    }
+
+    if ((attribute as AttributeWithRelations).type === "color" && colorHex === "") {
+      throw ApiError.badRequest("Color code is required for a Color attribute value");
     }
 
     const adminId = await getAdminInternalId(adminEmail);
@@ -224,7 +229,8 @@ export const attributeService = {
       valueUuid,
       value,
       adminId,
-      priceAdjustment
+      priceAdjustment,
+      colorHex !== undefined ? colorHex : undefined
     );
     if (!updated) {
       throw ApiError.notFound("Attribute value not found");
@@ -248,46 +254,221 @@ export const attributeService = {
     return formatAttribute(refreshed as AttributeWithRelations);
   },
 
-  async setCategories(attributeUuid: string, data: SetAttributeCategoriesInput) {
-    const attribute = await attributeRepository.findByUuid(attributeUuid);
-    if (!attribute) {
-      throw ApiError.notFound("Attribute not found");
-    }
+  /**
+   * The Product's configured attributes WITH their values (e.g. Color: Black,
+   * White) - powers the single-variant "Add/Edit Item" form and the bulk
+   * "Generate Variants" form, so attribute selection is driven purely by what
+   * the Product has configured (no category involved).
+   */
+  async getConfiguredAttributesForProduct(productUuid: string) {
+    const product = await productRepository.findByUuid(productUuid);
+    if (!product) return [];
 
-    const categoryInternalIds = await resolveCategoryInternalIds(data.categoryIds);
-    await attributeRepository.setCategoriesForAttribute(attribute.id, categoryInternalIds);
-
-    const refreshed = await attributeRepository.findByUuid(attributeUuid);
-    return formatAttribute(refreshed as AttributeWithRelations);
-  },
-
-  /** Used by the product form to render only the attributes relevant to a category. */
-  async getAttributesForCategory(categoryUuidOrId: string) {
-    const numericId = Number(categoryUuidOrId);
-    const category = await db.productCategory.findFirst({
-      where: {
-        OR: [
-          { uuid: categoryUuidOrId },
-          ...(Number.isFinite(numericId) ? [{ id: BigInt(numericId) }] : []),
-        ],
-      },
-      select: { id: true },
-    });
-    if (!category) return [];
-
-    const links = await attributeRepository.findCategoryAttributesForCategory(category.id);
-    return links.map((link) => ({
-      id: link.product_attributes.uuid || String(link.product_attributes.id),
-      name: link.product_attributes.name,
-      slug: link.product_attributes.slug,
-      isRequired: link.is_required,
-      values: link.product_attributes.values.map((v) => ({
+    const configs = await attributeRepository.findAttributeConfigsForProduct(product.id);
+    return configs.map((config) => ({
+      id: config.product_attributes.uuid || String(config.product_attributes.id),
+      name: config.product_attributes.name,
+      slug: config.product_attributes.slug,
+      type: (config.product_attributes.type as "text" | "color") ?? "text",
+      isRequired: config.is_required,
+      values: config.product_attributes.values.map((v) => ({
         id: v.uuid || String(v.id),
         value: v.value,
+        colorHex: v.color_hex,
         isActive: Boolean(v.is_active),
         createdAt: v.createdAt,
         priceAdjustment: Number(v.price_adjustment ?? 0),
       })),
     }));
+  },
+
+  /**
+   * All active attributes, flagged with whether they're currently configured
+   * on this Product - powers the Product edit "Attributes" checkbox panel.
+   */
+  async getAttributesForProduct(productUuid: string) {
+    const product = await productRepository.findByUuid(productUuid);
+    if (!product) {
+      throw ApiError.notFound("Product not found");
+    }
+
+    const [allAttributes, configs] = await Promise.all([
+      attributeRepository.findAllActive(),
+      attributeRepository.findAttributeConfigsForProduct(product.id),
+    ]);
+
+    const configByAttributeId = new Map(configs.map((c) => [c.attribute_id.toString(), c]));
+
+    return allAttributes.map((attribute) => {
+      const config = configByAttributeId.get(attribute.id.toString());
+      return {
+        id: attribute.uuid || String(attribute.id),
+        name: attribute.name,
+        slug: attribute.slug,
+        type: (attribute.type as "text" | "color") ?? "text",
+        configured: Boolean(config),
+        isRequired: config?.is_required ?? false,
+        sortOrder: config?.sort_order ?? 0,
+      };
+    });
+  },
+
+  /**
+   * Full-replace the set of attributes configured on a Product. Unchecking an
+   * attribute that's already in use by Items/Variants under this Product
+   * requires `force: true` - otherwise this throws with the usage counts so
+   * the admin UI can show a confirmation instead of silently dropping data.
+   */
+  async setAttributesForProduct(
+    productUuid: string,
+    attributeIds: string[],
+    force: boolean,
+    _adminEmail?: string
+  ) {
+    const product = await productRepository.findByUuid(productUuid);
+    if (!product) {
+      throw ApiError.notFound("Product not found");
+    }
+
+    const resolved = await Promise.all(
+      attributeIds.map(async (id) => {
+        const attribute = await attributeRepository.findByUuid(id);
+        if (!attribute) {
+          throw ApiError.badRequest(`Attribute not found: ${id}`);
+        }
+        return attribute;
+      })
+    );
+    const nextAttributeIdSet = new Set(resolved.map((a) => a.id.toString()));
+
+    const existingConfigs = await attributeRepository.findAttributeConfigsForProduct(product.id);
+    const removedConfigs = existingConfigs.filter(
+      (c) => !nextAttributeIdSet.has(c.attribute_id.toString())
+    );
+
+    if (removedConfigs.length && !force) {
+      const usage = await Promise.all(
+        removedConfigs.map(async (c) => {
+          const counts = await attributeRepository.countProductAttributeUsage(
+            product.id,
+            c.attribute_id
+          );
+          return {
+            attributeId: c.product_attributes.uuid || String(c.attribute_id),
+            attributeName: c.product_attributes.name,
+            itemCount: counts.itemCount,
+            variantCount: counts.variantCount,
+          };
+        })
+      );
+      const inUse = usage.filter((u) => u.itemCount > 0 || u.variantCount > 0);
+      if (inUse.length) {
+        throw ApiError.conflict(
+          "Some attributes being removed are already used by items or variants",
+          { usage: inUse }
+        );
+      }
+    }
+
+    await attributeRepository.setAttributesForProduct(
+      product.id,
+      resolved.map((a, idx) => ({
+        attributeId: a.id,
+        isRequired: false,
+        sortOrder: idx,
+      }))
+    );
+
+    return attributeService.getAttributesForProduct(productUuid);
+  },
+
+  /**
+   * The Item's currently selected attribute values, grouped by the Product's
+   * configured attributes - only attributes configured on the parent Product
+   * are ever offered, enforced here server-side (not just in the UI).
+   */
+  async getAttributeValuesForItem(itemUuid: string) {
+    const item = await itemRepository.findByUuid(itemUuid);
+    if (!item) {
+      throw ApiError.notFound("Item not found");
+    }
+
+    const productId = item.style.productId;
+    const [configs, selected] = await Promise.all([
+      attributeRepository.findAttributeConfigsForProduct(productId),
+      attributeRepository.findAttributeValuesForItem(item.id),
+    ]);
+
+    const selectedValueIdsByAttribute = new Map<string, Set<string>>();
+    for (const s of selected) {
+      const key = s.attribute_id.toString();
+      if (!selectedValueIdsByAttribute.has(key)) selectedValueIdsByAttribute.set(key, new Set());
+      selectedValueIdsByAttribute.get(key)!.add(s.attribute_value_id.toString());
+    }
+
+    return configs.map((config) => {
+      const attribute = config.product_attributes;
+      const selectedIds = selectedValueIdsByAttribute.get(attribute.id.toString()) ?? new Set();
+      return {
+        id: attribute.uuid || String(attribute.id),
+        name: attribute.name,
+        slug: attribute.slug,
+        type: (attribute.type as "text" | "color") ?? "text",
+        isRequired: config.is_required,
+        values: attribute.values.map((v) => ({
+          id: v.uuid || String(v.id),
+          value: v.value,
+          colorHex: v.color_hex,
+          selected: selectedIds.has(v.id.toString()),
+        })),
+      };
+    });
+  },
+
+  /**
+   * Full-replace the Item's selected attribute values. Only values belonging
+   * to attributes configured on the parent Product are accepted.
+   */
+  async setAttributeValuesForItem(itemUuid: string, attributeValueIds: string[]) {
+    const item = await itemRepository.findByUuid(itemUuid);
+    if (!item) {
+      throw ApiError.notFound("Item not found");
+    }
+
+    const productId = item.style.productId;
+    const configs = await attributeRepository.findAttributeConfigsForProduct(productId);
+    const allowedValueMap = new Map<string, { attributeId: bigint }>();
+    for (const config of configs) {
+      for (const v of config.product_attributes.values) {
+        allowedValueMap.set(v.uuid || String(v.id), { attributeId: config.attribute_id });
+        allowedValueMap.set(String(v.id), { attributeId: config.attribute_id });
+      }
+    }
+
+    const entries = attributeValueIds.map((valueUuid) => {
+      const allowed = allowedValueMap.get(valueUuid);
+      if (!allowed) {
+        throw ApiError.badRequest(
+          `Attribute value is not part of this product's configured attributes: ${valueUuid}`
+        );
+      }
+      return { attributeId: allowed.attributeId, valueUuid };
+    });
+
+    const values = await db.attributeValue.findMany({
+      where: { uuid: { in: entries.map((e) => e.valueUuid) } },
+      select: { id: true, uuid: true },
+    });
+    const internalIdByUuid = new Map(values.map((v) => [v.uuid, v.id]));
+
+    await attributeRepository.setAttributeValuesForItem(
+      item.id,
+      entries.map((e) => ({
+        attributeId: e.attributeId,
+        attributeValueId: internalIdByUuid.get(e.valueUuid) ?? BigInt(e.valueUuid),
+      }))
+    );
+
+    return attributeService.getAttributeValuesForItem(itemUuid);
   },
 };

@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import type { NextRequest } from "next/server";
 import { db } from "@/lib/db/prisma";
 import { ApiError } from "@/lib/api/api-error";
 import { userRepository } from "@/features/users/repositories/user.repository";
@@ -7,6 +8,7 @@ import { couponValidationService } from "@/features/coupons/services/coupon-vali
 import { customerAddressService } from "@/features/customers/services/customer-address.service";
 import { cartRepository } from "@/features/cart/repositories/cart.repository";
 import { generateAccessToken, generateRefreshToken } from "@/lib/auth/jwt";
+import { getAttributingAgent } from "@/lib/referral/agent-attribution";
 import { orderRepository } from "../repositories/order.repository";
 import type {
   OrderDetailResponse,
@@ -32,7 +34,8 @@ const CUSTOMER_ROLE_ID = BigInt(3);
 export const orderService = {
   async createCustomerOrder(
     sessionUserId: string,
-    input: CustomerCreateOrderInput
+    input: CustomerCreateOrderInput,
+    request?: NextRequest
   ): Promise<OrderDetailResponse> {
     const user = await userRepository.findById(sessionUserId);
     if (!user || !user.internalId) {
@@ -58,6 +61,8 @@ export const orderService = {
           },
           include: {
             product: true,
+            style: true,
+            item: true,
             variant_unit_price: {
               include: {
                 variant: true,
@@ -78,9 +83,12 @@ export const orderService = {
     // 2. Validate every cart item's product and variant unit price
     const orderItemsData: Array<{
       productId: bigint;
+      styleId: bigint;
+      itemId: bigint | null;
       variantId: bigint;
       variantUnitPriceId: bigint;
       productName: string;
+      itemName: string;
       variantName: string;
       sku: string;
       quantity: number;
@@ -102,6 +110,9 @@ export const orderService = {
         !item.product ||
         !item.product.isActive ||
         item.product.deleted_at !== null ||
+        !item.style ||
+        !item.style.isActive ||
+        item.style.deleted_at !== null ||
         !unitPriceRow ||
         !unitPriceRow.isActive ||
         unitPriceRow.deleted_at !== null ||
@@ -132,9 +143,12 @@ export const orderService = {
 
       orderItemsData.push({
         productId: item.productId,
+        styleId: item.styleId,
+        itemId: item.itemId,
         variantId: variant.id,
         variantUnitPriceId: item.variantUnitPriceId!,
         productName: item.product.name,
+        itemName: item.style.name,
         variantName: variant.variant_name,
         sku: unitPriceRow.sku,
         quantity: item.quantity,
@@ -245,9 +259,16 @@ export const orderService = {
     const shippingCharge = payableBeforeShipping >= 499 ? 0 : 49;
     const totalAmount = payableBeforeShipping + shippingCharge;
 
+    // Commission attribution: referral_agent cookie takes priority over the
+    // agent the customer was attributed to at signup.
+    const agentId = request
+      ? await getAttributingAgent(request, user.referred_by_agent_id)
+      : (user.referred_by_agent_id ?? null);
+
     // 5. Execute creation transaction
     return orderRepository.createCustomerOrderTransaction({
       userId,
+      agentId,
       cartId: cart.id,
       subtotal,
       discountAmount: totalDiscount,
@@ -301,7 +322,8 @@ export const orderService = {
    */
   async createGuestOrder(
     input: GuestCreateOrderInput,
-    guestSessionId: string | null
+    guestSessionId: string | null,
+    request?: NextRequest
   ): Promise<{ order: OrderDetailResponse; accessToken: string; refreshToken: string }> {
     if (!guestSessionId) {
       throw ApiError.badRequest("Your cart could not be found. Please add items again.");
@@ -355,13 +377,17 @@ export const orderService = {
 
     await cartRepository.claimGuestCart(guestSessionId, BigInt(shadowUser.internalId));
 
-    const order = await this.createCustomerOrder(shadowUser.uuid, {
-      shippingAddressId: address.id,
-      notes: input.notes,
-      paymentMethod: input.paymentMethod || "COD",
-      paymentDetails: input.paymentDetails,
-      couponCode: input.couponCode,
-    });
+    const order = await this.createCustomerOrder(
+      shadowUser.uuid,
+      {
+        shippingAddressId: address.id,
+        notes: input.notes,
+        paymentMethod: input.paymentMethod || "COD",
+        paymentDetails: input.paymentDetails,
+        couponCode: input.couponCode,
+      },
+      request
+    );
 
     const userRole = shadowUser.roleName || "CUSTOMER";
     const accessToken = generateAccessToken({
@@ -730,14 +756,18 @@ export const orderService = {
     return this.getCustomerOrders(String(userId), params);
   },
 
-  async placeOrder(userId: number | string | bigint, input: any) {
-    return this.createCustomerOrder(String(userId), {
-      shippingAddressId: input.shippingAddressId || String(input.addressId),
-      billingAddressId: input.billingAddressId,
-      notes: input.notes,
-      paymentMethod: input.paymentMethod || "CARD",
-      paymentDetails: input.paymentDetails,
-    });
+  async placeOrder(userId: number | string | bigint, input: any, request?: NextRequest) {
+    return this.createCustomerOrder(
+      String(userId),
+      {
+        shippingAddressId: input.shippingAddressId || String(input.addressId),
+        billingAddressId: input.billingAddressId,
+        notes: input.notes,
+        paymentMethod: input.paymentMethod || "CARD",
+        paymentDetails: input.paymentDetails,
+      },
+      request
+    );
   },
 
   async getCheckoutSummary(

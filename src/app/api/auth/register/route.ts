@@ -5,10 +5,10 @@ import { userService } from "@/features/users/services/user.service";
 
 export const POST = createApiHandler(
   {
-    POST: async (_request, context) => {
+    POST: async (request, context) => {
       const body = context.body as RegisterInput;
 
-      const user = await userService.registerUserWithToken(body);
+      const user = await userService.registerUserWithToken(body, request);
 
       return apiCreated(
         {

@@ -1,5 +1,10 @@
 import { apiClient } from "@/lib/api/api-client";
-import type { AttributeListItem, CategoryAttributeOption } from "../types";
+import type {
+  AttributeListItem,
+  ProductAttributeConfigOption,
+  ItemAttributeGroup,
+  ConfiguredProductAttribute,
+} from "../types";
 
 export interface GetAttributesResult {
   data: AttributeListItem[];
@@ -49,11 +54,12 @@ export async function deleteAttribute(uuid: string) {
 export async function addAttributeValue(
   attributeUuid: string,
   value: string,
-  priceAdjustment?: number
+  priceAdjustment?: number,
+  colorHex?: string
 ) {
   const response = await apiClient.post<AttributeListItem>(
     `/api/admin/attributes/${attributeUuid}/values`,
-    { value, priceAdjustment }
+    { value, priceAdjustment, ...(colorHex ? { colorHex } : {}) }
   );
   return response.data as AttributeListItem;
 }
@@ -62,11 +68,12 @@ export async function updateAttributeValue(
   attributeUuid: string,
   valueUuid: string,
   value: string,
-  priceAdjustment?: number
+  priceAdjustment?: number,
+  colorHex?: string
 ) {
   const response = await apiClient.put<AttributeListItem>(
     `/api/admin/attributes/${attributeUuid}/values/${valueUuid}`,
-    { value, priceAdjustment }
+    { value, priceAdjustment, ...(colorHex ? { colorHex } : {}) }
   );
   return response.data as AttributeListItem;
 }
@@ -78,17 +85,47 @@ export async function deleteAttributeValue(attributeUuid: string, valueUuid: str
   return response.data as AttributeListItem;
 }
 
-export async function setAttributeCategories(attributeUuid: string, categoryIds: string[]) {
-  const response = await apiClient.put<AttributeListItem>(
-    `/api/admin/attributes/${attributeUuid}/categories`,
-    { categoryIds }
+export async function getAttributesForProduct(productUuid: string) {
+  const response = await apiClient.get<ProductAttributeConfigOption[]>(
+    `/api/admin/products/${productUuid}/attributes`
   );
-  return response.data as AttributeListItem;
+  return response.data ?? [];
 }
 
-export async function getAttributesForCategory(categoryUuid: string) {
-  const response = await apiClient.get<CategoryAttributeOption[]>(
-    `/api/admin/categories/${categoryUuid}/attributes`
+export async function setAttributesForProduct(
+  productUuid: string,
+  attributeIds: string[],
+  force = false
+) {
+  const response = await apiClient.put<ProductAttributeConfigOption[]>(
+    `/api/admin/products/${productUuid}/attributes`,
+    { attributeIds, force }
+  );
+  return response.data ?? [];
+}
+
+export async function getConfiguredAttributesForProduct(productUuid: string) {
+  const response = await apiClient.get<ConfiguredProductAttribute[]>(
+    `/api/admin/products/${productUuid}/attributes/values`
+  );
+  return response.data ?? [];
+}
+
+export async function getAttributeValuesForItem(productUuid: string, itemUuid: string) {
+  const response = await apiClient.get<ItemAttributeGroup[]>(
+    `/api/admin/products/${productUuid}/items/${itemUuid}/attribute-values`
+  );
+  return response.data ?? [];
+}
+
+export async function setAttributeValuesForItem(
+  productUuid: string,
+  itemUuid: string,
+  attributeValueIds: string[]
+) {
+  const response = await apiClient.put<ItemAttributeGroup[]>(
+    `/api/admin/products/${productUuid}/items/${itemUuid}/attribute-values`,
+    { attributeValueIds }
   );
   return response.data ?? [];
 }

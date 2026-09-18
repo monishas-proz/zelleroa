@@ -16,7 +16,6 @@ export const GET = createApiHandler(
         page: query?.page ?? 1,
         pageSize: query?.pageSize ?? 10,
         search: query?.search,
-        categoryId: query?.categoryId,
       });
 
       return apiSuccess(result.data, "Attributes fetched successfully", 200, result.meta);

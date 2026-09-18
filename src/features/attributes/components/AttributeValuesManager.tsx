@@ -13,12 +13,16 @@ interface AttributeValuesManagerProps {
   attribute: AttributeListItem;
 }
 
+const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
+
 function AttributeValuesManager({ attribute }: AttributeValuesManagerProps) {
+  const isColor = attribute.type === "color";
   const [draft, setDraft] = useState("");
-  const [draftPriceAdjustment, setDraftPriceAdjustment] = useState("");
+  const [draftColorHex, setDraftColorHex] = useState("#000000");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
-  const [editPriceAdjustment, setEditPriceAdjustment] = useState("");
+  const [editColorHex, setEditColorHex] = useState("#000000");
+  const [formError, setFormError] = useState<string | null>(null);
 
   const addMutation = useAddAttributeValue();
   const updateMutation = useUpdateAttributeValue();
@@ -27,50 +31,73 @@ function AttributeValuesManager({ attribute }: AttributeValuesManagerProps) {
   const handleAdd = () => {
     const value = draft.trim();
     if (!value) return;
-    const priceAdjustment = Number(draftPriceAdjustment);
+    if (isColor && !HEX_COLOR_REGEX.test(draftColorHex)) {
+      setFormError("Enter a valid color code, e.g. #000000");
+      return;
+    }
+    setFormError(null);
     addMutation.mutate(
       {
         attributeUuid: attribute.id,
         value,
-        priceAdjustment: Number.isFinite(priceAdjustment) ? priceAdjustment : 0,
+        ...(isColor ? { colorHex: draftColorHex } : {}),
       },
       {
         onSuccess: () => {
           setDraft("");
-          setDraftPriceAdjustment("");
+          setDraftColorHex("#000000");
         },
+        onError: (err) => setFormError(err instanceof Error ? err.message : "Failed to add value"),
       }
     );
   };
 
-  const startEdit = (id: string, value: string, priceAdjustment: number) => {
+  const startEdit = (id: string, value: string, colorHex?: string | null) => {
     setEditingId(id);
     setEditDraft(value);
-    setEditPriceAdjustment(String(priceAdjustment ?? 0));
+    setEditColorHex(colorHex || "#000000");
+    setFormError(null);
   };
 
   const saveEdit = () => {
     if (!editingId || !editDraft.trim()) return;
-    const priceAdjustment = Number(editPriceAdjustment);
+    if (isColor && !HEX_COLOR_REGEX.test(editColorHex)) {
+      setFormError("Enter a valid color code, e.g. #000000");
+      return;
+    }
+    setFormError(null);
     updateMutation.mutate(
       {
         attributeUuid: attribute.id,
         valueUuid: editingId,
         value: editDraft.trim(),
-        priceAdjustment: Number.isFinite(priceAdjustment) ? priceAdjustment : 0,
+        ...(isColor ? { colorHex: editColorHex } : {}),
       },
-      { onSuccess: () => setEditingId(null) }
+      {
+        onSuccess: () => setEditingId(null),
+        onError: (err) => setFormError(err instanceof Error ? err.message : "Failed to update value"),
+      }
     );
   };
 
   return (
     <div className="space-y-4">
       <p className="text-xs text-neutral-500">
-        These are the selectable options shown for &ldquo;{attribute.name}&rdquo; when adding a
-        product (e.g. Red, Blue, Cotton, Silk). The price add-on (₹) is added on top of the
-        product&apos;s base price whenever this value is picked (e.g. Size &ldquo;L&rdquo; = +₹50)
-        — leave it at 0 if this value shouldn&apos;t change the price.
+        {isColor ? (
+          <>
+            These are the selectable colors shown for &ldquo;{attribute.name}&rdquo;. Enter the
+            color name and its hex code once here — items will pick from this list, they
+            won&apos;t need to enter the code again.
+          </>
+        ) : (
+          <>
+            These are the selectable options shown for &ldquo;{attribute.name}&rdquo; when adding
+            a product (e.g. Red, Blue, Cotton, Silk).
+          </>
+        )}
       </p>
+
+      {formError && <p className="text-xs font-medium text-error-600">{formError}</p>}
 
       <div className="flex gap-2">
         <input
@@ -83,24 +110,28 @@ function AttributeValuesManager({ attribute }: AttributeValuesManagerProps) {
               handleAdd();
             }
           }}
-          placeholder="e.g. Cotton"
+          placeholder={isColor ? "e.g. Navy Blue" : "e.g. Cotton"}
           className="flex-1 min-w-0 rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-secondary-600 focus:ring-2 focus:ring-secondary-600/20"
         />
-        <input
-          type="number"
-          step="any"
-          value={draftPriceAdjustment}
-          onChange={(e) => setDraftPriceAdjustment(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleAdd();
-            }
-          }}
-          placeholder="+₹ add-on"
-          title="Price add-on (₹)"
-          className="w-28 shrink-0 rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-secondary-600 focus:ring-2 focus:ring-secondary-600/20"
-        />
+        {isColor && (
+          <>
+            <input
+              type="color"
+              value={draftColorHex}
+              onChange={(e) => setDraftColorHex(e.target.value)}
+              title="Color swatch"
+              className="h-[38px] w-10 shrink-0 cursor-pointer rounded-lg border border-neutral-200 p-1"
+            />
+            <input
+              type="text"
+              value={draftColorHex}
+              onChange={(e) => setDraftColorHex(e.target.value)}
+              placeholder="#000000"
+              title="Color hex code"
+              className="w-24 shrink-0 rounded-lg border border-neutral-200 px-2 py-2 text-sm font-mono outline-none focus:border-secondary-600 focus:ring-2 focus:ring-secondary-600/20"
+            />
+          </>
+        )}
         <button
           type="button"
           onClick={handleAdd}
@@ -135,20 +166,24 @@ function AttributeValuesManager({ attribute }: AttributeValuesManagerProps) {
                     }}
                     className="flex-1 min-w-0 rounded-md border border-secondary-300 px-2 py-1 text-sm outline-none"
                   />
-                  <input
-                    type="number"
-                    step="any"
-                    value={editPriceAdjustment}
-                    onChange={(e) => setEditPriceAdjustment(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        saveEdit();
-                      }
-                    }}
-                    title="Price add-on (₹)"
-                    className="w-24 shrink-0 rounded-md border border-secondary-300 px-2 py-1 text-sm outline-none"
-                  />
+                  {isColor && (
+                    <>
+                      <input
+                        type="color"
+                        value={editColorHex}
+                        onChange={(e) => setEditColorHex(e.target.value)}
+                        title="Color swatch"
+                        className="h-[30px] w-9 shrink-0 cursor-pointer rounded-md border border-secondary-300 p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={editColorHex}
+                        onChange={(e) => setEditColorHex(e.target.value)}
+                        title="Color hex code"
+                        className="w-20 shrink-0 rounded-md border border-secondary-300 px-2 py-1 text-sm font-mono outline-none"
+                      />
+                    </>
+                  )}
                   <button type="button" onClick={saveEdit} className="text-success-600 p-1">
                     <Check className="h-4 w-4" />
                   </button>
@@ -163,17 +198,22 @@ function AttributeValuesManager({ attribute }: AttributeValuesManagerProps) {
               ) : (
                 <>
                   <span className="text-sm text-neutral-800 flex items-center gap-2">
+                    {isColor && v.colorHex && (
+                      <span
+                        className="h-4 w-4 shrink-0 rounded-full border border-neutral-200"
+                        style={{ backgroundColor: v.colorHex }}
+                        title={v.colorHex}
+                      />
+                    )}
                     {v.value}
-                    {Number(v.priceAdjustment) > 0 && (
-                      <span className="text-[11px] font-semibold text-secondary-700 bg-secondary-50 border border-secondary-200 rounded-full px-1.5 py-0.5">
-                        +₹{v.priceAdjustment}
-                      </span>
+                    {isColor && v.colorHex && (
+                      <span className="text-[11px] font-mono text-neutral-400">{v.colorHex}</span>
                     )}
                   </span>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => startEdit(v.id, v.value, v.priceAdjustment)}
+                      onClick={() => startEdit(v.id, v.value, v.colorHex)}
                       className="p-1 text-neutral-400 hover:text-secondary-600"
                     >
                       <Pencil className="h-3.5 w-3.5" />

@@ -14,6 +14,8 @@ import type {
   VariantUnitPriceResponse,
   CreateVariantUnitPriceInput,
   UpdateVariantUnitPriceInput,
+  GenerateVariantsInput,
+  GenerateVariantsResponse,
 } from "../types";
 
 export async function getCustomerVariants(
@@ -139,12 +141,13 @@ export async function getAdminVariant(
 
 export async function createAdminVariant(
   productUuid: string,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  itemUuid?: string
 ) {
-  return apiClient.post<AdminVariantResponse>(
-    `/api/admin/products/${productUuid}/variants`,
-    data
-  );
+  const path = itemUuid
+    ? `/api/admin/products/${productUuid}/items/${itemUuid}/variants`
+    : `/api/admin/products/${productUuid}/variants`;
+  return apiClient.post<AdminVariantResponse>(path, data);
 }
 
 export async function updateAdminVariant(
@@ -154,6 +157,30 @@ export async function updateAdminVariant(
 ) {
   return apiClient.put<AdminVariantResponse>(
     `/api/admin/products/${productUuid}/variants/${variantUuid}`,
+    data
+  );
+}
+
+export async function generateAdminVariants(
+  productUuid: string,
+  data: GenerateVariantsInput,
+  itemUuid?: string
+) {
+  const path = itemUuid
+    ? `/api/admin/products/${productUuid}/items/${itemUuid}/variants/generate`
+    : `/api/admin/products/${productUuid}/variants/generate`;
+  return apiClient.post<GenerateVariantsResponse>(path, data);
+}
+
+/** Item-driven generation: attribute values come from the Item's already-saved
+ * item_attribute_values instead of being re-picked here. */
+export async function generateAdminVariantsFromItem(
+  productUuid: string,
+  itemUuid: string,
+  data: { unitId: string; defaultPrice?: number; defaultStock?: number; activate?: boolean }
+) {
+  return apiClient.post<GenerateVariantsResponse>(
+    `/api/admin/products/${productUuid}/items/${itemUuid}/variants/generate-from-attributes`,
     data
   );
 }

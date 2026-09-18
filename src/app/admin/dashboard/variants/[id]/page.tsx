@@ -19,7 +19,6 @@ import { useAdminProduct } from "@/features/products/hooks/use-products";
 import { useUnits } from "@/features/units/hooks";
 import { AdminDetailSkeleton } from "@/components/admin/AdminDetailSkeleton";
 import { ErrorState } from "@/components/ui/error-state";
-import { ExpandableRichText } from "@/components/ui/expandable-rich-text";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/Switch";
 import { FormModal } from "@/components/common/FormModal";
@@ -739,63 +738,21 @@ export default function AdminVariantDetailsPage() {
             </div>
           </div> */}
 
-          {/* Description Card */}
-          <div className="bg-white border border-cream-border rounded-2xl overflow-hidden shadow-xs">
-            <div className="px-6 py-4.5 border-b border-cream-border flex items-center justify-between">
-              <h2 className="text-[15px] font-bold text-neutral-900 tracking-tight">
-                Description
-              </h2>
-            </div>
-            <div className="p-6">
-              {variant.shortDescription || variant.description ? (
-                <div className="space-y-4">
-                  {variant.shortDescription && (
-                    <div>
-                      <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">
-                        Summary
-                      </div>
-                      <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed">
-                        {variant.shortDescription}
-                      </p>
-                    </div>
-                  )}
-
-                  {variant.description && (
-                    <div>
-                      <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">
-                        Full Description
-                      </div>
-                      <ExpandableRichText
-                        html={variant.description}
-                        className="text-xs sm:text-sm text-neutral-600"
-                        toggleClassName="mt-1 text-xs font-bold text-secondary-600 hover:underline cursor-pointer"
-                      />
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="py-6 px-4 text-center flex flex-col items-center gap-2">
-                  <p className="text-xs sm:text-sm font-semibold text-neutral-700">
-                    No description yet
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditModalOpen(true)}
-                    className="mt-1 border border-cream-border-subtle bg-white text-secondary-600 hover:bg-secondary-50 hover:border-secondary-200 text-xs font-bold px-3.5 py-1.5 rounded-lg cursor-pointer transition-colors"
-                  >
-                    Add description
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Color & Style Card */}
           <div className="bg-white border border-cream-border rounded-2xl overflow-hidden shadow-xs">
             <div className="px-6 py-4.5 border-b border-cream-border flex items-center justify-between">
               <h2 className="text-[15px] font-bold text-neutral-900 tracking-tight">
                 Color &amp; Style
               </h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditModalOpen(true)}
+                className="h-8 text-xs font-semibold cursor-pointer"
+              >
+                <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                <span>Edit</span>
+              </Button>
             </div>
             <div className="p-6">
               {variant.colorName || variant.colorHex ? (
@@ -849,10 +806,6 @@ export default function AdminVariantDetailsPage() {
           initialData={{
             variantName: variant.variantName,
             slug: variant.slug || "",
-            shortDescription: variant.shortDescription || "",
-            description: variant.description || "",
-            colorName: variant.colorName || "",
-            colorHex: variant.colorHex || "",
             priceAdjustment: variant.priceAdjustment ?? 0,
             isFeatured: variant.isFeatured ?? false,
             attributeValueIds: (variant.attributeValues || []).map((av) => av.valueId),
@@ -872,10 +825,6 @@ export default function AdminVariantDetailsPage() {
                 data: {
                   variantName: formData.variantName,
                   slug: formData.slug,
-                  shortDescription: formData.shortDescription || null,
-                  description: formData.description || null,
-                  colorName: formData.colorName || null,
-                  colorHex: formData.colorHex || null,
                   priceAdjustment: formData.priceAdjustment ?? 0,
                   isFeatured: formData.isFeatured,
                   attributeValueIds: formData.attributeValueIds || [],

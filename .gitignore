@@ -48,3 +48,6 @@ next-env.d.ts
 
 # whatsapp session credentials
 /auth_baileys
+
+# local DB backups taken before running one-off migration scripts
+/scratch_backup

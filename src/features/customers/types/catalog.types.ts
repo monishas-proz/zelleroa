@@ -30,6 +30,8 @@ export interface CustomerProductListItemDto {
   image: string | null;
   minPrice: number;
   maxPrice: number;
+  /** Distinct Color count across the Style's Items - shown on the storefront card. */
+  colorCount?: number;
   unitPrices?: Array<{
     id: string;
     label: string;
@@ -72,8 +74,12 @@ export interface CustomerVariantImageDto {
 }
 
 export interface CustomerVariantListItemDto {
-  id: string; // Variant UUID
-  productId: string; // Product UUID
+  id: string; // Variant UUID (Color level)
+  itemId: string; // Item UUID
+  itemName: string;
+  /** @deprecated use itemId - kept for callers not yet migrated */
+  productId: string;
+  /** @deprecated use itemName */
   productName: string;
   variantName: string;
   measurement: VariantMeasurement;
@@ -82,27 +88,46 @@ export interface CustomerVariantListItemDto {
   /** Default pack size's price after offers; mirrors `unitPrices`. */
   salePrice: number;
   primaryImage: string | null;
-  /** This variant's color, when the product distinguishes variants by color. */
+  /** This variant's color, when the Item distinguishes variants by color. */
   colorName: string | null;
   colorHex: string | null;
   /** Full set of images for this color - the gallery to show when this variant/color is selected. */
   images: CustomerVariantImageDto[];
   outOfStock?: boolean;
-  ingredients: string | null;
-  isReadyToMix: boolean;
-  cookingRecipe: string | null;
-  shelfLife: string | null;
-  // Full list of sellable pack sizes for this item - an item can have any
-  // number of pack sizes, each independently priced. `sku`/`basePrice`/
-  // `salePrice`/`measurement` above mirror the default (or first) entry here
-  // for backward compatibility with callers that expect a single price/sku.
+  // Full list of sellable Sizes/pack sizes for this color - each independently
+  // priced. `sku`/`basePrice`/`salePrice`/`measurement` above mirror the
+  // default (or first) entry here for callers that expect a single price/sku.
   unitPrices: CustomerVariantUnitPriceDto[];
-  /** This variant's non-color attribute values (e.g. Size=M) - empty unless the caller requested them. */
+  /** This variant's non-color, non-size attribute values (e.g. Fabric=Cotton). */
   attributeValues: Array<{ attributeName: string; valueId: string; value: string }>;
 }
 
 export interface CustomerVariantDetailDto extends CustomerVariantListItemDto {
   images: CustomerVariantImageDto[];
+}
+
+/**
+ * A single sellable style/design under a Product (e.g. Product "T-Shirt" ->
+ * Item "V Neck T-Shirt"). Holds the style-level description/ingredients/etc,
+ * and the Color variants the customer picks between.
+ */
+export interface CustomerItemDto {
+  id: string; // Item UUID
+  productId: string;
+  productName: string;
+  name: string;
+  slug: string;
+  shortDescription: string | null;
+  description: string | null;
+  ingredients: string | null;
+  isReadyToMix: boolean;
+  cookingRecipe: string | null;
+  shelfLife: string | null;
+  vegType: "veg" | "nonveg" | "vegan" | "na";
+  isDefault: boolean;
+  /** Item-level fallback images, used when this Item has no Color split. */
+  images: CustomerVariantImageDto[];
+  variants: CustomerVariantListItemDto[];
 }
 
 export interface CustomerProductDetailDto {
@@ -119,7 +144,7 @@ export interface CustomerProductDetailDto {
   } | null;
   image: string | null;
   gender: "men" | "women" | "kids" | "unisex" | null;
-  variants: CustomerVariantListItemDto[];
+  items: CustomerItemDto[];
 }
 
 /**

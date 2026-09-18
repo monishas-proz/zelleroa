@@ -14,7 +14,7 @@ function mapToInventoryListItem(
   stockSums?: { stockIn: number; stockOut: number }
 ): InventoryListItem {
   const v = item.variant_unit_price?.variant;
-  const prod = v?.product;
+  const prod = v?.item?.style?.product;
   const unit = item.variant_unit_price?.product_units;
   const available = Number(item.quantity_available ?? 0);
   const reserved = Number(item.quantity_reserved ?? 0);
@@ -150,7 +150,14 @@ export const inventoryService = {
               select: {
                 id: true,
                 variant_name: true,
-                product: { select: { id: true, name: true, slug: true } },
+                item: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    style: { select: { product: { select: { id: true, name: true, slug: true } } } },
+                  },
+                },
               },
             },
           },
@@ -175,7 +182,14 @@ export const inventoryService = {
               select: {
                 id: true,
                 variant_name: true,
-                product: { select: { id: true, name: true, slug: true } },
+                item: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    style: { select: { product: { select: { id: true, name: true, slug: true } } } },
+                  },
+                },
               },
             },
           },
@@ -214,7 +228,7 @@ export const inventoryService = {
       referenceId: t.referenceId ? Number(t.referenceId) : null,
       notes: t.note,
       createdAt: t.createdAt,
-      productName: (t as any).variant_unit_price?.variant?.product?.name ?? "",
+      productName: (t as any).variant_unit_price?.variant?.item?.product?.name ?? "",
     }));
 
     return {

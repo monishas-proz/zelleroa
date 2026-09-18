@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useAdminAttributes, useCreateAttribute, useDeleteAttribute } from "@/features/attributes/hooks";
 import { AttributeForm } from "@/features/attributes/components/AttributeForm";
 import { AttributeValuesManager } from "@/features/attributes/components/AttributeValuesManager";
-import { AttributeCategoryAssignment } from "@/features/attributes/components/AttributeCategoryAssignment";
 import { AdminBreadcrumb } from "@/components/admin/AdminBreadcrumb";
 import { AdminPageHeader, AdminContent } from "@/components/admin/AdminPageHeader";
 import { AdminTableSkeleton } from "@/components/admin/AdminTableSkeleton";
@@ -12,7 +11,6 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FormModal } from "@/components/common/FormModal";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/Tabs";
 import { DataTable } from "@/components/admin/data-table/DataTable";
 import { SearchInput } from "@/components/ui/search-input";
 import { Plus, Settings2, Trash2 } from "lucide-react";
@@ -39,7 +37,7 @@ export default function AttributesPage() {
 
   const attributes = data?.data ?? [];
 
-  // Keep the "manage" modal in sync with fresh values/categories after a mutation.
+  // Keep the "manage" modal in sync with fresh values after a mutation.
   const liveManageAttribute = manageAttribute
     ? attributes.find((a) => a.id === manageAttribute.id) ?? manageAttribute
     : null;
@@ -60,21 +58,23 @@ export default function AttributesPage() {
       ),
     },
     {
+      accessorKey: "type",
+      header: "Type",
+      cell: ({ row }) =>
+        row.original.type === "color" ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-secondary-50 px-2 py-0.5 text-[11px] font-semibold text-secondary-700 border border-secondary-200">
+            Color
+          </span>
+        ) : (
+          <span className="text-xs text-[var(--color-neutral-500)]">Text</span>
+        ),
+    },
+    {
       id: "values",
       header: "Values",
       cell: ({ row }) => (
         <span className="text-[var(--color-neutral-700)]">
           {row.original.values.length} value{row.original.values.length === 1 ? "" : "s"}
-        </span>
-      ),
-    },
-    {
-      id: "categories",
-      header: "Applies To",
-      cell: ({ row }) => (
-        <span className="text-[var(--color-neutral-700)]">
-          {row.original.categoryIds.length} categor
-          {row.original.categoryIds.length === 1 ? "y" : "ies"}
         </span>
       ),
     },
@@ -104,7 +104,7 @@ export default function AttributesPage() {
       <AdminBreadcrumb items={[{ label: "Catalog" }, { label: "Attributes" }]} />
       <AdminPageHeader
         title="Attribute Management"
-        description="Define category-specific product attributes (e.g. Fabric, Dial Color, Bag Type) and the categories they apply to."
+        description="Define product attributes (e.g. Color, Size, Fabric) and their selectable values."
       />
 
       <AdminContent className="flex-1 min-h-0 overflow-hidden">
@@ -167,6 +167,7 @@ export default function AttributesPage() {
             await createMutation.mutateAsync({
               name: data.name,
               slug: data.slug,
+              type: data.type,
               values: data.values ?? [],
             });
             setIsCreateOpen(false);
@@ -174,27 +175,14 @@ export default function AttributesPage() {
         />
       </FormModal>
 
-      {/* Manage Attribute: Values + Categories */}
+      {/* Manage Attribute Values */}
       <FormModal
         open={!!liveManageAttribute}
         onClose={() => setManageAttribute(null)}
         title={`Manage "${liveManageAttribute?.name ?? ""}"`}
-        description="Manage the selectable values for this attribute and which categories use it"
+        description="Manage the selectable values for this attribute"
       >
-        {liveManageAttribute && (
-          <Tabs defaultValue="values">
-            <TabsList>
-              <TabsTrigger value="values">Values</TabsTrigger>
-              <TabsTrigger value="categories">Categories</TabsTrigger>
-            </TabsList>
-            <TabsContent value="values">
-              <AttributeValuesManager attribute={liveManageAttribute} />
-            </TabsContent>
-            <TabsContent value="categories">
-              <AttributeCategoryAssignment attribute={liveManageAttribute} />
-            </TabsContent>
-          </Tabs>
-        )}
+        {liveManageAttribute && <AttributeValuesManager attribute={liveManageAttribute} />}
       </FormModal>
 
       <ConfirmDialog

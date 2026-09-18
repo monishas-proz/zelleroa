@@ -7,6 +7,7 @@ export interface ApiResponse<T = unknown> {
   message: string;
   errors?: string[];
   meta?: PaginationMeta;
+  details?: unknown;
 }
 
 export interface PaginationMeta {
@@ -57,10 +58,11 @@ export function apiNoContent(): NextResponse {
 export function apiError(
   message = "Something went wrong",
   status = 500,
-  errors?: string[]
+  errors?: string[],
+  details?: unknown
 ): NextResponse<ApiResponse<null>> {
   return NextResponse.json(
-    { success: false, data: null, message, errors },
+    { success: false, data: null, message, errors, details },
     { status }
   );
 }
@@ -98,7 +100,7 @@ export function apiValidationError(
 
 export function apiFromError(error: unknown): NextResponse<ApiResponse<null>> {
   if (isApiError(error)) {
-    return apiError(error.message, error.statusCode, error.errors);
+    return apiError(error.message, error.statusCode, error.errors, error.details);
   }
 
   const prismaError = handlePrismaError(error);

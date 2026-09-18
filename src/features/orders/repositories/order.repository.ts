@@ -35,6 +35,13 @@ export const orderItemInclude = Prisma.validator<Prisma.OrderItemInclude>()({
       },
     },
   },
+  style: {
+    select: {
+      id: true,
+      uuid: true,
+      name: true,
+    },
+  },
   variant_unit_price: {
     select: {
       id: true,
@@ -154,9 +161,11 @@ export function formatOrderItem(
   return {
     id: item.uuid || String(item.id),
     productId: item.product?.uuid || String(item.productId),
+    itemId: item.style?.uuid || String(item.styleId),
     variantId: variant?.uuid || String(variant?.id ?? ""),
     variantUnitPriceId: unitPrice?.uuid || String(item.variantUnitPriceId),
     productName: item.product_name_snapshot,
+    itemName: item.item_name_snapshot,
     variantName: item.variant_snapshot,
     sku: item.sku_snapshot,
     measurement,
@@ -394,6 +403,7 @@ export async function generateUniqueOrderNumber(
 export const orderRepository = {
   async createCustomerOrderTransaction(params: {
     userId: bigint;
+    agentId?: bigint | null;
     cartId: bigint;
     subtotal: number;
     discountAmount?: number;
@@ -432,9 +442,12 @@ export const orderRepository = {
     };
     items: Array<{
       productId: bigint;
+      styleId: bigint;
+      itemId: bigint | null;
       variantId: bigint;
       variantUnitPriceId: bigint;
       productName: string;
+      itemName: string;
       variantName: string;
       sku: string;
       quantity: number;
@@ -454,6 +467,7 @@ export const orderRepository = {
           uuid: crypto.randomUUID(),
           orderNumber,
           userId: params.userId,
+          agent_id: params.agentId ?? null,
           cart_id: params.cartId,
           couponId: params.coupon?.id ?? null,
           order_status: (params.orderStatus ?? "pending") as any,
@@ -536,9 +550,12 @@ export const orderRepository = {
           uuid: crypto.randomUUID(),
           orderId: createdOrder.id,
           productId: item.productId,
+          styleId: item.styleId,
+          itemId: item.itemId,
           variantId: item.variantId,
           variantUnitPriceId: item.variantUnitPriceId,
           product_name_snapshot: item.productName,
+          item_name_snapshot: item.itemName,
           variant_snapshot: item.variantName,
           sku_snapshot: item.sku,
           quantity: item.quantity,
