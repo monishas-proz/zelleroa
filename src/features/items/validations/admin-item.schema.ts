@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+// SKU carries a global UNIQUE index, and MySQL treats '' as a real value while
+// it allows any number of NULLs - so a blank SKU from the form has to land as
+// NULL, otherwise the second item saved without a SKU collides with the first.
+const optionalSku = z
+  .string()
+  .trim()
+  .max(100, "SKU cannot exceed 100 characters")
+  .optional()
+  .nullable()
+  // Left as undefined when absent, so a partial update never clears an
+  // existing SKU that the caller simply did not send.
+  .transform((v) => (v === "" ? null : v));
+
 export const createAdminItemSchema = z
   .object({
     name: z
@@ -12,7 +25,7 @@ export const createAdminItemSchema = z
       .trim()
       .min(1, "Slug cannot be empty")
       .max(220, "Slug cannot exceed 220 characters"),
-    sku: z.string().trim().max(100, "SKU cannot exceed 100 characters").optional().nullable(),
+    sku: optionalSku,
     shortDescription: z
       .string()
       .trim()
@@ -44,7 +57,7 @@ export const updateAdminItemSchema = z
       .min(1, "Slug cannot be empty")
       .max(220, "Slug cannot exceed 220 characters")
       .optional(),
-    sku: z.string().trim().max(100, "SKU cannot exceed 100 characters").optional().nullable(),
+    sku: optionalSku,
     shortDescription: z
       .string()
       .trim()

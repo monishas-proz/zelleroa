@@ -211,9 +211,7 @@ export const variantUnitPriceService = {
       }
     }
 
-    const created = await variantUnitPriceRepository.create({
-      uuid: crypto.randomUUID(),
-      variant_id: variant.id,
+    const row = {
       unit_id: unit.id,
       unit_value: data.unitValue,
       attribute_value_id: sizeValueInternalId,
@@ -221,33 +219,56 @@ export const variantUnitPriceService = {
       base_price: basePrice,
       is_default: data.isDefault ?? false,
       isActive: data.isActive !== undefined ? data.isActive : true,
-      created_by: adminId,
       updated_by: adminId,
-    });
+    };
 
-    if (data.stock !== undefined) {
+    // A previously deleted row still holds this (variant, size) pair in
+    // uniq_vup_variant_size, so reuse it rather than inserting a duplicate that
+    // the database would reject.
+    const archived = sizeValueInternalId
+      ? await variantUnitPriceRepository.findDeletedByVariantAndSize(
+          variant.id,
+          sizeValueInternalId
+        )
+      : null;
+
+    const created = archived
+      ? await variantUnitPriceRepository.reviveById(archived.id, row)
+      : await variantUnitPriceRepository.create({
+          uuid: crypto.randomUUID(),
+          variant_id: variant.id,
+          created_by: adminId,
+          ...row,
+        });
+
+    // A revived row carries its pre-deletion inventory, which would silently
+    // reappear as stock nobody re-counted, so it restarts at the requested
+    // quantity (zero when the caller sent none).
+    const stock = data.stock ?? (archived ? 0 : undefined);
+
+    if (stock !== undefined) {
       await db.inventory.upsert({
         where: { variantUnitPriceId: created.id },
         create: {
           variantUnitPriceId: created.id,
-          quantity_available: data.stock,
+          quantity_available: stock,
           quantity_reserved: 0,
           is_active: true,
           created_by: adminId,
           updated_by: adminId,
         },
         update: {
-          quantity_available: data.stock,
+          quantity_available: stock,
           updated_by: adminId,
         },
       });
 
-      if (data.stock !== 0) {
+      if (stock !== 0) {
         await db.inventoryTransaction.create({
           data: {
             variant_unit_price_id: created.id,
             type: "in",
-            quantity: data.stock,
+            quantity: stock,
             note: "Initial stock on create",
             created_by: adminId,
             updated_by: adminId,

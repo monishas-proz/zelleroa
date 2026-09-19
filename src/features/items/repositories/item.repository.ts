@@ -1,5 +1,6 @@
 import { db } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma";
+import { retireUniqueValue } from "@/lib/utils/retire-unique-value";
 import type { GetAdminItemsParams } from "../types";
 
 export const itemInclude = Prisma.validator<Prisma.ItemInclude>()({
@@ -12,6 +13,7 @@ export const itemInclude = Prisma.validator<Prisma.ItemInclude>()({
       isActive: true,
       deleted_at: true,
       productId: true,
+      product: { select: { uuid: true } },
     },
   },
   variants: {
@@ -24,6 +26,23 @@ export const itemInclude = Prisma.validator<Prisma.ItemInclude>()({
         select: {
           base_price: true,
           inventories: { select: { quantity_available: true } },
+        },
+      },
+    },
+  },
+  item_attribute_values: {
+    select: {
+      attribute_values: {
+        select: { uuid: true, value: true, color_hex: true, image_url: true },
+      },
+      product_attributes: {
+        select: {
+          id: true,
+          uuid: true,
+          name: true,
+          slug: true,
+          type: true,
+          multiple_selection: true,
         },
       },
     },
@@ -45,10 +64,26 @@ export const itemRepository = {
     });
   },
 
+  /**
+   * Duplicate lookups below deliberately match ACTIVE rows only (deleted_at:
+   * null). A soft-deleted item keeps its history but must not block an admin
+   * from creating a fresh item with the same code/SKU - softDeleteByUuid
+   * namespaces the archived values so the UNIQUE index agrees.
+   */
   async findBySlug(slug: string, excludeUuid?: string) {
     return db.item.findFirst({
       where: {
         slug,
+        deleted_at: null,
+        ...(excludeUuid ? { uuid: { not: excludeUuid } } : {}),
+      },
+    });
+  },
+
+  async findBySku(sku: string, excludeUuid?: string) {
+    return db.item.findFirst({
+      where: {
+        sku,
         deleted_at: null,
         ...(excludeUuid ? { uuid: { not: excludeUuid } } : {}),
       },
@@ -122,6 +157,12 @@ export const itemRepository = {
       data: {
         isActive: false,
         deleted_at: new Date(),
+        // Free the unique slug/sku so a new item can reuse them; the archived
+        // row keeps namespaced values instead of blocking the insert.
+        slug: retireUniqueValue(existing.slug, existing.id, 220),
+        ...(existing.sku
+          ? { sku: retireUniqueValue(existing.sku, existing.id, 100) }
+          : {}),
         ...(adminId ? { updated_by: adminId } : {}),
       },
     });

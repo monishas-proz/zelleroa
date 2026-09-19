@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { db } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma";
+import { retireUniqueValue } from "@/lib/utils/retire-unique-value";
 import type { GetVariantPriceHistoryParams } from "../types";
 
 export const variantUnitPriceInclude = Prisma.validator<Prisma.VariantUnitPriceInclude>()({
@@ -380,8 +381,44 @@ export const variantUnitPriceRepository = {
       data: {
         isActive: false,
         deleted_at: new Date(),
+        // Free the unique SKU so the next row - including a regenerated
+        // {item}-{color}-{size} SKU - can take it back.
+        sku: retireUniqueValue(existing.sku, existing.id, 100),
         ...(adminId ? { updated_by: adminId } : {}),
       },
+    });
+  },
+
+  /**
+   * An archived row still occupies uniq_vup_variant_size for its (variant, size)
+   * pair, which no amount of renaming can free. Re-adding that size therefore
+   * revives the archived row instead of inserting a second one, which also keeps
+   * its order and inventory history attached.
+   */
+  async findDeletedByVariantAndSize(variantId: bigint, attributeValueId: bigint) {
+    return db.variantUnitPrice.findFirst({
+      where: {
+        variant_id: variantId,
+        attribute_value_id: attributeValueId,
+        deleted_at: { not: null },
+      },
+      orderBy: { deleted_at: "desc" },
+    });
+  },
+
+  /**
+   * Brings an archived row back as if it were newly created: the caller's values
+   * overwrite every field, and stock restarts from the request rather than from
+   * whatever was on hand when the row was archived.
+   */
+  async reviveById(
+    id: bigint,
+    data: Omit<Prisma.VariantUnitPriceUncheckedCreateInput, "uuid" | "variant_id">
+  ) {
+    return db.variantUnitPrice.update({
+      where: { id },
+      data: { ...data, deleted_at: null },
+      include: variantUnitPriceInclude,
     });
   },
 

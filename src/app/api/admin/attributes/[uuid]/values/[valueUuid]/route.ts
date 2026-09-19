@@ -20,7 +20,8 @@ export const PUT = createApiHandler(
       if (
         body.value === undefined &&
         body.priceAdjustment === undefined &&
-        body.colorHex === undefined
+        body.colorHex === undefined &&
+        body.imageUrl === undefined
       ) {
         throw ApiError.badRequest("Nothing to update");
       }
@@ -32,7 +33,8 @@ export const PUT = createApiHandler(
         body.value,
         adminEmail,
         body.priceAdjustment,
-        body.colorHex
+        body.colorHex,
+        body.imageUrl
       );
       return apiSuccess(attribute, "Attribute value updated successfully");
     },

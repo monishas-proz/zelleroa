@@ -306,7 +306,7 @@ export const variantService = {
     const variant = await variantRepository.create({
       uuid: crypto.randomUUID(),
       itemId: item.id,
-      variant_name: data.variantName,
+      variant_name: data.variantName || colorName || "Default",
       slug: variantSlug,
       color_name: colorName,
       color_hex: colorHex,

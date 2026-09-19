@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAdminAttributes, useCreateAttribute, useDeleteAttribute } from "@/features/attributes/hooks";
+import { useAdminAttributes, useCreateAttribute, useUpdateAttribute, useDeleteAttribute } from "@/features/attributes/hooks";
 import { AttributeForm } from "@/features/attributes/components/AttributeForm";
 import { AttributeValuesManager } from "@/features/attributes/components/AttributeValuesManager";
 import { AdminBreadcrumb } from "@/components/admin/AdminBreadcrumb";
@@ -13,7 +13,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FormModal } from "@/components/common/FormModal";
 import { DataTable } from "@/components/admin/data-table/DataTable";
 import { SearchInput } from "@/components/ui/search-input";
-import { Plus, Settings2, Trash2 } from "lucide-react";
+import { Plus, Pencil, Settings2, Trash2 } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { AttributeListItem } from "@/features/attributes/types";
 
@@ -24,6 +24,7 @@ export default function AttributesPage() {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [manageAttribute, setManageAttribute] = useState<AttributeListItem | null>(null);
+  const [editingAttribute, setEditingAttribute] = useState<AttributeListItem | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data, isLoading, error, refetch } = useAdminAttributes({
@@ -33,6 +34,7 @@ export default function AttributesPage() {
   });
 
   const createMutation = useCreateAttribute();
+  const updateMutation = useUpdateAttribute();
   const deleteMutation = useDeleteAttribute();
 
   const attributes = data?.data ?? [];
@@ -70,6 +72,21 @@ export default function AttributesPage() {
         ),
     },
     {
+      id: "selection",
+      header: "Selection",
+      cell: ({ row }) => (
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+            row.original.multipleSelection
+              ? "bg-secondary-50 text-secondary-700 border border-secondary-200"
+              : "bg-neutral-100 text-neutral-600 border border-neutral-200"
+          }`}
+        >
+          {row.original.multipleSelection ? "Multiple" : "Single"}
+        </span>
+      ),
+    },
+    {
       id: "values",
       header: "Values",
       cell: ({ row }) => (
@@ -83,6 +100,9 @@ export default function AttributesPage() {
       header: "Actions",
       cell: ({ row }) => (
         <div className="flex items-center justify-center gap-1.5">
+          <Button variant="ghost" size="icon" onClick={() => setEditingAttribute(row.original)} title="Edit Attribute">
+            <Pencil className="h-4 w-4 text-[var(--color-neutral-500)]" />
+          </Button>
           <Button variant="ghost" size="icon" onClick={() => setManageAttribute(row.original)}>
             <Settings2 className="h-4 w-4 text-[var(--color-neutral-500)]" />
           </Button>
@@ -168,11 +188,46 @@ export default function AttributesPage() {
               name: data.name,
               slug: data.slug,
               type: data.type,
+              multipleSelection: data.multipleSelection,
               values: data.values ?? [],
             });
             setIsCreateOpen(false);
           }}
         />
+      </FormModal>
+
+      {/* Edit Attribute */}
+      <FormModal
+        open={Boolean(editingAttribute)}
+        onClose={() => setEditingAttribute(null)}
+        title={`Edit "${editingAttribute?.name ?? ""}"`}
+        description="Update the attribute's name, code, type and selection behaviour"
+      >
+        {editingAttribute && (
+          <AttributeForm
+            isEditing
+            initialData={{
+              name: editingAttribute.name,
+              slug: editingAttribute.slug,
+              type: editingAttribute.type,
+              multipleSelection: editingAttribute.multipleSelection,
+            }}
+            isLoading={updateMutation.isPending}
+            submitLabel="Save Changes"
+            onSubmit={async (data) => {
+              await updateMutation.mutateAsync({
+                uuid: editingAttribute.id,
+                data: {
+                  name: data.name,
+                  slug: data.slug,
+                  type: data.type,
+                  multipleSelection: data.multipleSelection,
+                },
+              });
+              setEditingAttribute(null);
+            }}
+          />
+        )}
       </FormModal>
 
       {/* Manage Attribute Values */}

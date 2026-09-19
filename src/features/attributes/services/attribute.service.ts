@@ -17,6 +17,7 @@ type AttributeWithRelations = {
   name: string;
   slug: string;
   type: string;
+  multiple_selection: boolean;
   is_active: boolean;
   createdAt: Date;
   values: {
@@ -24,6 +25,7 @@ type AttributeWithRelations = {
     uuid: string | null;
     value: string;
     color_hex: string | null;
+    image_url: string | null;
     is_active: boolean;
     createdAt: Date;
     price_adjustment: unknown;
@@ -37,12 +39,14 @@ function formatAttribute(attribute: AttributeWithRelations): AttributeListItem {
     name: attribute.name,
     slug: attribute.slug,
     type: (attribute.type as "text" | "color") ?? "text",
+    multipleSelection: Boolean(attribute.multiple_selection),
     isActive: Boolean(attribute.is_active),
     createdAt: attribute.createdAt,
     values: attribute.values.map((v) => ({
       id: v.uuid || String(v.id),
       value: v.value,
       colorHex: v.color_hex,
+      imageUrl: v.image_url,
       isActive: Boolean(v.is_active),
       createdAt: v.createdAt,
       priceAdjustment: Number(v.price_adjustment ?? 0),
@@ -80,6 +84,7 @@ export const attributeService = {
       name: data.name,
       slug: data.slug,
       type: data.type ?? "text",
+      multiple_selection: data.multipleSelection ?? true,
       is_active: true,
       created_by: adminId,
       updated_by: adminId,
@@ -93,7 +98,8 @@ export const attributeService = {
           v.value,
           adminId,
           undefined,
-          attributeType === "color" ? v.colorHex ?? null : undefined
+          attributeType === "color" ? v.colorHex ?? null : undefined,
+          attributeType === "color" ? v.imageUrl ?? null : undefined
         )
       )
     );
@@ -152,6 +158,10 @@ export const attributeService = {
       updateData.type = data.type;
     }
 
+    if (data.multipleSelection !== undefined) {
+      updateData.multiple_selection = data.multipleSelection;
+    }
+
     const updated = await attributeRepository.updateByUuid(uuid, updateData);
     if (!updated) {
       throw ApiError.notFound("Attribute not found");
@@ -177,7 +187,8 @@ export const attributeService = {
     value: string,
     adminEmail?: string,
     priceAdjustment?: number,
-    colorHex?: string
+    colorHex?: string,
+    imageUrl?: string
   ) {
     const attribute = await attributeRepository.findByUuid(attributeUuid);
     if (!attribute) {
@@ -201,7 +212,8 @@ export const attributeService = {
       value,
       adminId,
       priceAdjustment,
-      colorHex ?? null
+      colorHex ?? null,
+      imageUrl ?? null
     );
     const refreshed = await attributeRepository.findByUuid(attributeUuid);
     return formatAttribute(refreshed as AttributeWithRelations);
@@ -213,7 +225,8 @@ export const attributeService = {
     value: string | undefined,
     adminEmail?: string,
     priceAdjustment?: number,
-    colorHex?: string
+    colorHex?: string,
+    imageUrl?: string
   ) {
     const attribute = await attributeRepository.findByUuid(attributeUuid);
     if (!attribute) {
@@ -230,7 +243,8 @@ export const attributeService = {
       value,
       adminId,
       priceAdjustment,
-      colorHex !== undefined ? colorHex : undefined
+      colorHex !== undefined ? colorHex : undefined,
+      imageUrl !== undefined ? imageUrl : undefined
     );
     if (!updated) {
       throw ApiError.notFound("Attribute value not found");
@@ -271,10 +285,12 @@ export const attributeService = {
       slug: config.product_attributes.slug,
       type: (config.product_attributes.type as "text" | "color") ?? "text",
       isRequired: config.is_required,
+      multipleSelection: Boolean(config.product_attributes.multiple_selection),
       values: config.product_attributes.values.map((v) => ({
         id: v.uuid || String(v.id),
         value: v.value,
         colorHex: v.color_hex,
+        imageUrl: v.image_url,
         isActive: Boolean(v.is_active),
         createdAt: v.createdAt,
         priceAdjustment: Number(v.price_adjustment ?? 0),
@@ -306,6 +322,7 @@ export const attributeService = {
         name: attribute.name,
         slug: attribute.slug,
         type: (attribute.type as "text" | "color") ?? "text",
+        multipleSelection: Boolean(attribute.multiple_selection),
         configured: Boolean(config),
         isRequired: config?.is_required ?? false,
         sortOrder: config?.sort_order ?? 0,
@@ -387,13 +404,16 @@ export const attributeService = {
    * configured attributes - only attributes configured on the parent Product
    * are ever offered, enforced here server-side (not just in the UI).
    */
-  async getAttributeValuesForItem(itemUuid: string) {
+  async getAttributeValuesForItem(itemUuid: string, productUuid?: string) {
     const item = await itemRepository.findByUuid(itemUuid);
     if (!item) {
       throw ApiError.notFound("Item not found");
     }
 
     const productId = item.style.productId;
+    if (productUuid && item.style.product?.uuid !== productUuid) {
+      throw ApiError.notFound("Item not found for this product");
+    }
     const [configs, selected] = await Promise.all([
       attributeRepository.findAttributeConfigsForProduct(productId),
       attributeRepository.findAttributeValuesForItem(item.id),
@@ -415,10 +435,12 @@ export const attributeService = {
         slug: attribute.slug,
         type: (attribute.type as "text" | "color") ?? "text",
         isRequired: config.is_required,
+        multipleSelection: Boolean(attribute.multiple_selection),
         values: attribute.values.map((v) => ({
           id: v.uuid || String(v.id),
           value: v.value,
           colorHex: v.color_hex,
+          imageUrl: v.image_url,
           selected: selectedIds.has(v.id.toString()),
         })),
       };
@@ -429,16 +451,28 @@ export const attributeService = {
    * Full-replace the Item's selected attribute values. Only values belonging
    * to attributes configured on the parent Product are accepted.
    */
-  async setAttributeValuesForItem(itemUuid: string, attributeValueIds: string[]) {
+  async setAttributeValuesForItem(
+    itemUuid: string,
+    attributeValueIds: string[],
+    productUuid?: string
+  ) {
     const item = await itemRepository.findByUuid(itemUuid);
     if (!item) {
       throw ApiError.notFound("Item not found");
     }
 
     const productId = item.style.productId;
+    if (productUuid && item.style.product?.uuid !== productUuid) {
+      throw ApiError.notFound("Item not found for this product");
+    }
     const configs = await attributeRepository.findAttributeConfigsForProduct(productId);
     const allowedValueMap = new Map<string, { attributeId: bigint }>();
+    const multipleSelectionByAttribute = new Map<string, boolean>();
     for (const config of configs) {
+      multipleSelectionByAttribute.set(
+        config.attribute_id.toString(),
+        Boolean(config.product_attributes.multiple_selection)
+      );
       for (const v of config.product_attributes.values) {
         allowedValueMap.set(v.uuid || String(v.id), { attributeId: config.attribute_id });
         allowedValueMap.set(String(v.id), { attributeId: config.attribute_id });
@@ -455,6 +489,22 @@ export const attributeService = {
       return { attributeId: allowed.attributeId, valueUuid };
     });
 
+    // Single-selection attributes (Multiple Selection = OFF in the Attribute
+    // Master) may only ever hold one value per Item - enforce it server-side,
+    // not just in the UI.
+    const countByAttributeId = new Map<string, number>();
+    for (const entry of entries) {
+      const key = entry.attributeId.toString();
+      countByAttributeId.set(key, (countByAttributeId.get(key) ?? 0) + 1);
+    }
+    for (const [attributeId, count] of countByAttributeId) {
+      if (count > 1 && multipleSelectionByAttribute.get(attributeId) === false) {
+        throw ApiError.badRequest(
+          `Only one value can be selected for a single-selection attribute`
+        );
+      }
+    }
+
     const values = await db.attributeValue.findMany({
       where: { uuid: { in: entries.map((e) => e.valueUuid) } },
       select: { id: true, uuid: true },
@@ -469,6 +519,6 @@ export const attributeService = {
       }))
     );
 
-    return attributeService.getAttributeValuesForItem(itemUuid);
+    return attributeService.getAttributeValuesForItem(itemUuid, productUuid);
   },
 };

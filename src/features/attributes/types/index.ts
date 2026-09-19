@@ -4,6 +4,7 @@ export interface AttributeValueItem {
   id: string; // Public UUID
   value: string;
   colorHex?: string | null;
+  imageUrl?: string | null;
   isActive: boolean;
   createdAt: Date;
   priceAdjustment: number;
@@ -14,6 +15,7 @@ export interface AttributeListItem {
   name: string;
   slug: string;
   type: AttributeType;
+  multipleSelection: boolean;
   isActive: boolean;
   createdAt: Date;
   values: AttributeValueItem[];
@@ -35,6 +37,7 @@ export interface ConfiguredProductAttribute {
   slug: string;
   type: AttributeType;
   isRequired: boolean;
+  multipleSelection: boolean;
   values: AttributeValueItem[];
 }
 
@@ -46,6 +49,7 @@ export interface ProductAttributeConfigOption {
   type: AttributeType;
   configured: boolean;
   isRequired: boolean;
+  multipleSelection: boolean;
   sortOrder: number;
 }
 
@@ -54,6 +58,7 @@ export interface ItemAttributeValueOption {
   id: string; // AttributeValue UUID
   value: string;
   colorHex?: string | null;
+  imageUrl?: string | null;
   selected: boolean;
 }
 
@@ -65,6 +70,10 @@ export interface ItemAttributeGroup {
   slug: string;
   type: AttributeType;
   isRequired: boolean;
+  /** Whether an Item can pick several of this attribute's values (OFF means
+   * exactly one value may be selected, driven by the Attribute Master's
+   * "Multiple Selection" setting). */
+  multipleSelection: boolean;
   values: ItemAttributeValueOption[];
 }
 

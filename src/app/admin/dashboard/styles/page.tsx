@@ -87,7 +87,7 @@ export default function AdminStylesPage() {
   const columns: ColumnDef<AdminStyleResponse>[] = [
     {
       accessorKey: "name",
-      header: "Style Name",
+      header: "Item Name",
       cell: ({ row }) => (
         <Link href={`/admin/dashboard/styles/${row.original.id}`} className="group block cursor-pointer">
           <p className="font-semibold text-secondary-600 underline-offset-2 group-hover:underline transition-colors">
@@ -142,7 +142,7 @@ export default function AdminStylesPage() {
       cell: ({ row }) => (
         <div className="flex items-center justify-center gap-1.5">
           <Link href={`/admin/dashboard/styles/${row.original.id}`}>
-            <Button variant="ghost" size="icon" title="View Style">
+            <Button variant="ghost" size="icon" title="View Item">
               <Eye className="h-4 w-4 text-[var(--color-neutral-500)]" />
             </Button>
           </Link>
@@ -150,7 +150,7 @@ export default function AdminStylesPage() {
             variant="ghost"
             size="icon"
             onClick={() => setEditingStyle(row.original)}
-            title="Edit Style"
+            title="Edit Item"
           >
             <Pencil className="h-4 w-4 text-[var(--color-neutral-500)]" />
           </Button>
@@ -158,7 +158,7 @@ export default function AdminStylesPage() {
             variant="ghost"
             size="icon"
             onClick={() => setDeletingStyle(row.original)}
-            title="Delete Style"
+            title="Delete Item"
           >
             <Trash2 className="h-4 w-4 text-[var(--color-error-600)]" />
           </Button>
@@ -172,14 +172,14 @@ export default function AdminStylesPage() {
   }
 
   if (error) {
-    return <ErrorState message="Failed to load styles" onRetry={() => refetch()} />;
+    return <ErrorState message="Failed to load items" onRetry={() => refetch()} />;
   }
 
   return (
     <div className="flex flex-1 min-h-0 flex-col">
       <AdminPageHeader
-        title="Style Management"
-        description="Manage the sellable Styles customers see - each groups one or more admin-only Items."
+        title="Item Management"
+        description="Manage the sellable Items customers see - each groups one or more admin-only sub-variants."
       />
 
       <AdminContent className="flex-1 min-h-0 overflow-hidden">
@@ -187,7 +187,7 @@ export default function AdminStylesPage() {
           <div className="flex-shrink-0 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
               <SearchInput
-                placeholder="Search styles..."
+                placeholder="Search items..."
                 value={search}
                 onSearch={(val) => {
                   setSearch(val);
@@ -230,7 +230,7 @@ export default function AdminStylesPage() {
               className="h-11 rounded-xl bg-[var(--color-secondary-600)] px-5 text-sm font-semibold text-white hover:bg-[var(--color-secondary-700)]"
             >
               <Plus className="mr-2 h-4 w-4" />
-              Add Style
+              Add Item
             </Button>
           </div>
 
@@ -261,8 +261,8 @@ export default function AdminStylesPage() {
           setIsAddOpen(false);
           setAddProductUuid("");
         }}
-        title="Add Style"
-        description="Create a new sellable Style under a Product"
+        title="Add Item"
+        description="Create a new sellable Item under a Product"
         size="lg"
       >
         <div className="space-y-4">
@@ -281,7 +281,7 @@ export default function AdminStylesPage() {
           {addProductUuid && (
             <StyleForm
               isLoading={createStyleMutation.isPending}
-              submitLabel="Create Style"
+              submitLabel="Create Item"
               onSubmit={async (formData: StyleFormValues) => {
                 try {
                   await createStyleMutation.mutateAsync({
@@ -297,7 +297,7 @@ export default function AdminStylesPage() {
                       cookingRecipe: formData.cookingRecipe || null,
                       shelfLife: null,
                       vegType: "na",
-                      basePrice: 0,
+                      basePrice: formData.basePrice ?? 0,
                       isFeatured: formData.isFeatured,
                       isDefault: formData.isDefault ?? false,
                       isActive: formData.isActive,
@@ -305,10 +305,10 @@ export default function AdminStylesPage() {
                   });
                   setIsAddOpen(false);
                   setAddProductUuid("");
-                  toast.success("Style created", `"${formData.name}" was added.`);
+                  toast.success("Item created", `"${formData.name}" was added.`);
                   refetch();
                 } catch (err: any) {
-                  toast.error("Failed to create style", err?.message || "Please try again.");
+                  toast.error("Failed to create item", err?.message || "Please try again.");
                 }
               }}
             />
@@ -320,7 +320,7 @@ export default function AdminStylesPage() {
       <FormModal
         open={Boolean(editingStyle)}
         onClose={() => setEditingStyle(null)}
-        title="Edit Style"
+        title="Edit Item"
         description={`Update information for ${editingStyle?.name || ""}`}
         size="lg"
       >
@@ -334,6 +334,7 @@ export default function AdminStylesPage() {
               shortDescription: editingStyle.shortDescription || "",
               description: editingStyle.description || "",
               cookingRecipe: editingStyle.cookingRecipe || "",
+              basePrice: editingStyle.basePrice ?? 0,
               isFeatured: editingStyle.isFeatured,
               isDefault: editingStyle.isDefault,
               isActive: editingStyle.isActive,
@@ -357,17 +358,17 @@ export default function AdminStylesPage() {
                     cookingRecipe: formData.cookingRecipe || null,
                     shelfLife: editingStyle.shelfLife || null,
                     vegType: editingStyle.vegType || "na",
-                    basePrice: editingStyle.basePrice ?? 0,
+                    basePrice: formData.basePrice ?? 0,
                     isFeatured: formData.isFeatured,
                     isDefault: formData.isDefault ?? false,
                     isActive: formData.isActive,
                   },
                 });
                 setEditingStyle(null);
-                toast.success("Style updated", `"${formData.name}" was saved.`);
+                toast.success("Item updated", `"${formData.name}" was saved.`);
                 refetch();
               } catch (err: any) {
-                toast.error("Failed to update style", err?.message || "Please try again.");
+                toast.error("Failed to update item", err?.message || "Please try again.");
               }
             }}
           />
@@ -387,13 +388,13 @@ export default function AdminStylesPage() {
               productUuid: target.productId,
               styleUuid: target.id,
             });
-            toast.success("Style deleted", `"${target.name}" was removed.`);
+            toast.success("Item deleted", `"${target.name}" was removed.`);
             refetch();
           } catch (err: any) {
-            toast.error("Failed to delete style", err?.message || "Please try again.");
+            toast.error("Failed to delete item", err?.message || "Please try again.");
           }
         }}
-        title="Delete Style"
+        title="Delete Item"
         description={`Are you sure you want to delete "${deletingStyle?.name}"? Its Items, Colors and Sizes will no longer be manageable. This action cannot be undone.`}
         confirmText="Delete"
         variant="destructive"

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { db } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma";
+import { retireUniqueValue } from "@/lib/utils/retire-unique-value";
 import type { GetAdminUnitsParams } from "../types";
 
 const unitInclude = Prisma.validator<Prisma.product_unitsInclude>()({
@@ -125,6 +126,9 @@ export const unitRepository = {
       where: { id: existing.id },
       data: {
         is_active: false,
+        // Free the unique code so a new unit can reuse it. VarChar(10) has no
+        // room for a readable suffix, so the archived row keeps a bare marker.
+        code: retireUniqueValue(existing.code, existing.id, 10),
         ...(adminId ? { updated_by: adminId } : {}),
       },
     });

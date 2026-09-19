@@ -55,11 +55,12 @@ export async function addAttributeValue(
   attributeUuid: string,
   value: string,
   priceAdjustment?: number,
-  colorHex?: string
+  colorHex?: string,
+  imageUrl?: string
 ) {
   const response = await apiClient.post<AttributeListItem>(
     `/api/admin/attributes/${attributeUuid}/values`,
-    { value, priceAdjustment, ...(colorHex ? { colorHex } : {}) }
+    { value, priceAdjustment, ...(colorHex ? { colorHex } : {}), ...(imageUrl ? { imageUrl } : {}) }
   );
   return response.data as AttributeListItem;
 }
@@ -69,11 +70,12 @@ export async function updateAttributeValue(
   valueUuid: string,
   value: string,
   priceAdjustment?: number,
-  colorHex?: string
+  colorHex?: string,
+  imageUrl?: string
 ) {
   const response = await apiClient.put<AttributeListItem>(
     `/api/admin/attributes/${attributeUuid}/values/${valueUuid}`,
-    { value, priceAdjustment, ...(colorHex ? { colorHex } : {}) }
+    { value, priceAdjustment, ...(colorHex ? { colorHex } : {}), ...(imageUrl !== undefined ? { imageUrl } : {}) }
   );
   return response.data as AttributeListItem;
 }

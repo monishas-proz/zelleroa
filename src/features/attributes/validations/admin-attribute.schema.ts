@@ -14,6 +14,7 @@ const initialAttributeValueSchema = z
       .trim()
       .regex(HEX_COLOR_REGEX, "Color code must be a valid hex value like #000000")
       .optional(),
+    imageUrl: z.string().trim().max(255).optional(),
   })
   .strict();
 
@@ -34,6 +35,9 @@ export const createAdminAttributeSchema = z
         "Attribute code can only contain letters, numbers, and underscores"
       ),
     type: attributeTypeSchema.optional().default("text"),
+    /** When true (default) an Item can pick several of this attribute's
+     * values; when false only a single value can be selected per Item. */
+    multipleSelection: z.boolean().optional().default(true),
     values: z
       .array(initialAttributeValueSchema)
       .min(1, "At least one value is required"),
@@ -63,6 +67,7 @@ export const updateAdminAttributeSchema = z
       )
       .optional(),
     type: attributeTypeSchema.optional(),
+    multipleSelection: z.boolean().optional(),
   })
   .strict();
 
@@ -92,6 +97,7 @@ export const createAttributeValueSchema = z
       .trim()
       .regex(HEX_COLOR_REGEX, "Color code must be a valid hex value like #000000")
       .optional(),
+    imageUrl: z.string().trim().max(255).optional(),
     /** Amount added to the base price whenever this value is picked. */
     priceAdjustment: z.coerce.number().min(0).optional().default(0),
   })

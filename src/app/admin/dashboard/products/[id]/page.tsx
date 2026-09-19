@@ -32,6 +32,7 @@ import {
   LayoutList,
   LayoutGrid,
   AlertCircle,
+  Star,
 } from "lucide-react";
 import { toast } from "@/components/ui/Toast";
 import { useAdminProduct, useProductImages, useCreateProductImages, useDeleteProductImage } from "@/features/products/hooks";
@@ -70,7 +71,7 @@ import { useStyles, useCreateStyle, useUpdateStyle, useDeleteStyle } from "@/fea
 import { StyleForm, StyleCard, type StyleFormValues } from "@/features/styles/components";
 import type { AdminStyleResponse } from "@/features/styles/types";
 import { useItems, useCreateItem, useUpdateItem, useDeleteItem } from "@/features/items/hooks";
-import { ItemForm, ItemCard, ItemAttributesPanel, type ItemFormValues } from "@/features/items/components";
+import { ItemForm, ItemAttributesPanel, type ItemFormValues } from "@/features/items/components";
 import type { AdminItemResponse } from "@/features/items/types";
 
 type VariantFilter = "active" | "inactive";
@@ -764,12 +765,12 @@ export default function AdminProductDetailsPage() {
           <section className="bg-white border border-cream-border rounded-lg overflow-hidden">
             <div className="p-3.5 sm:p-4 border-b border-cream-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
-                <h2 className="text-base font-bold text-neutral-900 tracking-tight">Styles</h2>
+                <h2 className="text-base font-bold text-neutral-900 tracking-tight">Items</h2>
                 <span className="px-2.5 py-0.5 rounded-full bg-cream-200 border border-cream-border text-xs font-bold text-neutral-500">
                   {styles.length}
                 </span>
                 <span className="text-xs text-neutral-400 hidden sm:inline">
-                  Each Style (e.g. &ldquo;V Neck&rdquo;, &ldquo;Solo&rdquo;) gets its own Items, Colors &amp; Sizes below.
+                  Each Item (e.g. &ldquo;V Neck&rdquo;, &ldquo;Solo&rdquo;) gets its own sub-variants, Colors &amp; Sizes below.
                 </span>
               </div>
               <button
@@ -778,7 +779,7 @@ export default function AdminProductDetailsPage() {
                 className="px-3.5 py-1.5 rounded-md border border-secondary-700 bg-secondary-600 hover:bg-secondary-700 text-cream-white text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add Style</span>
+                <span>Add Item</span>
               </button>
             </div>
 
@@ -850,17 +851,137 @@ export default function AdminProductDetailsPage() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                {items.map((item) => (
-                  <ItemCard
-                    key={item.id}
-                    item={item}
-                    isSelected={item.id === selectedItemUuid}
-                    onSelect={(i) => setSelectedItemUuid(i.id)}
-                    onEdit={(i) => setEditingItem(i)}
-                    onDelete={(i) => setDeletingItem(i)}
-                  />
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm border-collapse">
+                  <thead className="text-[11px] font-bold tracking-wider text-neutral-400 uppercase">
+                    <tr>
+                      <th className="px-3.5 py-2.5 min-w-[200px] border-b border-cream-border">Item</th>
+                      <th className="px-3.5 py-2.5 min-w-[220px] border-b border-cream-border">Attributes</th>
+                      <th className="px-3.5 py-2.5 min-w-[110px] text-right border-b border-cream-border">Price</th>
+                      <th className="px-3.5 py-2.5 min-w-[95px] text-center border-b border-cream-border">Status</th>
+                      <th className="px-3.5 py-2.5 min-w-[90px] text-center border-b border-cream-border">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-cream-border-subtle">
+                    {items.map((item) => {
+                      const isSelected = item.id === selectedItemUuid;
+                      return (
+                        <tr
+                          key={item.id}
+                          onClick={() => setSelectedItemUuid(item.id)}
+                          className={`cursor-pointer transition-colors ${
+                            isSelected ? "bg-secondary-50" : "hover:bg-cream-50"
+                          }`}
+                        >
+                          <td className="px-3.5 py-2.5 min-w-[200px]">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-neutral-900">{item.name}</span>
+                              {item.isDefault && (
+                                <span title="Default Item">
+                                  <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-mono text-[11px] text-neutral-400">{item.slug}</span>
+                          </td>
+                          <td className="px-3.5 py-2.5 min-w-[220px] text-neutral-700">
+                            {item.selectedAttributes && item.selectedAttributes.length > 0 ? (
+                              <div className="space-y-1.5">
+                                {item.selectedAttributes.map((group) => (
+                                  <div
+                                    key={group.id}
+                                    className="flex flex-wrap items-center gap-1.5"
+                                  >
+                                    <span className="text-[10px] font-semibold text-neutral-500 w-14 shrink-0 uppercase">
+                                      {group.name}
+                                    </span>
+                                    <div className="flex flex-wrap gap-1">
+                                      {group.values.map((value) => (
+                                        <span
+                                          key={value.id}
+                                          className="inline-flex items-center gap-1 rounded-full bg-secondary-50 text-secondary-700 border border-secondary-200 px-2 py-0.5 text-[11px] font-semibold"
+                                        >
+                                          {group.type === "color" &&
+                                            (value.imageUrl ? (
+                                              <img
+                                                src={value.imageUrl}
+                                                alt=""
+                                                className="h-3 w-3 rounded-full border border-white/60 object-cover"
+                                              />
+                                            ) : (
+                                              value.colorHex && (
+                                                <span
+                                                  className="h-3 w-3 rounded-full border border-white/60"
+                                                  style={{ backgroundColor: value.colorHex }}
+                                                />
+                                              )
+                                            ))}
+                                          {value.value}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-neutral-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-3.5 py-2.5 min-w-[110px] text-right tabular-nums text-neutral-900 font-semibold">
+                            {item.basePrice > 0 ? `₹${item.basePrice.toFixed(0)}` : "—"}
+                          </td>
+                          <td className="px-3.5 py-2.5 min-w-[95px] text-center">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                item.isActive
+                                  ? "bg-success-50 text-success-700 border border-success-200"
+                                  : "bg-cream-200 text-neutral-500 border border-cream-border"
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  item.isActive ? "bg-success-600" : "bg-neutral-400"
+                                }`}
+                              />
+                              {item.isActive ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          <td className="px-3.5 py-2.5 min-w-[90px]">
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon-sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingItem(item);
+                                }}
+                                aria-label="Edit item"
+                                title="Edit item"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon-sm"
+                                className="text-red-500 hover:text-red-600 border-red-200 hover:bg-red-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingItem(item);
+                                }}
+                                aria-label="Delete item"
+                                title="Delete item"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -883,6 +1004,7 @@ export default function AdminProductDetailsPage() {
               <ItemAttributesPanel
                 productUuid={canonicalProductId}
                 itemUuid={selectedItemUuid}
+                itemSlug={items.find((i) => i.id === selectedItemUuid)?.slug}
                 onGenerated={() => refetchVariants()}
               />
             </div>
@@ -1075,6 +1197,22 @@ export default function AdminProductDetailsPage() {
                       setVariantToActivate(v);
                     } else {
                       setVariantToDeactivate(v);
+                    }
+                  }}
+                  onToggleStock={async (v, nextOutOfStock) => {
+                    try {
+                      await updateVariantMutation.mutateAsync({
+                        productUuid: canonicalProductId,
+                        variantUuid: v.id,
+                        data: { outOfStock: nextOutOfStock },
+                      });
+                      toast.success(
+                        nextOutOfStock ? "Marked Out of Stock" : "Marked In Stock",
+                        `"${v.variantName}" is now ${nextOutOfStock ? "Out of Stock" : "In Stock"}.`
+                      );
+                      refetchVariants();
+                    } catch (err: any) {
+                      toast.error("Failed to update stock status", err?.message || "Please try again.");
                     }
                   }}
                 />
@@ -1544,6 +1682,7 @@ export default function AdminProductDetailsPage() {
                     slug: formData.slug,
                     priceAdjustment: formData.priceAdjustment ?? 0,
                     isFeatured: formData.isFeatured,
+                    isActive: formData.isActive,
                     attributeValueIds: formData.attributeValueIds || [],
                   },
                 });
@@ -1651,6 +1790,7 @@ export default function AdminProductDetailsPage() {
                   slug: editingVariant.slug || "",
                   priceAdjustment: editingVariant.priceAdjustment ?? 0,
                   isFeatured: editingVariant.isFeatured ?? false,
+                  isActive: editingVariant.isActive ?? false,
                   attributeValueIds: (editingVariant.attributeValues || []).map(
                     (av) => av.valueId
                   ),
@@ -1672,6 +1812,7 @@ export default function AdminProductDetailsPage() {
                         slug: formData.slug,
                         priceAdjustment: formData.priceAdjustment ?? 0,
                         isFeatured: formData.isFeatured,
+                        isActive: formData.isActive,
                         attributeValueIds: formData.attributeValueIds || [],
                       },
                     });
@@ -1785,13 +1926,13 @@ export default function AdminProductDetailsPage() {
       <FormModal
         open={isAddStyleOpen}
         onClose={() => setIsAddStyleOpen(false)}
-        title="Add Style"
-        description={`Create a new sellable style for ${product.name} (e.g. "V Neck", "Solo")`}
+        title="Add Item"
+        description={`Create a new sellable item for ${product.name} (e.g. "V Neck", "Solo")`}
         size="lg"
       >
         <StyleForm
           isLoading={createStyleMutation.isPending}
-          submitLabel="Create Style"
+          submitLabel="Create Item"
           onSubmit={async (formData: StyleFormValues) => {
             try {
               const res = await createStyleMutation.mutateAsync({
@@ -1807,7 +1948,7 @@ export default function AdminProductDetailsPage() {
                   cookingRecipe: formData.cookingRecipe || null,
                   shelfLife: null,
                   vegType: "na",
-                  basePrice: 0,
+                  basePrice: formData.basePrice ?? 0,
                   isFeatured: formData.isFeatured,
                   isDefault: formData.isDefault ?? false,
                   isActive: formData.isActive,
@@ -1818,10 +1959,10 @@ export default function AdminProductDetailsPage() {
                 setSelectedStyleUuid(created.id);
               }
               setIsAddStyleOpen(false);
-              toast.success("Style created", `"${formData.name}" is ready for Items, Colors & Sizes.`);
+              toast.success("Item created", `"${formData.name}" is ready for sub-variants, Colors & Sizes.`);
             } catch (err: any) {
               console.error("Failed to create style", err);
-              toast.error("Failed to create style", err?.message || "Please try again.");
+              toast.error("Failed to create item", err?.message || "Please try again.");
             }
           }}
         />
@@ -1831,7 +1972,7 @@ export default function AdminProductDetailsPage() {
       <FormModal
         open={Boolean(editingStyle)}
         onClose={() => setEditingStyle(null)}
-        title="Edit Style"
+        title="Edit Item"
         description={`Update information for ${editingStyle?.name || ""}`}
         size="lg"
       >
@@ -1845,6 +1986,7 @@ export default function AdminProductDetailsPage() {
               shortDescription: editingStyle.shortDescription || "",
               description: editingStyle.description || "",
               cookingRecipe: editingStyle.cookingRecipe || "",
+              basePrice: editingStyle.basePrice ?? 0,
               isFeatured: editingStyle.isFeatured,
               isDefault: editingStyle.isDefault,
               isActive: editingStyle.isActive,
@@ -1868,17 +2010,17 @@ export default function AdminProductDetailsPage() {
                     cookingRecipe: formData.cookingRecipe || null,
                     shelfLife: editingStyle.shelfLife || null,
                     vegType: editingStyle.vegType || "na",
-                    basePrice: editingStyle.basePrice ?? 0,
+                    basePrice: formData.basePrice ?? 0,
                     isFeatured: formData.isFeatured,
                     isDefault: formData.isDefault ?? false,
                     isActive: formData.isActive,
                   },
                 });
                 setEditingStyle(null);
-                toast.success("Style updated", `"${formData.name}" was saved.`);
+                toast.success("Item updated", `"${formData.name}" was saved.`);
               } catch (err: any) {
                 console.error("Failed to update style", err);
-                toast.error("Failed to update style", err?.message || "Please try again.");
+                toast.error("Failed to update item", err?.message || "Please try again.");
               }
             }}
           />
@@ -1901,14 +2043,14 @@ export default function AdminProductDetailsPage() {
             if (selectedStyleUuid === target.id) {
               setSelectedStyleUuid(null);
             }
-            toast.success("Style deleted", `"${target.name}" was removed.`);
+            toast.success("Item deleted", `"${target.name}" was removed.`);
           } catch (err: any) {
             console.error("Failed to delete style", err);
-            toast.error("Failed to delete style", err?.message || "Please try again.");
+            toast.error("Failed to delete item", err?.message || "Please try again.");
           }
         }}
-        title="Delete Style"
-        description={`Are you sure you want to delete the style "${deletingStyle?.name}"? Its Items, Colors and Sizes will no longer be manageable. This action cannot be undone.`}
+        title="Delete Item"
+        description={`Are you sure you want to delete the item "${deletingStyle?.name}"? Its sub-variants, Colors and Sizes will no longer be manageable. This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
         variant="destructive"
@@ -1929,7 +2071,7 @@ export default function AdminProductDetailsPage() {
         description={
           newlyCreatedItem
             ? `Pick which Color/Size/etc. values "${newlyCreatedItem.name}" comes in`
-            : `Create a new sub-variant under "${styles.find((s) => s.id === selectedStyleUuid)?.name || "this style"}" (e.g. "Regular Fit", "Slim Fit")`
+            : `Create a new sub-variant under "${styles.find((s) => s.id === selectedStyleUuid)?.name || "this item"}" (e.g. "Regular Fit", "Slim Fit")`
         }
         size="lg"
       >
@@ -1973,6 +2115,7 @@ export default function AdminProductDetailsPage() {
             <ItemAttributesPanel
               productUuid={canonicalProductId}
               itemUuid={newlyCreatedItem.id}
+              itemSlug={newlyCreatedItem.slug}
               onGenerated={() => refetchVariants()}
             />
             <div className="flex justify-end">

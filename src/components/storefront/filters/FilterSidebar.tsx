@@ -467,7 +467,7 @@ export function FilterSidebar({
           htmlFor="filter-search-input"
           className="text-[11px] font-extrabold uppercase tracking-wider text-[#7A6258]"
         >
-          Search by Name or Style
+          Search by Name or Item
         </label>
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9C8274] pointer-events-none" />

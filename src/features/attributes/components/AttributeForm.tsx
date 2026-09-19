@@ -7,7 +7,9 @@ import { z } from "zod";
 import { Plus, X } from "lucide-react";
 import { FormInput } from "@/components/forms/form-input";
 import { FormSelect } from "@/components/forms/form-select";
+import { FormCheckbox } from "@/components/forms/form-checkbox";
 import { FormSubmitButton } from "@/components/forms/form-submit-button";
+import { ColorImagePicker } from "./ColorImagePicker";
 
 const attributeFormSchema = z.object({
   name: z
@@ -22,6 +24,7 @@ const attributeFormSchema = z.object({
     .max(120, "Attribute code cannot exceed 120 characters")
     .regex(/^[A-Za-z0-9_]+$/, "Use letters, numbers, and underscores only"),
   type: z.enum(["text", "color"]),
+  multipleSelection: z.boolean(),
 });
 
 export type AttributeFormValues = z.infer<typeof attributeFormSchema>;
@@ -29,6 +32,7 @@ export type AttributeFormValues = z.infer<typeof attributeFormSchema>;
 export interface AttributeFormPendingValue {
   value: string;
   colorHex?: string;
+  imageUrl?: string;
 }
 
 interface AttributeFormProps {
@@ -52,6 +56,7 @@ function AttributeForm({
   const [pendingValues, setPendingValues] = useState<AttributeFormPendingValue[]>([]);
   const [valueDraft, setValueDraft] = useState("");
   const [colorDraft, setColorDraft] = useState("#000000");
+  const [imageDraft, setImageDraft] = useState("");
   const [valuesError, setValuesError] = useState<string | null>(null);
 
   const methods = useForm<AttributeFormValues>({
@@ -61,6 +66,7 @@ function AttributeForm({
       name: initialData?.name || "",
       slug: initialData?.slug || "",
       type: initialData?.type || "text",
+      multipleSelection: initialData?.multipleSelection ?? true,
     },
   });
 
@@ -76,9 +82,14 @@ function AttributeForm({
     }
     setPendingValues((prev) => [
       ...prev,
-      { value: v, ...(isColor ? { colorHex: colorDraft } : {}) },
+      {
+        value: v,
+        ...(isColor ? { colorHex: colorDraft } : {}),
+        ...(isColor && imageDraft ? { imageUrl: imageDraft } : {}),
+      },
     ]);
     setValueDraft("");
+    setImageDraft("");
     setValuesError(null);
   };
 
@@ -121,6 +132,14 @@ function AttributeForm({
           />
         </div>
 
+        <div className="rounded-xl border border-neutral-200 bg-neutral-50/50 p-4">
+          <FormCheckbox
+            name="multipleSelection"
+            label="Multiple Selection"
+            description="When ON, an item can pick several of this attribute's values at once (e.g. Color -> Red, Blue and Green). When OFF, only one value can be selected per item (e.g. Fit -> Regular, Slim or Oversized)."
+          />
+        </div>
+
         {showInitialValues && (
           <div>
             <label className="block text-xs font-semibold text-[var(--color-neutral-800)] mb-1.5">
@@ -141,13 +160,16 @@ function AttributeForm({
                 className="flex-1 min-w-0 rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-secondary-600 focus:ring-2 focus:ring-secondary-600/20"
               />
               {isColor && (
-                <input
-                  type="color"
-                  value={colorDraft}
-                  onChange={(e) => setColorDraft(e.target.value)}
-                  title="Color swatch"
-                  className="h-[38px] w-10 shrink-0 cursor-pointer rounded-lg border border-neutral-200 p-1"
-                />
+                <>
+                  <input
+                    type="color"
+                    value={colorDraft}
+                    onChange={(e) => setColorDraft(e.target.value)}
+                    title="Color swatch"
+                    className="h-[38px] w-10 shrink-0 cursor-pointer rounded-lg border border-neutral-200 p-1"
+                  />
+                  <ColorImagePicker imageUrl={imageDraft} onChange={setImageDraft} />
+                </>
               )}
               <button
                 type="button"
@@ -170,11 +192,19 @@ function AttributeForm({
                     key={v.value}
                     className="inline-flex items-center gap-1.5 rounded-full bg-secondary-50 px-2.5 py-1 text-xs font-medium text-secondary-700"
                   >
-                    {v.colorHex && (
-                      <span
-                        className="h-3 w-3 rounded-full border border-white"
-                        style={{ backgroundColor: v.colorHex }}
+                    {v.imageUrl ? (
+                      <img
+                        src={v.imageUrl}
+                        alt=""
+                        className="h-4 w-4 rounded-full border border-white object-cover"
                       />
+                    ) : (
+                      v.colorHex && (
+                        <span
+                          className="h-3 w-3 rounded-full border border-white"
+                          style={{ backgroundColor: v.colorHex }}
+                        />
+                      )
                     )}
                     {v.value}
                     <button

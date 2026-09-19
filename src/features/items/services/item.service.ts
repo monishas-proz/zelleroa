@@ -42,6 +42,22 @@ type ItemWithRollups = {
       inventories: { quantity_available: number } | null;
     }>;
   }>;
+  item_attribute_values?: Array<{
+    attribute_values: {
+      uuid: string | null;
+      value: string;
+      color_hex: string | null;
+      image_url: string | null;
+    };
+    product_attributes: {
+      id: bigint;
+      uuid: string | null;
+      name: string;
+      slug: string;
+      type: string;
+      multiple_selection: boolean;
+    };
+  }>;
 };
 
 function formatAdminItemResponse(item: ItemWithRollups): AdminItemResponse {
@@ -58,6 +74,44 @@ function formatAdminItemResponse(item: ItemWithRollups): AdminItemResponse {
       totalStock += unitPrice.inventories?.quantity_available ?? 0;
     }
   }
+
+  let selectedColorValueCount = 0;
+  let selectedOtherValueCount = 0;
+  const selectedByAttribute = new Map<string, {
+    id: string;
+    name: string;
+    slug: string;
+    type: "text" | "color";
+    multipleSelection: boolean;
+    values: { id: string; value: string; colorHex: string | null; imageUrl: string | null }[];
+  }>();
+  for (const iav of item.item_attribute_values ?? []) {
+    const attr = iav.product_attributes;
+    const attrId = attr.uuid ?? String(attr.id);
+    let group = selectedByAttribute.get(attrId);
+    if (!group) {
+      group = {
+        id: attrId,
+        name: attr.name,
+        slug: attr.slug,
+        type: (attr.type as "text" | "color") ?? "text",
+        multipleSelection: Boolean(attr.multiple_selection),
+        values: [],
+      };
+      selectedByAttribute.set(attrId, group);
+    }
+    const valueUuid = iav.attribute_values.uuid ?? "";
+    group.values.push({
+      id: valueUuid || `v-${group.values.length}`,
+      value: iav.attribute_values.value,
+      colorHex: iav.attribute_values.color_hex,
+      imageUrl: iav.attribute_values.image_url,
+    });
+    if (attr.type === "color") selectedColorValueCount += 1;
+    else selectedOtherValueCount += 1;
+  }
+
+  const selectedAttributes = Array.from(selectedByAttribute.values());
 
   return {
     id: item.uuid,
@@ -76,6 +130,9 @@ function formatAdminItemResponse(item: ItemWithRollups): AdminItemResponse {
     outOfStock: Boolean(item.out_of_stock),
     colorCount: colorNames.size,
     sizeCount,
+    selectedColorValueCount,
+    selectedOtherValueCount,
+    selectedAttributes,
     minPrice: sizePrices.length ? Math.min(...sizePrices) : null,
     maxPrice: sizePrices.length ? Math.max(...sizePrices) : null,
     totalStock,
@@ -104,10 +161,21 @@ export const itemService = {
       throw ApiError.notFound("Style not found or inactive");
     }
 
+    // Duplicate checks look at active items only - a soft-deleted item stays
+    // archived as-is and is never restored or reused, so the same code/SKU can
+    // be issued again as a brand new record.
     const itemSlug = slugify(data.slug).substring(0, 220);
     const existingSlug = await itemRepository.findBySlug(itemSlug);
     if (existingSlug) {
       throw ApiError.conflict(`An active item with slug '${data.slug}' already exists`);
+    }
+
+    const itemSku = data.sku ?? null;
+    if (itemSku) {
+      const existingSku = await itemRepository.findBySku(itemSku);
+      if (existingSku) {
+        throw ApiError.conflict(`An active item with SKU '${itemSku}' already exists`);
+      }
     }
 
     const existingCount = await itemRepository.countActiveByStyleId(style.id);
@@ -118,7 +186,7 @@ export const itemService = {
       styleId: style.id,
       name: data.name,
       slug: itemSlug,
-      sku: data.sku ?? null,
+      sku: itemSku,
       short_description: data.shortDescription ?? null,
       description: data.description ?? null,
       base_price: data.basePrice ?? 0,
@@ -202,9 +270,16 @@ export const itemService = {
       const normalizedSlug = slugify(data.slug).substring(0, 220);
       const slugConflict = await itemRepository.findBySlug(normalizedSlug, itemUuid);
       if (slugConflict) {
-        throw ApiError.conflict(`An item with slug '${data.slug}' already exists`);
+        throw ApiError.conflict(`An active item with slug '${data.slug}' already exists`);
       }
       updateData.slug = normalizedSlug;
+    }
+
+    if (data.sku) {
+      const skuConflict = await itemRepository.findBySku(data.sku, itemUuid);
+      if (skuConflict) {
+        throw ApiError.conflict(`An active item with SKU '${data.sku}' already exists`);
+      }
     }
 
     const updated = await itemRepository.updateByUuid(itemUuid, updateData);

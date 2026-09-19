@@ -6,15 +6,32 @@ export type { VariantMeasurement };
 export interface CartItemResponse {
   id: string; // Public Cart Item UUID
   productId: string; // Public Product UUID
+  /** Public Style UUID - the unit the storefront lists and links to. */
+  styleId: string;
+  styleName: string;
+  styleSlug: string | null;
   itemId: string; // Public Item UUID
   variantId: string; // Public Variant UUID (Color level)
   variantUnitPriceId: string; // Public Variant Unit Price UUID (Size/pack)
   productName: string;
   itemName: string;
   variantName: string;
+  /**
+   * The exact Color + Size this line sells. A cart line is keyed by the
+   * Color+Size combination, not the Item, so Red/M and Red/L are separate
+   * lines with their own price, stock and image.
+   */
+  colorId: string | null; // Public Variant UUID, null when the Item has no Color split
+  colorName: string | null;
+  colorHex: string | null;
+  colorImage: string | null;
+  sizeId: string | null; // Public AttributeValue UUID
+  sizeLabel: string | null;
   measurement: VariantMeasurement;
   primaryImage: string | null;
   quantity: number;
+  /** What one unit costs for this exact Color+Size, after offers. */
+  unitPrice: number;
   /** Alias of `currentPrice`, kept for callers that read `price`. */
   price?: number;
   /** Catalog price captured when the item was added to the cart. */

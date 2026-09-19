@@ -6,10 +6,10 @@ export { vegTypeEnum };
 export const createAdminVariantSchema = z
   .object({
     variantName: z
-      .string({ message: "Variant name is required" })
+      .string()
       .trim()
-      .min(1, "Variant name cannot be empty")
-      .max(100, "Variant name cannot exceed 100 characters"),
+      .max(100, "Variant name cannot exceed 100 characters")
+      .optional(),
     slug: z
       .string({ message: "Slug is required" })
       .trim()

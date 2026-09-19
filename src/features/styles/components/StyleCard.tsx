@@ -42,7 +42,7 @@ export function StyleCard({ item, isSelected, onSelect, onEdit, onDelete }: Styl
         <div className="flex items-center gap-1.5">
           <p className="text-sm font-semibold text-neutral-900 truncate">{item.name}</p>
           {item.isDefault && (
-            <span title="Default Style">
+            <span title="Default Item">
               <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
             </span>
           )}
@@ -82,8 +82,8 @@ export function StyleCard({ item, isSelected, onSelect, onEdit, onDelete }: Styl
               e.stopPropagation();
               onEdit(item);
             }}
-            aria-label="Edit style"
-            title="Edit style"
+            aria-label="Edit item"
+            title="Edit item"
           >
             <Pencil className="w-3.5 h-3.5" />
           </Button>
@@ -98,8 +98,8 @@ export function StyleCard({ item, isSelected, onSelect, onEdit, onDelete }: Styl
               e.stopPropagation();
               onDelete(item);
             }}
-            aria-label="Delete style"
-            title="Delete style"
+            aria-label="Delete item"
+            title="Delete item"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </Button>

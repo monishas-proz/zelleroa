@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { db } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma";
+import { retireUniqueValue } from "@/lib/utils/retire-unique-value";
 import type { GetAdminAttributesParams } from "../types";
 
 const attributeInclude = Prisma.validator<Prisma.ProductAttributeInclude>()({
@@ -97,16 +98,13 @@ export const attributeRepository = {
     const existing = await db.productAttribute.findFirst({ where: { uuid } });
     if (!existing) return null;
 
-    const suffix = `-deleted-${existing.id}`;
-    const slug = `${existing.slug.slice(0, 120 - suffix.length)}${suffix}`;
-
     return db.productAttribute.update({
       where: { id: existing.id },
       data: {
         is_active: false,
         // Free up the unique slug so a new attribute can reuse it; the
         // deleted row keeps a namespaced slug instead of blocking inserts.
-        slug,
+        slug: retireUniqueValue(existing.slug, existing.id, 120),
         ...(adminId ? { updated_by: adminId } : {}),
       },
     });
@@ -117,7 +115,8 @@ export const attributeRepository = {
     value: string,
     adminId?: bigint | null,
     priceAdjustment?: number,
-    colorHex?: string | null
+    colorHex?: string | null,
+    imageUrl?: string | null
   ) {
     return db.attributeValue.create({
       data: {
@@ -125,6 +124,7 @@ export const attributeRepository = {
         attributeId,
         value,
         color_hex: colorHex ?? null,
+        image_url: imageUrl ?? null,
         price_adjustment: priceAdjustment ?? 0,
         created_by: adminId ?? undefined,
         updated_by: adminId ?? undefined,
@@ -141,7 +141,8 @@ export const attributeRepository = {
     value: string | undefined,
     adminId?: bigint | null,
     priceAdjustment?: number,
-    colorHex?: string | null
+    colorHex?: string | null,
+    imageUrl?: string | null
   ) {
     const existing = await db.attributeValue.findFirst({ where: { uuid } });
     if (!existing) return null;
@@ -152,6 +153,7 @@ export const attributeRepository = {
         ...(value !== undefined ? { value } : {}),
         ...(priceAdjustment !== undefined ? { price_adjustment: priceAdjustment } : {}),
         ...(colorHex !== undefined ? { color_hex: colorHex } : {}),
+        ...(imageUrl !== undefined ? { image_url: imageUrl } : {}),
         updated_by: adminId ?? undefined,
       },
     });

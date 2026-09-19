@@ -1,7 +1,7 @@
 "use client";
 
-import { useCustomerProduct } from "@/features/customers/hooks/use-customer-catalog";
-import { ProductDetails } from "@/features/products/components/ProductDetails";
+import { useCustomerStyle } from "@/features/customers/hooks/use-customer-catalog";
+import { StyleDetailView } from "@/features/styles/components/storefront/StyleDetailView";
 import { RecentlyViewed } from "@/features/products/components/RecentlyViewed";
 import { RecommendedProducts } from "@/features/products/components/RecommendedProducts";
 import { ErrorState } from "@/components/ui/error-state";
@@ -60,8 +60,12 @@ function ProductDetailSkeleton() {
   );
 }
 
+/**
+ * `slug` is the Style UUID the listing card links to - the Style is the unit
+ * customers browse, and its Items/Colours/Sizes are chosen on this page.
+ */
 export function ProductDetailClient({ slug }: { slug: string }) {
-  const { data: product, isLoading, error, refetch } = useCustomerProduct(slug);
+  const { data: style, isLoading, error, refetch } = useCustomerStyle(slug);
 
   if (isLoading) {
     return (
@@ -84,7 +88,7 @@ export function ProductDetailClient({ slug }: { slug: string }) {
     );
   }
 
-  if (!product) {
+  if (!style) {
     return (
       <PageContainer>
         <ErrorState message="Product not found" />
@@ -97,17 +101,18 @@ export function ProductDetailClient({ slug }: { slug: string }) {
       <Breadcrumb
         items={[
           { label: "Products", href: "/products" },
-          ...(product.category
-            ? [{ label: product.category.name, href: `/categories/${product.category.id}` }]
+          ...(style.category
+            ? [{ label: style.category.name, href: `/categories/${style.category.id}` }]
             : []),
-          { label: product.name },
+          { label: style.name },
         ]}
       />
       <div className="mt-6">
-        <ProductDetails product={product} />
+        <StyleDetailView style={style} />
       </div>
-      <RecommendedProducts productId={product.id} />
-      <RecentlyViewed currentProductId={product.id} />
+      {/* Related/recently-viewed are keyed off the parent Product, not the Style. */}
+      <RecommendedProducts productId={style.product.id} />
+      <RecentlyViewed currentProductId={style.product.id} />
     </PageContainer>
   );
 }

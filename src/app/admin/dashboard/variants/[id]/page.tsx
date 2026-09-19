@@ -808,6 +808,7 @@ export default function AdminVariantDetailsPage() {
             slug: variant.slug || "",
             priceAdjustment: variant.priceAdjustment ?? 0,
             isFeatured: variant.isFeatured ?? false,
+            isActive: variant.isActive ?? false,
             attributeValueIds: (variant.attributeValues || []).map((av) => av.valueId),
           }}
           isEditing
@@ -827,6 +828,7 @@ export default function AdminVariantDetailsPage() {
                   slug: formData.slug,
                   priceAdjustment: formData.priceAdjustment ?? 0,
                   isFeatured: formData.isFeatured,
+                  isActive: formData.isActive,
                   attributeValueIds: formData.attributeValueIds || [],
                 },
               });

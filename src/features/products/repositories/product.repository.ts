@@ -1,5 +1,6 @@
 import { db } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma";
+import { retireUniqueValue } from "@/lib/utils/retire-unique-value";
 import type {
   GetAdminProductsParams,
   AdminProductListParams,
@@ -285,6 +286,9 @@ export const productRepository = {
       data: {
         isActive: false,
         deleted_at: new Date(),
+        // Free the unique slug so a new product can reuse it; the archived row
+        // keeps a namespaced slug instead of blocking the insert.
+        slug: retireUniqueValue(existing.slug, existing.id, 220),
         ...(adminId ? { updated_by: adminId } : {}),
       },
     });

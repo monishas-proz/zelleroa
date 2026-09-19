@@ -8,6 +8,7 @@ import {
   useDeleteAttributeValue,
 } from "../hooks";
 import type { AttributeListItem } from "../types";
+import { ColorImagePicker } from "./ColorImagePicker";
 
 interface AttributeValuesManagerProps {
   attribute: AttributeListItem;
@@ -19,9 +20,11 @@ function AttributeValuesManager({ attribute }: AttributeValuesManagerProps) {
   const isColor = attribute.type === "color";
   const [draft, setDraft] = useState("");
   const [draftColorHex, setDraftColorHex] = useState("#000000");
+  const [draftImageUrl, setDraftImageUrl] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [editColorHex, setEditColorHex] = useState("#000000");
+  const [editImageUrl, setEditImageUrl] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
   const addMutation = useAddAttributeValue();
@@ -41,21 +44,29 @@ function AttributeValuesManager({ attribute }: AttributeValuesManagerProps) {
         attributeUuid: attribute.id,
         value,
         ...(isColor ? { colorHex: draftColorHex } : {}),
+        ...(isColor && draftImageUrl ? { imageUrl: draftImageUrl } : {}),
       },
       {
         onSuccess: () => {
           setDraft("");
           setDraftColorHex("#000000");
+          setDraftImageUrl("");
         },
         onError: (err) => setFormError(err instanceof Error ? err.message : "Failed to add value"),
       }
     );
   };
 
-  const startEdit = (id: string, value: string, colorHex?: string | null) => {
+  const startEdit = (
+    id: string,
+    value: string,
+    colorHex?: string | null,
+    imageUrl?: string | null
+  ) => {
     setEditingId(id);
     setEditDraft(value);
     setEditColorHex(colorHex || "#000000");
+    setEditImageUrl(imageUrl || "");
     setFormError(null);
   };
 
@@ -71,7 +82,7 @@ function AttributeValuesManager({ attribute }: AttributeValuesManagerProps) {
         attributeUuid: attribute.id,
         valueUuid: editingId,
         value: editDraft.trim(),
-        ...(isColor ? { colorHex: editColorHex } : {}),
+        ...(isColor ? { colorHex: editColorHex, imageUrl: editImageUrl } : {}),
       },
       {
         onSuccess: () => setEditingId(null),
@@ -130,6 +141,11 @@ function AttributeValuesManager({ attribute }: AttributeValuesManagerProps) {
               title="Color hex code"
               className="w-24 shrink-0 rounded-lg border border-neutral-200 px-2 py-2 text-sm font-mono outline-none focus:border-secondary-600 focus:ring-2 focus:ring-secondary-600/20"
             />
+            <ColorImagePicker
+              imageUrl={draftImageUrl}
+              onChange={setDraftImageUrl}
+              disabled={addMutation.isPending}
+            />
           </>
         )}
         <button
@@ -182,6 +198,11 @@ function AttributeValuesManager({ attribute }: AttributeValuesManagerProps) {
                         title="Color hex code"
                         className="w-20 shrink-0 rounded-md border border-secondary-300 px-2 py-1 text-sm font-mono outline-none"
                       />
+                      <ColorImagePicker
+                        imageUrl={editImageUrl}
+                        onChange={setEditImageUrl}
+                        disabled={updateMutation.isPending}
+                      />
                     </>
                   )}
                   <button type="button" onClick={saveEdit} className="text-success-600 p-1">
@@ -197,23 +218,34 @@ function AttributeValuesManager({ attribute }: AttributeValuesManagerProps) {
                 </>
               ) : (
                 <>
-                  <span className="text-sm text-neutral-800 flex items-center gap-2">
-                    {isColor && v.colorHex && (
-                      <span
-                        className="h-4 w-4 shrink-0 rounded-full border border-neutral-200"
-                        style={{ backgroundColor: v.colorHex }}
-                        title={v.colorHex}
+                  <span className="text-sm text-neutral-800 flex items-center gap-2 min-w-0">
+                    {isColor && v.imageUrl ? (
+                      <img
+                        src={v.imageUrl}
+                        alt=""
+                        className="h-6 w-6 shrink-0 rounded-md border border-neutral-200 object-cover"
                       />
+                    ) : (
+                      isColor &&
+                      v.colorHex && (
+                        <span
+                          className="h-4 w-4 shrink-0 rounded-full border border-neutral-200"
+                          style={{ backgroundColor: v.colorHex }}
+                          title={v.colorHex}
+                        />
+                      )
                     )}
-                    {v.value}
+                    <span className="truncate">{v.value}</span>
                     {isColor && v.colorHex && (
-                      <span className="text-[11px] font-mono text-neutral-400">{v.colorHex}</span>
+                      <span className="text-[11px] font-mono text-neutral-400 shrink-0">
+                        {v.colorHex}
+                      </span>
                     )}
                   </span>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => startEdit(v.id, v.value, v.colorHex)}
+                      onClick={() => startEdit(v.id, v.value, v.colorHex, v.imageUrl)}
                       className="p-1 text-neutral-400 hover:text-secondary-600"
                     >
                       <Pencil className="h-3.5 w-3.5" />

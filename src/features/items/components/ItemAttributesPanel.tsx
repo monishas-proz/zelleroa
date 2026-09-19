@@ -9,11 +9,15 @@ import { useGenerateVariantsFromItem } from "@/features/variants/hooks";
 import type { AdminUnitResponse } from "@/features/units/types";
 import type { GenerateVariantsResponse } from "@/features/variants/types";
 import type { ItemAttributeGroup } from "@/features/attributes/types";
+import { AttributeValueQuickAdd } from "@/features/attributes/components/AttributeValueQuickAdd";
 import { ItemColorImagesManager } from "./ItemColorImagesManager";
 
 interface ItemAttributesPanelProps {
   productUuid: string;
   itemUuid: string;
+  /** Used by the Color Images section below to build a readable slug when
+   * auto-creating a Color that doesn't have a variant yet. */
+  itemSlug?: string;
   /** Called after a successful "Generate Variants" run so the parent can refetch Colors/Sizes. */
   onGenerated?: () => void;
 }
@@ -30,7 +34,12 @@ const EMPTY_GROUPS: ItemAttributeGroup[] = [];
  * White) for the attributes the Product already defines. Saving triggers the
  * existing Color x Size generation engine straight from this selection.
  */
-function ItemAttributesPanel({ productUuid, itemUuid, onGenerated }: ItemAttributesPanelProps) {
+function ItemAttributesPanel({
+  productUuid,
+  itemUuid,
+  itemSlug,
+  onGenerated,
+}: ItemAttributesPanelProps) {
   const {
     data: groups = EMPTY_GROUPS,
     isLoading,
@@ -54,26 +63,79 @@ function ItemAttributesPanel({ productUuid, itemUuid, onGenerated }: ItemAttribu
     if (isDirty) return;
     const next = new Set<string>();
     for (const group of groups) {
-      for (const value of group.values) {
-        if (value.selected) next.add(value.id);
+      const groupSelected = group.values.filter((value) => value.selected);
+      if (!group.multipleSelection && groupSelected.length > 1) {
+        next.add(groupSelected[0].id);
+      } else {
+        for (const value of groupSelected) next.add(value.id);
       }
     }
     setSelected(next);
   }, [groups, isDirty]);
 
-  const toggle = (valueId: string) => {
+  const toggle = (group: ItemAttributeGroup, valueId: string) => {
     setIsDirty(true);
     setResult(null);
     setSelected((prev) => {
       const next = new Set(prev);
+
+      if (!group.multipleSelection) {
+        // Single-selection attribute (Attribute Master "Multiple Selection" =
+        // OFF): picking a value replaces every other selection in the group.
+        const groupIds = new Set(group.values.map((value) => value.id));
+        for (const id of groupIds) next.delete(id);
+        if (!prev.has(valueId)) next.add(valueId);
+        return next;
+      }
+
       if (next.has(valueId)) next.delete(valueId);
       else next.add(valueId);
       return next;
     });
   };
 
+  // A value created right here from the quick-add form is pre-selected, so the
+  // admin doesn't have to hunt for the chip they just made. Marking the panel
+  // dirty also stops the refetched groups from wiping the pick before Save.
+  const selectNewValue = (group: ItemAttributeGroup, valueId: string) => {
+    setIsDirty(true);
+    setResult(null);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (!group.multipleSelection) {
+        for (const value of group.values) next.delete(value.id);
+      }
+      next.add(valueId);
+      return next;
+    });
+  };
+
+  // Live "Selected Values" summary - groups the currently selected value IDs
+  // back under their attribute so the table below shows one row per attribute
+  // (chips per value) instead of scattering values across separate rows.
+  const summaryRows = groups
+    .map((group) => {
+      const selectedValues = group.values.filter((value) => selected.has(value.id));
+      return { group, selectedValues };
+    })
+    .filter((row) => row.selectedValues.length > 0);
+
+  const selectionCount = summaryRows.reduce((sum, row) => sum + row.selectedValues.length, 0);
+
   const saveSelection = async () => {
     setFormError(null);
+
+    // Single-selection attributes may only ever hold one value - enforced in
+    // the UI by the radio behaviour and again server-side on save.
+    for (const group of groups) {
+      if (group.multipleSelection) continue;
+      const picked = group.values.filter((value) => selected.has(value.id));
+      if (picked.length > 1) {
+        setFormError(`Only one value can be selected for "${group.name}".`);
+        return;
+      }
+    }
+
     try {
       await setValuesMutation.mutateAsync({
         productUuid,
@@ -180,9 +242,20 @@ function ItemAttributesPanel({ productUuid, itemUuid, onGenerated }: ItemAttribu
       <div className="space-y-4">
         {groups.map((group) => (
           <div key={group.id}>
-            <label className="block text-xs font-semibold text-neutral-800 mb-1.5">
-              {group.name}
-            </label>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <label className="block text-xs font-semibold text-neutral-800">
+                {group.name}
+              </label>
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  group.multipleSelection
+                    ? "bg-secondary-50 text-secondary-700"
+                    : "bg-neutral-100 text-neutral-500"
+                }`}
+              >
+                {group.multipleSelection ? "Multiple values" : "Select one"}
+              </span>
+            </div>
             <div className="flex flex-wrap gap-2">
               {group.values.map((value) => {
                 const isChecked = selected.has(value.id);
@@ -190,7 +263,7 @@ function ItemAttributesPanel({ productUuid, itemUuid, onGenerated }: ItemAttribu
                   <button
                     key={value.id}
                     type="button"
-                    onClick={() => toggle(value.id)}
+                    onClick={() => toggle(group, value.id)}
                     disabled={setValuesMutation.isPending}
                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer select-none disabled:opacity-50 ${
                       isChecked
@@ -198,20 +271,119 @@ function ItemAttributesPanel({ productUuid, itemUuid, onGenerated }: ItemAttribu
                         : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-400 hover:bg-neutral-50"
                     }`}
                   >
-                    {group.type === "color" && value.colorHex && (
+                    {!group.multipleSelection && (
                       <span
-                        className="h-3 w-3 rounded-full border border-white/60"
-                        style={{ backgroundColor: value.colorHex }}
-                      />
+                        className={`flex h-3 w-3 items-center justify-center rounded-full border ${
+                          isChecked ? "border-white" : "border-neutral-400"
+                        }`}
+                      >
+                        {isChecked && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                      </span>
                     )}
+                    {group.type === "color" &&
+                      (value.imageUrl ? (
+                        <img
+                          src={value.imageUrl}
+                          alt=""
+                          className="h-4 w-4 rounded-full border border-white/60 object-cover"
+                        />
+                      ) : (
+                        value.colorHex && (
+                          <span
+                            className="h-3 w-3 rounded-full border border-white/60"
+                            style={{ backgroundColor: value.colorHex }}
+                          />
+                        )
+                      ))}
                     {value.value}
                   </button>
                 );
               })}
             </div>
+            <AttributeValueQuickAdd
+              attributeUuid={group.id}
+              attributeName={group.name}
+              type={group.type}
+              disabled={setValuesMutation.isPending}
+              onAdded={(valueId) => {
+                if (valueId) selectNewValue(group, valueId);
+                refetchGroups();
+              }}
+            />
           </div>
         ))}
       </div>
+
+      {/* Selected Values table - one row per attribute, every picked value as a
+          chip in the same cell (never spread across separate attribute rows). */}
+      {summaryRows.length > 0 && (
+        <div className="rounded-xl border border-neutral-200 overflow-hidden">
+          <div className="px-4 py-2.5 bg-neutral-50 border-b border-neutral-200 flex items-center justify-between gap-3">
+            <p className="text-xs font-semibold text-neutral-800">Selected Values</p>
+            <span className="inline-flex items-center rounded-full bg-secondary-50 text-secondary-700 px-2 py-0.5 text-[10px] font-semibold">
+              {selectionCount} value{selectionCount === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm border-collapse">
+              <thead>
+                <tr className="text-[11px] font-bold tracking-wider text-neutral-400 uppercase">
+                  <th className="px-4 py-2.5 min-w-[140px] border-b border-cream-border">Attribute</th>
+                  <th className="px-4 py-2.5 min-w-[220px] border-b border-cream-border">Selected Values</th>
+                  <th className="px-4 py-2.5 min-w-[110px] border-b border-cream-border">Selection Type</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {summaryRows.map(({ group, selectedValues }) => (
+                  <tr key={group.id}>
+                    <td className="px-4 py-2.5 align-top">
+                      <span className="font-semibold text-neutral-900">{group.name}</span>
+                    </td>
+                    <td className="px-4 py-2.5 align-top">
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedValues.map((value) => (
+                          <span
+                            key={value.id}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-secondary-50 text-secondary-700 border border-secondary-200 px-2.5 py-1 text-xs font-semibold"
+                          >
+                            {group.type === "color" &&
+                              (value.imageUrl ? (
+                                <img
+                                  src={value.imageUrl}
+                                  alt=""
+                                  className="h-3.5 w-3.5 rounded-full border border-white/60 object-cover"
+                                />
+                              ) : (
+                                value.colorHex && (
+                                  <span
+                                    className="h-3 w-3 rounded-full border border-white/60"
+                                    style={{ backgroundColor: value.colorHex }}
+                                  />
+                                )
+                              ))}
+                            {value.value}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 align-top">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          group.multipleSelection
+                            ? "bg-secondary-50 text-secondary-700"
+                            : "bg-neutral-100 text-neutral-500"
+                        }`}
+                      >
+                        {group.multipleSelection ? "Multiple" : "Single"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="flex justify-end">
         <Button
@@ -324,7 +496,7 @@ function ItemAttributesPanel({ productUuid, itemUuid, onGenerated }: ItemAttribu
 
       <div className="rounded-xl border border-neutral-200 p-4 space-y-4">
         <p className="text-xs font-semibold text-neutral-800">Color Images</p>
-        <ItemColorImagesManager productUuid={productUuid} itemUuid={itemUuid} />
+        <ItemColorImagesManager productUuid={productUuid} itemUuid={itemUuid} itemSlug={itemSlug} />
       </div>
     </div>
   );

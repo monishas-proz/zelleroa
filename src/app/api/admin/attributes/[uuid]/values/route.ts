@@ -23,7 +23,8 @@ export const POST = createApiHandler(
         body.value,
         adminEmail,
         body.priceAdjustment,
-        body.colorHex
+        body.colorHex,
+        body.imageUrl
       );
       return apiCreated(attribute, "Attribute value added successfully");
     },

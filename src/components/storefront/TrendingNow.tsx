@@ -1,31 +1,23 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { Flame } from "lucide-react";
 import { SnackCard } from "./cards/SnackCard";
 import { ProductCardSkeleton } from "./cards/ProductCardSkeleton";
-import { useCustomerVariants } from "@/features/variants";
+import { useCustomerStyles } from "@/features/customers/hooks/use-customer-catalog";
 import { useCategoryTree } from "@/features/categories/hooks";
-import { useAddToCart } from "@/features/cart/hooks/use-cart";
-import {
-  useAddToWishlist,
-  useRemoveFromWishlist,
-  useWishlistedUnitPriceIds,
-} from "@/features/wishlist/hooks/use-wishlist";
-import { mapVariantToStorefrontProduct } from "@/lib/storefront";
-import { type StorefrontProduct } from "@/constants/storefront";
+import { formatStylePriceRange, mapStyleToStorefrontProduct } from "@/lib/storefront";
 
+/**
+ * Trending styles on the home page - one card per Style, linking to the Style
+ * page where Item, Colour and Size are picked.
+ */
 export function TrendingNow() {
-  const router = useRouter();
-  const { data: session } = useSession();
-  const [toastMessage, setToastMessage] = React.useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | null>(null);
 
   const { data: categoryTree = [] } = useCategoryTree();
 
-  const { data: response, isLoading, isError } = useCustomerVariants({
+  const { data: response, isLoading, isError } = useCustomerStyles({
     categoryIds: selectedCategoryId ? [selectedCategoryId] : undefined,
     page: 1,
     pageSize: 4,
@@ -33,57 +25,11 @@ export function TrendingNow() {
     sortOrder: "desc",
   });
 
-  const { wishlistedIds } = useWishlistedUnitPriceIds({ enabled: !!session });
-  const addToCart = useAddToCart();
-  const addToWishlist = useAddToWishlist();
-  const removeFromWishlist = useRemoveFromWishlist();
-
-  const products: StorefrontProduct[] = React.useMemo(() => {
-    return (response?.data ?? []).map(mapVariantToStorefrontProduct);
-  }, [response]);
-
-  const showNotification = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
-
-  const requireLogin = () => {
-    router.push("/login?callbackUrl=/");
-  };
-
-  const handleAddToCart = (product: StorefrontProduct, unitPriceId: string) => {
-    if (!session) return requireLogin();
-    addToCart.mutate(
-      { variantUnitPriceId: unitPriceId, quantity: 1 },
-      {
-        onSuccess: () => showNotification(`Added ${product.name} to cart`),
-        onError: () => showNotification("Could not add item to cart"),
-      }
-    );
-  };
-
-  const handleWishlistToggle = (product: StorefrontProduct, unitPriceId: string) => {
-    if (!session) return requireLogin();
-    if (wishlistedIds.has(unitPriceId)) {
-      removeFromWishlist.mutate(unitPriceId, {
-        onSuccess: () => showNotification(`Removed ${product.name} from wishlist`),
-      });
-    } else {
-      addToWishlist.mutate(unitPriceId, {
-        onSuccess: () => showNotification(`Added ${product.name} to wishlist`),
-      });
-    }
-  };
+  const styles = React.useMemo(() => response?.data ?? [], [response]);
 
   return (
     <section className="relative w-full bg-white">
       <div className="w-full max-w-[1400px] 2xl:max-w-[1600px] 3xl:max-w-[1800px] mx-auto px-4 sm:px-6 md:px-8 py-10 sm:py-14">
-        {toastMessage && (
-          <div className="fixed top-24 right-4 z-50 rounded-xl bg-theme-text-primary text-white px-5 py-3 shadow-xl text-sm font-medium animate-in fade-in-0 duration-200">
-            {toastMessage}
-          </div>
-        )}
-
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-600">
@@ -135,25 +81,20 @@ export function TrendingNow() {
             ))}
 
           {!isLoading &&
-            products.map((product) => (
+            styles.map((style) => (
               <SnackCard
-                key={product.id}
-                product={product}
+                key={style.id}
+                product={mapStyleToStorefrontProduct(style)}
+                subtitle={style.category?.name}
+                priceRangeText={formatStylePriceRange(style)}
                 showRating
-                isWishlisted={product.unitPrices.some((u) => wishlistedIds.has(u.id))}
-                onWishlistToggle={(unitPriceId) =>
-                  handleWishlistToggle(product, unitPriceId || product.unitPrices[0]?.id)
-                }
-                onAddToCart={(unitPriceId) =>
-                  handleAddToCart(product, unitPriceId || product.unitPrices[0]?.id)
-                }
-                disabled={addToCart.isPending}
+                viewOnly
               />
             ))}
         </div>
 
         {/* Empty State */}
-        {!isLoading && !isError && products.length === 0 && (
+        {!isLoading && !isError && styles.length === 0 && (
           <div className="py-16 text-center text-sm text-theme-text-subtle">
             <p className="text-base font-medium text-theme-text-primary">
               No items found in this collection.

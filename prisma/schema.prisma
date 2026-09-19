@@ -633,6 +633,7 @@ model ProductAttribute {
   name                                       String                     @db.VarChar(100)
   slug                                       String                     @unique(map: "slug") @db.VarChar(120)
   type                                       attribute_type_enum        @default(text)
+  multiple_selection                         Boolean                    @default(true)
   createdAt                                  DateTime                   @default(now()) @map("created_at") @db.Timestamp(0)
   updated_at                                 DateTime                   @default(now()) @db.Timestamp(0)
   is_active                                  Boolean                    @default(true)
@@ -663,6 +664,7 @@ model AttributeValue {
   attributeId                              BigInt                         @map("attribute_id") @db.UnsignedBigInt
   value                                    String                         @db.VarChar(150)
   color_hex                                String?                        @db.VarChar(7)
+  image_url                                String?                        @db.VarChar(255)
   price_adjustment                         Decimal                        @default(0.00) @map("price_adjustment") @db.Decimal(10, 2)
   createdAt                                DateTime                       @default(now()) @map("created_at") @db.Timestamp(0)
   updated_at                               DateTime                       @default(now()) @db.Timestamp(0)

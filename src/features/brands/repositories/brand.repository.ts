@@ -1,5 +1,6 @@
 import { db } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma";
+import { retireUniqueValue } from "@/lib/utils/retire-unique-value";
 import type { GetBrandsParams, GetAdminBrandsParams } from "../types";
 
 const brandListInclude = Prisma.validator<Prisma.ProductBrandInclude>()({
@@ -176,6 +177,9 @@ export const brandRepository = {
       data: {
         isActive: false,
         deleted_at: new Date(),
+        // Free the unique slug so a new brand can reuse it; the archived row
+        // keeps a namespaced slug instead of blocking the insert.
+        slug: retireUniqueValue(existing.slug, existing.id, 170),
         ...(adminId ? { updated_by: adminId } : {}),
       },
     });

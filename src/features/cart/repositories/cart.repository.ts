@@ -39,6 +39,16 @@ export const cartItemInclude = Prisma.validator<Prisma.CartItemInclude>()({
       deleted_at: true,
     },
   },
+  // The Style the line was bought under - the unit the storefront lists and
+  // links to, so the cart can name it and link back to its detail page.
+  style: {
+    select: {
+      id: true,
+      uuid: true,
+      name: true,
+      slug: true,
+    },
+  },
   variant_unit_price: {
     select: {
       id: true,
@@ -49,6 +59,13 @@ export const cartItemInclude = Prisma.validator<Prisma.CartItemInclude>()({
       is_default: true,
       isActive: true,
       deleted_at: true,
+      // The exact Size this line sells, when the Color was split by Size.
+      attribute_value: {
+        select: { id: true, uuid: true, value: true },
+      },
+      inventories: {
+        select: { quantity_available: true },
+      },
       product_units: {
         select: {
           id: true,
@@ -63,6 +80,8 @@ export const cartItemInclude = Prisma.validator<Prisma.CartItemInclude>()({
           id: true,
           uuid: true,
           variant_name: true,
+          color_name: true,
+          color_hex: true,
           isActive: true,
           deleted_at: true,
           product_variant_images: {

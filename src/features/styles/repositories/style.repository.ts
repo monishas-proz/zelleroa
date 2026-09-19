@@ -1,5 +1,6 @@
 import { db } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma";
+import { retireUniqueValue } from "@/lib/utils/retire-unique-value";
 import type { GetAdminStylesParams } from "../types";
 
 export const styleInclude = Prisma.validator<Prisma.StyleInclude>()({
@@ -168,6 +169,12 @@ export const styleRepository = {
       data: {
         isActive: false,
         deleted_at: new Date(),
+        // Free the unique slug/sku so a new style can reuse them; the archived
+        // row keeps namespaced values instead of blocking the insert.
+        slug: retireUniqueValue(existing.slug, existing.id, 220),
+        ...(existing.sku
+          ? { sku: retireUniqueValue(existing.sku, existing.id, 100) }
+          : {}),
         ...(adminId ? { updated_by: adminId } : {}),
       },
     });

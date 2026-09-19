@@ -17,8 +17,12 @@ export const CUSTOMER_CATALOG_QUERY_KEYS = {
     [...CUSTOMER_CATALOG_QUERY_KEYS.all, "products", params ?? {}] as const,
   styles: (params?: CustomerProductListInput) =>
     [...CUSTOMER_CATALOG_QUERY_KEYS.all, "styles", params ?? {}] as const,
+  item: (uuid: string) =>
+    [...CUSTOMER_CATALOG_QUERY_KEYS.all, "item", uuid] as const,
   product: (uuid: string) =>
     [...CUSTOMER_CATALOG_QUERY_KEYS.all, "product", uuid] as const,
+  style: (uuid: string) =>
+    [...CUSTOMER_CATALOG_QUERY_KEYS.all, "style", uuid] as const,
   productVariants: (uuid: string, params?: CustomerVariantListInput) =>
     [...CUSTOMER_CATALOG_QUERY_KEYS.all, "product-variants", uuid, params ?? {}] as const,
   relatedProducts: (uuid: string, limit?: number) =>
@@ -69,6 +73,40 @@ export function useCustomerStyles(
     placeholderData: keepPreviousData,
     staleTime: 1000 * 60,
     ...options,
+  });
+}
+
+/**
+ * Fetch one Style with its Items, and each Item's Colors/Sizes - everything
+ * the Style detail page needs to switch Item, Color and Size without
+ * re-fetching.
+ */
+export function useCustomerStyle(
+  styleUuid: string | null,
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: CUSTOMER_CATALOG_QUERY_KEYS.style(styleUuid ?? ""),
+    queryFn: () => customerCatalogApi.getStyle(styleUuid!),
+    enabled: !!styleUuid && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+/**
+ * Fetch one Item with its Colors, and each Color's own images, Sizes, prices
+ * and stock - everything the Item detail page needs to switch Color and Size
+ * without re-fetching.
+ */
+export function useCustomerItem(
+  itemUuid: string | null,
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: CUSTOMER_CATALOG_QUERY_KEYS.item(itemUuid ?? ""),
+    queryFn: () => customerCatalogApi.getItem(itemUuid!),
+    enabled: !!itemUuid && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
   });
 }
 

@@ -1,0 +1,60 @@
+"use client";
+
+import { useCustomerItem } from "@/features/customers/hooks/use-customer-catalog";
+import { ItemView } from "@/features/items/components/storefront";
+import { ItemViewSkeleton } from "@/features/items/components/storefront/ItemViewSkeleton";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageContainer } from "@/components/layout/PageContainer";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
+
+export function ItemDetailClient({ itemId }: { itemId: string }) {
+  const { data: item, isLoading, error, refetch } = useCustomerItem(itemId);
+
+  if (isLoading) {
+    return (
+      <PageContainer>
+        <div className="mt-6">
+          <ItemViewSkeleton />
+        </div>
+      </PageContainer>
+    );
+  }
+
+  if (error) {
+    return (
+      <PageContainer>
+        <ErrorState message="Failed to load item" onRetry={() => refetch()} />
+      </PageContainer>
+    );
+  }
+
+  if (!item) {
+    return (
+      <PageContainer>
+        <ErrorState message="Item not found" />
+      </PageContainer>
+    );
+  }
+
+  return (
+    <PageContainer>
+      <Breadcrumb
+        items={[
+          { label: "Products", href: "/products" },
+          ...(item.category
+            ? [{ label: item.category.name, href: `/categories/${item.category.id}` }]
+            : []),
+          { label: item.styleName, href: `/styles/${item.styleId}` },
+          { label: item.name },
+        ]}
+      />
+      <div className="mt-6">
+        <ItemView
+          item={item}
+          eyebrow={item.styleName}
+          returnUrl={`/items/${item.id}`}
+        />
+      </div>
+    </PageContainer>
+  );
+}

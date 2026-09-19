@@ -1,5 +1,6 @@
 import { db } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma";
+import { retireUniqueValue } from "@/lib/utils/retire-unique-value";
 import type {
   GetAdminVariantsParams,
   AdminVariantListParams,
@@ -451,6 +452,11 @@ export const variantRepository = {
       data: {
         isActive: false,
         deleted_at: new Date(),
+        // Free the unique slug so a new variant can reuse it; the archived row
+        // keeps a namespaced slug instead of blocking the insert.
+        ...(existing.slug
+          ? { slug: retireUniqueValue(existing.slug, existing.id, 255) }
+          : {}),
         ...(adminId ? { updated_by: adminId } : {}),
       },
     });

@@ -48,6 +48,9 @@ export {
 export {
   useCustomerProducts,
   useCustomerProduct,
+  useCustomerStyles,
+  useCustomerStyle,
+  useCustomerItem,
   useCustomerCategories,
   useCustomerBrands,
   useCustomerProductVariants,

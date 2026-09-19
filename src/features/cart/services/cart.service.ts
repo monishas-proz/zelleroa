@@ -109,15 +109,25 @@ async function formatCartResponse(
     return {
       id: item.uuid || String(item.id),
       productId: product.uuid || String(product.id),
+      styleId: item.style?.uuid || String(item.styleId),
+      styleName: item.style?.name || product.name,
+      styleSlug: item.style?.slug ?? null,
       itemId: cartItem.uuid || String(cartItem.id),
       variantId: variant.uuid || String(variant.id),
       variantUnitPriceId: unitPrice.uuid || String(unitPrice.id),
       productName: product.name,
       itemName: cartItem.name,
       variantName,
+      colorId: variant.color_name ? variant.uuid || String(variant.id) : null,
+      colorName: variant.color_name ?? null,
+      colorHex: variant.color_hex ?? null,
+      colorImage: variant.product_variant_images?.[0]?.image_url ?? null,
+      sizeId: unitPrice.attribute_value?.uuid ?? null,
+      sizeLabel: unitPrice.attribute_value?.value ?? null,
       measurement,
       primaryImage: primaryImg,
       quantity: item.quantity,
+      unitPrice: line.finalPrice,
       price: line.finalPrice,
       priceAtAdd,
       basePrice,
@@ -184,6 +194,7 @@ export const cartService = {
           },
           include: {
             variant: { include: { item: { include: { style: { include: { product: true } } } } } },
+            inventories: { select: { quantity_available: true } },
           },
         })
       : null;
@@ -201,6 +212,7 @@ export const cartService = {
           orderBy: [{ is_default: "desc" }, { createdAt: "asc" }],
           include: {
             variant: { include: { item: { include: { style: { include: { product: true } } } } } },
+            inventories: { select: { quantity_available: true } },
           },
         });
       }
@@ -226,6 +238,20 @@ export const cartService = {
       variant.item.style.product.deleted_at !== null
     ) {
       throw ApiError.badRequest("Product variant is unavailable");
+    }
+
+    // Stock is held per exact Color+Size row, so an out-of-stock Red/L is
+    // rejected here even when Red/M and Blue/L are both available.
+    const available = unitPrice.inventories?.quantity_available ?? 0;
+    if (variant.out_of_stock || available <= 0) {
+      throw ApiError.badRequest(
+        "This colour and size combination is out of stock"
+      );
+    }
+    if (available < input.quantity) {
+      throw ApiError.badRequest(
+        `Only ${available} left for this colour and size combination`
+      );
     }
 
     const currentPrice = calculateVariantPrice(unitPrice);
@@ -304,15 +330,25 @@ export const cartService = {
     return {
       id: item.uuid || String(item.id),
       productId: product?.uuid || String(item.productId),
+      styleId: item.style?.uuid || String(item.styleId),
+      styleName: item.style?.name || product?.name || "",
+      styleSlug: item.style?.slug ?? null,
       itemId: cartItem?.uuid || String(item.itemId),
       variantId: variant?.uuid || "",
       variantUnitPriceId: unitPrice?.uuid || String(item.variantUnitPriceId),
       productName: product?.name || "",
       itemName: cartItem?.name || "",
       variantName,
+      colorId: variant?.color_name ? variant.uuid || String(variant.id) : null,
+      colorName: variant?.color_name ?? null,
+      colorHex: variant?.color_hex ?? null,
+      colorImage: variant?.product_variant_images?.[0]?.image_url ?? null,
+      sizeId: unitPrice?.attribute_value?.uuid ?? null,
+      sizeLabel: unitPrice?.attribute_value?.value ?? null,
       measurement,
       primaryImage: primaryImg,
       quantity: item.quantity,
+      unitPrice: line?.finalPrice ?? basePrice,
       price: line?.finalPrice ?? basePrice,
       priceAtAdd,
       basePrice,

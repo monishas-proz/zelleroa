@@ -56,6 +56,30 @@ export const catalogService = {
     return result;
   },
 
+  /**
+   * The Style detail page: the Style plus every Item under it, each Item with
+   * its Colors, and each Color with its own images, Sizes, prices and stock.
+   */
+  async getStyleByUuid(uuid: string) {
+    const style = await catalogRepository.findCustomerStyleDetailByUuid(uuid);
+    if (!style) {
+      throw ApiError.notFound("Style not found");
+    }
+    return catalogOffers.decorateStyleDetail(style);
+  },
+
+  /**
+   * One Item on its own page - the same Color/Size tree the Style detail page
+   * shows for a selected Item, fetched directly by Item UUID.
+   */
+  async getItemByUuid(uuid: string) {
+    const item = await catalogRepository.findCustomerItemDetailByUuid(uuid);
+    if (!item) {
+      throw ApiError.notFound("Item not found");
+    }
+    return catalogOffers.decorateItemDetail(item);
+  },
+
   async getProductByUuid(uuid: string) {
     const product = await catalogRepository.findCustomerProductByUuid(uuid);
     if (!product) {

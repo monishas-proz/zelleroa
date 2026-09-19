@@ -56,6 +56,14 @@ export interface SnackCardProps {
   priceRangeText?: string;
   /** Fetch and show the real average rating/review count for this product. Off by default to avoid firing a reviews request per card in large grids. */
   showRating?: boolean;
+  /**
+   * Style cards have no single sellable combination - Colour and Size are
+   * picked on the detail page - so the card links there instead of offering
+   * pack-size pills and an add-to-cart button.
+   */
+  viewOnly?: boolean;
+  /** CTA label used in `viewOnly` mode. */
+  viewLabel?: string;
 }
 
 export function SnackCard({
@@ -78,6 +86,8 @@ export function SnackCard({
   fallbackPrice,
   priceRangeText,
   showRating = false,
+  viewOnly = false,
+  viewLabel = "View Style",
 }: SnackCardProps) {
   // If product prop is supplied, derive fields from it
   const resolvedId = id || product?.productId || product?.id || "";
@@ -160,7 +170,9 @@ export function SnackCard({
           </div>
         )}
 
-        {/* Wishlist Button (Top-Right) */}
+        {/* Wishlist Button (Top-Right) - a Style has no single row to save,
+            so it is hidden until a Colour+Size is picked on the detail page */}
+        {!viewOnly && (
         <button
           type="button"
           onClick={(e) => {
@@ -179,6 +191,7 @@ export function SnackCard({
             }`}
           />
         </button>
+        )}
       </div>
 
       {/* 2. Middle Info Row: Title on Left, Variants + Price on Right */}
@@ -203,7 +216,7 @@ export function SnackCard({
         {/* Right Column: Variant Selector & Prices */}
         <div className="flex flex-col items-end shrink-0">
           {/* Variant Selector Pills */}
-          {resolvedVariants.length > 0 && (
+          {!viewOnly && resolvedVariants.length > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap justify-end">
               {resolvedVariants.map((v) => {
                 const isSelected = v.id === activeVariant?.id;
@@ -231,7 +244,7 @@ export function SnackCard({
 
           {/* Price & Strikethrough Row */}
           <div className="flex items-baseline gap-1.5 sm:gap-2 mt-1.5 justify-end">
-            {priceRangeText && resolvedVariants.length === 0 ? (
+            {priceRangeText && (viewOnly || resolvedVariants.length === 0) ? (
               <span className="font-bold text-theme-text-primary text-sm sm:text-base tracking-tight">
                 {priceRangeText}
               </span>
@@ -252,8 +265,16 @@ export function SnackCard({
         </div>
       </div>
 
-      {/* 3. Bottom Action: "Add to Cart" Button */}
+      {/* 3. Bottom Action: add to cart, or - for a Style - a link to its page */}
       <div className="w-full px-3 mt-3.5 sm:mt-4">
+        {viewOnly ? (
+          <Link
+            href={resolvedHref}
+            className="w-full bg-theme-primary-light text-theme-primary hover:bg-theme-primary hover:text-theme-primary-fg font-bold text-xs sm:text-sm tracking-wide uppercase py-2.5 sm:py-3 px-4 rounded-lg shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+          >
+            {viewLabel}
+          </Link>
+        ) : (
         <button
           type="button"
           disabled={disabled || isLoading || (activeVariant && activeVariant.inStock === false)}
@@ -267,6 +288,7 @@ export function SnackCard({
               ? "Out of Stock"
               : "ADD TO CART"}
         </button>
+        )}
       </div>
     </div>
   );

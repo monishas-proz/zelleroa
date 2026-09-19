@@ -763,6 +763,7 @@ export default function AdminVariantsPage() {
                 slug: formData.slug,
                 priceAdjustment: formData.priceAdjustment ?? 0,
                 isFeatured: formData.isFeatured,
+                isActive: formData.isActive,
                 attributeValueIds: formData.attributeValueIds || [],
               };
 
@@ -775,7 +776,7 @@ export default function AdminVariantsPage() {
                 setCreatedVariant({
                   id: res.data.id,
                   productId: res.data.productId,
-                  name: res.data.variantName || formData.variantName,
+                  name: res.data.variantName || formData.variantName || "Variant",
                   variantData: res.data,
                 });
                 setCreateStep(2);
@@ -974,6 +975,7 @@ export default function AdminVariantsPage() {
                   slug: selectedVariant.slug || "",
                   priceAdjustment: selectedVariant.priceAdjustment ?? 0,
                   isFeatured: selectedVariant.isFeatured ?? false,
+                  isActive: selectedVariant.isActive ?? false,
                   attributeValueIds: (selectedVariant.attributeValues || []).map(
                     (av) => av.valueId
                   ),
@@ -989,6 +991,7 @@ export default function AdminVariantsPage() {
                     slug: formData.slug,
                     priceAdjustment: formData.priceAdjustment ?? 0,
                     isFeatured: formData.isFeatured,
+                    isActive: formData.isActive,
                     attributeValueIds: formData.attributeValueIds || [],
                   };
 

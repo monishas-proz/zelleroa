@@ -53,12 +53,14 @@ export function useAddAttributeValue() {
       value,
       priceAdjustment,
       colorHex,
+      imageUrl,
     }: {
       attributeUuid: string;
       value: string;
       priceAdjustment?: number;
       colorHex?: string;
-    }) => addAttributeValue(attributeUuid, value, priceAdjustment, colorHex),
+      imageUrl?: string;
+    }) => addAttributeValue(attributeUuid, value, priceAdjustment, colorHex, imageUrl),
     onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: attributeKeys.all });
       queryClient.invalidateQueries({ queryKey: attributeKeys.detail(variables.attributeUuid) });
@@ -75,13 +77,15 @@ export function useUpdateAttributeValue() {
       value,
       priceAdjustment,
       colorHex,
+      imageUrl,
     }: {
       attributeUuid: string;
       valueUuid: string;
       value: string;
       priceAdjustment?: number;
       colorHex?: string;
-    }) => updateAttributeValue(attributeUuid, valueUuid, value, priceAdjustment, colorHex),
+      imageUrl?: string;
+    }) => updateAttributeValue(attributeUuid, valueUuid, value, priceAdjustment, colorHex, imageUrl),
     onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: attributeKeys.all });
       queryClient.invalidateQueries({ queryKey: attributeKeys.detail(variables.attributeUuid) });

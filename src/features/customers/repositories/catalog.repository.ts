@@ -24,6 +24,9 @@ import type {
   CustomerVariantUnitPriceDto,
   CustomerItemDto,
   CustomerRelatedVariantDto,
+  CustomerStyleDetailDto,
+  CustomerStyleItemDto,
+  CustomerItemDetailDto,
 } from "../types/catalog.types";
 
 /**
@@ -56,6 +59,12 @@ const unitPriceListArgs = {
     inventories: {
       select: { quantity_available: true },
     },
+    // The Size leaf: admins split a Color into Sizes by pointing each unit
+    // price row at a Size attribute value (S/M/L/XL). Catalogs that still use
+    // this table for pack sizes leave it null and fall back to `measurement`.
+    attribute_value: {
+      select: { uuid: true, value: true },
+    },
   },
   orderBy: [{ is_default: "desc" as const }, { createdAt: "asc" as const }],
 };
@@ -68,6 +77,7 @@ type VariantUnitPriceForDto = {
   is_default: boolean;
   product_units: { id: bigint; uuid: string | null; name: string; code: string; type: string } | null;
   inventories?: { quantity_available: number } | null;
+  attribute_value?: { uuid: string | null; value: string } | null;
 };
 
 function pickDefaultUnitPrice(
@@ -108,10 +118,15 @@ function toVariantListItemDto(
   ).map((up) => {
     const basePrice = Number(up.base_price);
     const stock = up.inventories?.quantity_available ?? 0;
+    const measurement = formatVariantMeasurement(up.product_units, up.unit_value ?? 0);
+    const sizeLabel = up.attribute_value?.value ?? null;
     return {
       id: up.uuid,
       sku: up.sku,
-      measurement: formatVariantMeasurement(up.product_units, up.unit_value ?? 0),
+      measurement,
+      sizeId: up.attribute_value?.uuid ?? null,
+      sizeLabel,
+      label: sizeLabel || formatMeasurementLabel(measurement),
       basePrice,
       sellingPrice: computeSellingPrice(basePrice),
       isDefault: Boolean(up.is_default),
@@ -220,6 +235,118 @@ function toStyleDto(
     variants: variants.map((v) => toVariantListItemDto(v, styleUuid, style.name)),
   };
 }
+
+/**
+ * One Item under a Style, as the storefront sees it: its Colors, each Color's
+ * own images/Sizes/prices/stock, and the price range and stock flags derived
+ * from them. Shared by the Style detail page (which maps every Item through
+ * it) and the standalone Item page.
+ */
+function toStyleItemDto(
+  item: {
+    id: bigint;
+    uuid: string | null;
+    name: string;
+    slug: string;
+    short_description: string | null;
+    description: string | null;
+    is_default: boolean;
+    out_of_stock: boolean;
+    base_price: Prisma.Decimal | number;
+    variants: Array<Parameters<typeof toVariantListItemDto>[0]>;
+    item_attribute_values?: Array<{
+      product_attributes: { name: string };
+      attribute_values: { uuid: string | null; value: string };
+    }> | null;
+  },
+  styleUuid: string,
+  styleImages: CustomerVariantImageDto[]
+): CustomerStyleItemDto {
+  const itemUuid = item.uuid || String(item.id);
+  const colors = item.variants.map((v) => toVariantListItemDto(v, itemUuid, item.name));
+
+  const prices = colors.flatMap((c) => c.unitPrices.map((up) => up.basePrice));
+  // The Item falls back to its default Color's gallery until a Color is
+  // picked; an Item with no Color rows at all falls back to the Style's.
+  const fallbackImages = colors.find((c) => c.images.length > 0)?.images ?? styleImages;
+
+  return {
+    id: itemUuid,
+    styleId: styleUuid,
+    name: item.name,
+    slug: item.slug,
+    shortDescription: item.short_description,
+    description: item.description,
+    isDefault: Boolean(item.is_default),
+    outOfStock: Boolean(item.out_of_stock),
+    image: fallbackImages[0]?.imageUrl ?? null,
+    images: fallbackImages,
+    minPrice: prices.length > 0 ? Math.min(...prices) : Number(item.base_price),
+    maxPrice: prices.length > 0 ? Math.max(...prices) : Number(item.base_price),
+    hasSizes: colors.some((c) => c.unitPrices.some((up) => up.sizeId !== null)),
+    inStock:
+      !item.out_of_stock &&
+      colors.some((c) => !c.outOfStock && c.unitPrices.some((up) => up.inStock)),
+    colors,
+    attributes: (item.item_attribute_values || [])
+      .filter((iav) => {
+        // Color and Size are picked with their own selectors, so they never
+        // belong in the generic extra-attributes list.
+        const name = iav.product_attributes.name.trim().toLowerCase();
+        return name !== "color" && name !== "colour" && name !== "size";
+      })
+      .map((iav) => ({
+        attributeName: iav.product_attributes.name,
+        valueId: iav.attribute_values.uuid || "",
+        value: iav.attribute_values.value,
+      })),
+  };
+}
+
+/**
+ * The Color/Size tree every Item carries, loaded identically for the Style
+ * detail page and the standalone Item page so both render the same thing.
+ * Colors with no priced Size row at all are filtered out - there would be
+ * nothing to sell under them.
+ */
+const styleItemVariantsArgs = {
+  where: {
+    isActive: true,
+    deleted_at: null,
+    variant_unit_prices: {
+      some: { deleted_at: null, isActive: true, base_price: { gt: 0 } },
+    },
+  },
+  include: {
+    product_variant_images: {
+      where: { is_active: true },
+      orderBy: [{ is_primary: "desc" as const }, { sort_order: "asc" as const }],
+    },
+    variant_unit_prices: unitPriceListArgs,
+    variant_attribute_values: {
+      include: {
+        product_attributes: { select: { name: true } },
+        attribute_values: { select: { uuid: true, value: true } },
+      },
+    },
+  },
+  orderBy: [{ is_default: "desc" as const }, { createdAt: "asc" as const }],
+};
+
+/**
+ * Everything one Item needs on the storefront: its Colors (and their Sizes)
+ * plus the Item's own extra attributes - Material, Fit, Pattern and the like,
+ * which are properties of the Item itself rather than of any one Color.
+ */
+const styleItemIncludeArgs = {
+  variants: styleItemVariantsArgs,
+  item_attribute_values: {
+    include: {
+      product_attributes: { select: { name: true } },
+      attribute_values: { select: { uuid: true, value: true } },
+    },
+  },
+};
 
 export const catalogRepository = {
   // ----------------------------------------------------
@@ -921,6 +1048,172 @@ export const catalogRepository = {
       image: imgUrl,
       gender: (style.product.gender as CustomerProductDetailDto["gender"]) ?? null,
       items: [styleDto],
+    };
+  },
+
+  /**
+   * The storefront Style detail page, keyed by the Style UUID the listing card
+   * links to. Unlike `findCustomerProductByUuid` - which flattens every Item's
+   * Colors into one list - this keeps the real
+   * Style -> Item -> Color -> Size tree intact, because the shopper now picks
+   * an Item first and each Color carries its own images, sizes, prices and
+   * stock.
+   */
+  async findCustomerStyleDetailByUuid(uuid: string): Promise<CustomerStyleDetailDto | null> {
+    const style = await db.style.findFirst({
+      where: { uuid, isActive: true, deleted_at: null },
+      include: {
+        product: {
+          select: {
+            id: true,
+            uuid: true,
+            name: true,
+            gender: true,
+            categoryId: true,
+            brand: { select: { id: true, uuid: true, name: true } },
+          },
+        },
+        images: {
+          where: { is_active: true },
+          orderBy: [{ is_primary: "desc" }, { sort_order: "asc" }],
+        },
+        items: {
+          where: { deleted_at: null, isActive: true },
+          include: styleItemIncludeArgs,
+          orderBy: [{ is_default: "desc" }, { createdAt: "asc" }],
+        },
+      },
+    });
+
+    if (!style) return null;
+
+    let categoryDto: { id: string; name: string } | null = null;
+    if (style.product.categoryId) {
+      const cat = await db.productCategory.findFirst({
+        where: { id: style.product.categoryId },
+        select: { id: true, uuid: true, name: true },
+      });
+      if (cat) categoryDto = { id: cat.uuid || String(cat.id), name: cat.name };
+    }
+
+    const styleUuid = style.uuid || String(style.id);
+    const styleImages: CustomerVariantImageDto[] = style.images.map((img, idx) => ({
+      id: img.uuid || String(idx),
+      imageUrl: img.image_url,
+      sortOrder: img.sort_order ?? idx,
+      isPrimary: Boolean(img.is_primary),
+    }));
+
+    const items: CustomerStyleItemDto[] = style.items.map((item) =>
+      toStyleItemDto(item, styleUuid, styleImages)
+    );
+
+    const allPrices = items.flatMap((i) => [i.minPrice, i.maxPrice]).filter((p) => p > 0);
+
+    return {
+      id: styleUuid,
+      name: style.name,
+      slug: style.slug,
+      shortDescription: style.short_description,
+      description: style.description,
+      ingredients: style.ingredients,
+      isReadyToMix: Boolean(style.is_ready_to_mix),
+      cookingRecipe: style.cooking_recipe,
+      shelfLife: style.shelf_life,
+      vegType: (style.veg_type as CustomerStyleDetailDto["vegType"]) || "na",
+      product: {
+        id: style.product.uuid || String(style.product.id),
+        name: style.product.name,
+        gender: (style.product.gender as CustomerStyleDetailDto["product"]["gender"]) ?? null,
+      },
+      brand: style.product.brand
+        ? {
+            id: style.product.brand.uuid || String(style.product.brand.id),
+            name: style.product.brand.name,
+          }
+        : null,
+      category: categoryDto,
+      image: styleImages[0]?.imageUrl ?? items.find((i) => i.image)?.image ?? null,
+      images: styleImages,
+      minPrice: allPrices.length > 0 ? Math.min(...allPrices) : 0,
+      maxPrice: allPrices.length > 0 ? Math.max(...allPrices) : 0,
+      items,
+    };
+  },
+
+  /**
+   * The standalone Item detail page: one Item with its Colors, each Color's
+   * Sizes/prices/stock, and enough Style/Product context for the breadcrumb,
+   * the title and the "more from this style" link. Mirrors exactly what the
+   * Style detail page hands its selected Item, so both render the same view.
+   */
+  async findCustomerItemDetailByUuid(uuid: string): Promise<CustomerItemDetailDto | null> {
+    const item = await db.item.findFirst({
+      where: { uuid, isActive: true, deleted_at: null },
+      include: {
+        ...styleItemIncludeArgs,
+        style: {
+          include: {
+            images: {
+              where: { is_active: true },
+              orderBy: [{ is_primary: "desc" }, { sort_order: "asc" }],
+            },
+            product: {
+              select: {
+                id: true,
+                uuid: true,
+                name: true,
+                gender: true,
+                categoryId: true,
+                brand: { select: { id: true, uuid: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!item || !item.style || !item.style.isActive || item.style.deleted_at) {
+      return null;
+    }
+
+    const style = item.style;
+
+    let categoryDto: { id: string; name: string } | null = null;
+    if (style.product.categoryId) {
+      const cat = await db.productCategory.findFirst({
+        where: { id: style.product.categoryId },
+        select: { id: true, uuid: true, name: true },
+      });
+      if (cat) categoryDto = { id: cat.uuid || String(cat.id), name: cat.name };
+    }
+
+    const styleUuid = style.uuid || String(style.id);
+    const styleImages: CustomerVariantImageDto[] = style.images.map((img, idx) => ({
+      id: img.uuid || String(idx),
+      imageUrl: img.image_url,
+      sortOrder: img.sort_order ?? idx,
+      isPrimary: Boolean(img.is_primary),
+    }));
+
+    return {
+      ...toStyleItemDto(item, styleUuid, styleImages),
+      styleName: style.name,
+      styleSlug: style.slug,
+      styleDescription: style.description,
+      styleShortDescription: style.short_description,
+      product: {
+        id: style.product.uuid || String(style.product.id),
+        name: style.product.name,
+        gender: (style.product.gender as CustomerItemDetailDto["product"]["gender"]) ?? null,
+      },
+      brand: style.product.brand
+        ? {
+            id: style.product.brand.uuid || String(style.product.brand.id),
+            name: style.product.brand.name,
+          }
+        : null,
+      category: categoryDto,
     };
   },
 

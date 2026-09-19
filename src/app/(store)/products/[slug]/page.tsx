@@ -9,9 +9,10 @@ interface ProductDetailPageProps {
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const SITE_NAME = "Zellora";
 
-async function getProductForSeo(slug: string) {
+/** `slug` is the Style UUID - the Style is what the storefront lists and links to. */
+async function getStyleForSeo(slug: string) {
   try {
-    return await catalogService.getProductByUuid(slug);
+    return await catalogService.getStyleByUuid(slug);
   } catch {
     return null;
   }
@@ -21,18 +22,18 @@ export async function generateMetadata({
   params,
 }: ProductDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const product = await getProductForSeo(slug);
+  const style = await getStyleForSeo(slug);
 
-  if (!product) {
+  if (!style) {
     return { title: `Product Not Found | ${SITE_NAME}` };
   }
 
-  const title = `${product.name}${product.brand ? ` by ${product.brand.name}` : ""} | ${SITE_NAME}`;
+  const title = `${style.name}${style.brand ? ` by ${style.brand.name}` : ""} | ${SITE_NAME}`;
   const description =
-    product.description?.slice(0, 160) ||
-    `Shop ${product.name} at ${SITE_NAME}. ${product.category ? `Explore our ${product.category.name} collection.` : ""}`;
+    (style.description || style.shortDescription)?.slice(0, 160) ||
+    `Shop ${style.name} at ${SITE_NAME}. ${style.category ? `Explore our ${style.category.name} collection.` : ""}`;
   const canonicalUrl = `${SITE_URL}/products/${slug}`;
-  const image = product.image || undefined;
+  const image = style.image || undefined;
 
   return {
     title,
@@ -57,28 +58,33 @@ export async function generateMetadata({
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const { slug } = await params;
-  const product = await getProductForSeo(slug);
+  const style = await getStyleForSeo(slug);
 
-  const allVariants = product?.items.flatMap((item) => item.variants) ?? [];
+  // Every sellable Colour+Size row under the Style - that is what an offer
+  // actually quotes a price for.
+  const sellableRows =
+    style?.items.flatMap((item) =>
+      item.colors.flatMap((color) => color.unitPrices)
+    ) ?? [];
 
-  const jsonLd = product
+  const jsonLd = style
     ? {
         "@context": "https://schema.org",
         "@type": "Product",
-        name: product.name,
-        description: product.description || undefined,
-        image: product.image ? [product.image] : undefined,
-        brand: product.brand ? { "@type": "Brand", name: product.brand.name } : undefined,
-        sku: allVariants[0]?.sku,
+        name: style.name,
+        description: style.description || style.shortDescription || undefined,
+        image: style.image ? [style.image] : undefined,
+        brand: style.brand ? { "@type": "Brand", name: style.brand.name } : undefined,
+        sku: sellableRows[0]?.sku,
         offers:
-          allVariants.length > 0
+          sellableRows.length > 0
             ? {
                 "@type": "AggregateOffer",
                 priceCurrency: "INR",
-                lowPrice: Math.min(...allVariants.map((v) => v.salePrice)),
-                highPrice: Math.max(...allVariants.map((v) => v.salePrice)),
-                offerCount: allVariants.length,
-                availability: allVariants.some((v) => !v.outOfStock)
+                lowPrice: Math.min(...sellableRows.map((r) => r.sellingPrice)),
+                highPrice: Math.max(...sellableRows.map((r) => r.sellingPrice)),
+                offerCount: sellableRows.length,
+                availability: sellableRows.some((r) => r.inStock)
                   ? "https://schema.org/InStock"
                   : "https://schema.org/OutOfStock",
               }

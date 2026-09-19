@@ -4,7 +4,7 @@ import React, { useMemo, useEffect, useState, useRef } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Info } from "lucide-react";
+import { Info, ChevronDown } from "lucide-react";
 import type { UnitOption } from "../types";
 import { FormInput } from "@/components/forms/form-input";
 import { FormSelect } from "@/components/forms/form-select";
@@ -23,10 +23,9 @@ const variantFormSchema = z.object({
     .uuid("Invalid Product UUID format")
     .optional(),
   variantName: z
-    .string({ message: "Item name is required" })
+    .string()
     .trim()
-    .min(1, "Item name cannot be empty")
-    .max(100, "Item name cannot exceed 100 characters"),
+    .optional(),
   slug: z
     .string({ message: "Item code is required" })
     .trim()
@@ -34,6 +33,7 @@ const variantFormSchema = z.object({
     .max(255, "Item code cannot exceed 255 characters"),
   priceAdjustment: z.number().optional(),
   isFeatured: z.boolean(),
+  isActive: z.boolean(),
   attributeValueIds: z.array(z.string().uuid()).optional(),
 });
 
@@ -72,7 +72,7 @@ interface VariantFormProps {
 
 function VariantForm({
   initialData,
-  isEditing: _isEditing = false,
+  isEditing = false,
   fixedProductId,
   fixedProductSlug,
   categoryUuid,
@@ -138,6 +138,7 @@ function VariantForm({
       slug: initialData?.slug || "",
       priceAdjustment: initialData?.priceAdjustment ?? 0,
       isFeatured: initialData?.isFeatured ?? false,
+      isActive: initialData?.isActive ?? true,
       attributeValueIds: initialData?.attributeValueIds || [],
     },
   });
@@ -161,6 +162,20 @@ function VariantForm({
   // attribute here, entirely driven by the Attribute Master.
   const { data: productAttributes = [] } = useConfiguredAttributesForProduct(effectiveProductId);
   const { data: sizeChart = [] } = useSizeChart(effectiveCategoryUuid, effectiveProductGender);
+
+  // Derive readable variant name (e.g. "Emerald Green", "Red") from selected color/attribute values (excluding size, which is added per-unit)
+  const selectedAttributeNames = useMemo(() => {
+    if (!watchedAttributeValueIds.length || !productAttributes.length) return "";
+    const names: string[] = [];
+    for (const attr of productAttributes) {
+      if (attr.name.trim().toLowerCase() === "size") continue;
+      const match = attr.values.find((v) => watchedAttributeValueIds.includes(v.id));
+      if (match) {
+        names.push(match.value);
+      }
+    }
+    return names.join(" / ");
+  }, [watchedAttributeValueIds, productAttributes]);
 
   const handleAttributeValueChange = (
     attributeValueIdsForAttribute: string[],
@@ -191,17 +206,18 @@ function VariantForm({
     });
   }, [slugPrefix, extraSlug, methods]);
 
-  // Fill in the Item Code from the Item Name automatically, so most admins
+  // Fill in the Item Code from selected attribute values automatically, so most admins
   // never have to think about it. Stops as soon as they edit the code by hand.
   useEffect(() => {
     if (codeTouched) return;
-    const auto = (watchedVariantName || "")
+    const source = selectedAttributeNames || watchedVariantName || initialData?.variantName || "";
+    const auto = source
       .trim()
       .toUpperCase()
       .replace(/[^A-Z0-9]+/g, "_")
       .replace(/^_+|_+$/g, "");
     setExtraSlug(auto);
-  }, [watchedVariantName, codeTouched]);
+  }, [selectedAttributeNames, watchedVariantName, initialData?.variantName, codeTouched]);
 
   useEffect(() => {
     if (initialData) {
@@ -211,6 +227,7 @@ function VariantForm({
         slug: initialData.slug || "",
         priceAdjustment: initialData.priceAdjustment ?? 0,
         isFeatured: initialData.isFeatured ?? false,
+        isActive: initialData.isActive ?? true,
         attributeValueIds: initialData.attributeValueIds || [],
       });
 
@@ -241,20 +258,26 @@ function VariantForm({
       return;
     }
 
-    if (!extraSlug.trim()) {
-      const msg = "Please enter the Item code (cannot be empty)";
-      setExtraSlugError(msg);
-      methods.setError("slug", {
-        type: "manual",
-        message: msg,
-      });
-      return;
-    }
+    const derivedVariantName =
+      selectedAttributeNames ||
+      data.variantName ||
+      initialData?.variantName ||
+      "Default";
 
-    const finalSlug = `${slugPrefix}${extraSlug.trim()}`;
+    const autoExtra = derivedVariantName
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "COLOR";
+
+    const effectiveExtraSlug = extraSlug.trim() || autoExtra;
+    const finalSlug = (isEditing && !codeTouched && initialData?.slug)
+      ? initialData.slug
+      : `${slugPrefix}${effectiveExtraSlug}`;
 
     const submissionPayload: VariantFormValues = {
       ...data,
+      variantName: derivedVariantName,
       slug: finalSlug,
     };
 
@@ -267,175 +290,21 @@ function VariantForm({
         onSubmit={methods.handleSubmit(handleFormSubmit)}
         className="space-y-6"
       >
-        {/* Row 1: Product & Item Name (or just Item Name if product is fixed) */}
-        {!fixedProductId ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormSelect
-              name="productId"
-              label="Product"
-              placeholder="Select product"
-              options={productOptions}
-              required
-            />
-
-            <FormInput
-              name="variantName"
-              label="Item Name"
-              placeholder="e.g. Floral Maxi Dress, Classic Analog Watch"
-              required
-            />
-          </div>
-        ) : (
-          <FormInput
-            name="variantName"
-            label="Item Name"
-            placeholder="e.g. Floral Maxi Dress, Classic Analog Watch"
+        {/* Product selection (if product is not fixed) */}
+        {!fixedProductId && (
+          <FormSelect
+            name="productId"
+            label="Product"
+            placeholder="Select product"
+            options={productOptions}
             required
           />
         )}
 
-        {/* Row 2: Item Code (Full Width) with Category + Product Code Prefix & Floating Info Pop-Up */}
-        <div className="pt-0 mb-3">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <label className="block text-xs font-semibold text-[var(--color-neutral-800)]">
-              Item Code (fills in automatically) <span className="text-red-500">*</span>
-            </label>
-            <div className="relative inline-flex items-center" ref={infoRef}>
-              <button
-                type="button"
-                onClick={() => setShowInfo((prev) => !prev)}
-                className="text-neutral-400 hover:text-[var(--color-secondary-600)] transition-colors focus:outline-none cursor-pointer rounded-full p-0.5"
-                title="Click for more information"
-                aria-label="Information"
-              >
-                <Info className="h-3.5 w-3.5" />
-              </button>
-
-              {showInfo && (
-                <div className="absolute left-0 top-full mt-1.5 z-50 w-72 sm:w-80 rounded-xl bg-white border border-neutral-200/90 p-3 text-xs text-neutral-700 shadow-xl shadow-neutral-900/10 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-2">
-                      <Info className="h-4 w-4 text-[var(--color-secondary-600)] shrink-0 mt-0.5" />
-                      <p className="leading-relaxed text-[var(--color-neutral-800)]">
-                        This is a short internal code used to identify the item — it fills in
-                        by itself from the Item Name, with the product's code added in front.
-                        You only need to change it if you want a shorter or different code.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowInfo(false)}
-                      className="text-neutral-400 hover:text-neutral-700 font-bold text-sm leading-none ml-1 p-0.5 cursor-pointer"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div
-            className={`flex items-stretch rounded-lg border transition-all ${
-              extraSlugError || methods.formState.errors.slug
-                ? "border-red-500 ring-2 ring-red-500/10"
-                : "border-neutral-200 focus-within:border-secondary-600 focus-within:ring-2 focus-within:ring-secondary-600/20"
-            } bg-white overflow-hidden`}
-          >
-            {/* Non-editable Category + Product Code prefix */}
-            <div
-              className="flex items-center px-3 bg-neutral-100/90 border-r border-neutral-200 text-neutral-600 font-mono text-xs select-none max-w-[60%] shrink-0 truncate"
-              title={
-                slugPrefix
-                  ? `Product Prefix: ${slugPrefix}`
-                  : "Select Product to auto-generate prefix"
-              }
-            >
-              {slugPrefix ? (
-                <span className="font-semibold text-neutral-800 tracking-wide truncate">
-                  {slugPrefix}
-                </span>
-              ) : (
-                <span className="text-neutral-400 italic text-[11px]">
-                  [category_product_code]_
-                </span>
-              )}
-            </div>
-
-            {/* Editable extra code for the variant */}
-            <input
-              type="text"
-              value={extraSlug}
-              onChange={(e) => handleExtraSlugChange(e.target.value)}
-              placeholder="e.g. CLASSIC_MIX"
-              className="flex-1 min-w-0 px-3 py-2 text-sm text-neutral-900 bg-transparent outline-none font-mono placeholder:text-neutral-400 placeholder:font-sans uppercase"
-            />
-          </div>
-
-          {/* Helper message / live preview / error */}
-          <div className="mt-1.5 min-h-[18px]">
-            {extraSlugError || methods.formState.errors.slug?.message ? (
-              <p className="text-xs text-red-500 font-medium">
-                {extraSlugError || methods.formState.errors.slug?.message}
-              </p>
-            ) : (
-              <p className="text-[11px] text-neutral-500 font-mono flex items-center gap-1 flex-wrap">
-                <span className="font-sans font-medium text-neutral-600">Full Code:</span>
-                {slugPrefix || extraSlug ? (
-                  <span className="text-secondary-700 font-semibold bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-200">
-                    {slugPrefix}
-                    <span className={extraSlug ? "text-secondary-800 font-bold" : "text-neutral-400 italic font-normal"}>
-                      {extraSlug || "ENTER_ITEM_CODE"}
-                    </span>
-                  </span>
-                ) : (
-                  <span className="text-neutral-400 italic font-sans">
-                    Select product to generate prefix
-                  </span>
-                )}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-          <div>
-            <label className="block text-xs font-semibold text-[var(--color-neutral-800)] mb-1.5">
-              Price add-on (₹)
-            </label>
-            <FormInput
-              name="priceAdjustment"
-              type="number"
-              step="any"
-              placeholder="e.g. 100"
-            />
-            <p className="mt-1 text-[11px] text-neutral-500">
-              Added on top of the product&apos;s base price whenever this combination is picked.
-              Leave as 0 if it doesn&apos;t change the price.
-            </p>
-          </div>
-          <FormCheckbox
-            name="isFeatured"
-            label="Featured Item"
-            description="Display this item prominently in featured sections"
-          />
-        </div>
-
-        {/* Attribute Values (e.g. Color, Size, Material) — driven entirely by
-            what's configured on the Product (Catalog > Products > Attributes),
-            never by category. Color is just another attribute here: its hex
-            code comes straight from the Attribute Master, never typed by hand.
-            The Size attribute prefers the category+gender size chart (curated
-            order/subset) when one has been configured, but falls back to its
-            full value list otherwise. */}
+        {/* 1. Attribute Values (Color, Fabric, etc. — excluding Size, which is managed in the Sizes & Pricing step) */}
         {(() => {
           const visibleAttributes = productAttributes
-            .map((attribute) => {
-              if (attribute.name.trim().toLowerCase() === "size") {
-                return { ...attribute, values: sizeChart.length > 0 ? sizeChart : attribute.values };
-              }
-              return attribute;
-            })
+            .filter((attribute) => attribute.name.trim().toLowerCase() !== "size")
             .filter((attribute) => attribute.values.length > 0);
 
           if (visibleAttributes.length === 0) {
@@ -449,60 +318,196 @@ function VariantForm({
           }
 
           return (
-          <div>
-            <label className="block text-xs font-semibold text-[var(--color-neutral-800)] mb-1.5">
-              Attributes
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {visibleAttributes.map((attribute) => {
-                const valueIdsForAttribute = attribute.values.map((v) => v.id);
-                const selectedValueId =
-                  watchedAttributeValueIds.find((id) =>
-                    valueIdsForAttribute.includes(id)
-                  ) || "";
-                const isColor = attribute.type === "color";
-                // The Size branch above swaps in size-chart entries (no colorHex field) -
-                // Size is never color-type, so this cast only ever matters when isColor is true.
-                const selectedValue = attribute.values.find((v) => v.id === selectedValueId) as
-                  | { colorHex?: string | null }
-                  | undefined;
+            <div>
+              <label className="block text-xs font-semibold text-[var(--color-neutral-800)] mb-1.5">
+                Select Variation Attributes
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {visibleAttributes.map((attribute) => {
+                  const valueIdsForAttribute = attribute.values.map((v) => v.id);
+                  const selectedValueId =
+                    watchedAttributeValueIds.find((id) =>
+                      valueIdsForAttribute.includes(id)
+                    ) || "";
+                  const isColor = attribute.type === "color";
+                  const selectedValue = attribute.values.find((v) => v.id === selectedValueId) as
+                    | { colorHex?: string | null }
+                    | undefined;
 
-                return (
-                  <div key={attribute.id}>
-                    <label className="block text-xs font-medium text-neutral-600 mb-1">
-                      {attribute.name}
-                      {attribute.isRequired && <span className="text-red-500"> *</span>}
-                    </label>
-                    <div className="flex items-center gap-2">
-                      {isColor && (
-                        <span
-                          className="h-6 w-6 shrink-0 rounded-full border border-neutral-200"
-                          style={{ backgroundColor: selectedValue?.colorHex || "#e5e5e5" }}
-                          title={selectedValue?.colorHex || undefined}
-                        />
-                      )}
-                      <select
-                        value={selectedValueId}
-                        onChange={(e) =>
-                          handleAttributeValueChange(valueIdsForAttribute, e.target.value)
-                        }
-                        className="w-full h-10 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-900 outline-none focus:border-secondary-600 focus:ring-2 focus:ring-secondary-600/20"
-                      >
-                        <option value="">Select {attribute.name}</option>
-                        {attribute.values.map((value) => (
-                          <option key={value.id} value={value.id}>
-                            {value.value}
-                          </option>
-                        ))}
-                      </select>
+                  return (
+                    <div key={attribute.id}>
+                      <label className="block text-xs font-medium text-neutral-600 mb-1">
+                        {attribute.name}
+                        {attribute.isRequired && <span className="text-red-500"> *</span>}
+                      </label>
+                      <div className="flex items-center gap-2">
+                        {isColor && (
+                          <span
+                            className="h-6 w-6 shrink-0 rounded-full border border-neutral-200"
+                            style={{ backgroundColor: selectedValue?.colorHex || "#e5e5e5" }}
+                            title={selectedValue?.colorHex || undefined}
+                          />
+                        )}
+                        <select
+                          value={selectedValueId}
+                          onChange={(e) =>
+                            handleAttributeValueChange(valueIdsForAttribute, e.target.value)
+                          }
+                          className="w-full h-10 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-900 outline-none focus:border-secondary-600 focus:ring-2 focus:ring-secondary-600/20"
+                        >
+                          <option value="">Select {attribute.name}</option>
+                          {attribute.values.map((value) => (
+                            <option key={value.id} value={value.id}>
+                              {value.value}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
           );
         })()}
+
+        {/* 2. Secondary / Advanced Options (Item Code, Price Add-on, Featured) */}
+        <details className="group rounded-xl border border-neutral-200/80 bg-neutral-50/50 p-4 font-sans text-xs">
+          <summary className="flex items-center justify-between font-semibold text-neutral-700 cursor-pointer select-none">
+            <span>Advanced Options (Item Code, Price Add-on, Featured)</span>
+            <ChevronDown className="h-4 w-4 text-neutral-400 group-open:rotate-180 transition-transform" />
+          </summary>
+          <div className="mt-4 space-y-4 pt-3 border-t border-neutral-200/60">
+            {/* Item Code with Category + Product Code Prefix & Info Pop-Up */}
+            <div>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <label className="block text-xs font-semibold text-[var(--color-neutral-800)]">
+                  Item Code (fills in automatically) <span className="text-red-500">*</span>
+                </label>
+                <div className="relative inline-flex items-center" ref={infoRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowInfo((prev) => !prev)}
+                    className="text-neutral-400 hover:text-[var(--color-secondary-600)] transition-colors focus:outline-none cursor-pointer rounded-full p-0.5"
+                    title="Click for more information"
+                    aria-label="Information"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+
+                  {showInfo && (
+                    <div className="absolute left-0 top-full mt-1.5 z-50 w-72 sm:w-80 rounded-xl bg-white border border-neutral-200/90 p-3 text-xs text-neutral-700 shadow-xl shadow-neutral-900/10 animate-in fade-in zoom-in-95 duration-150">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2">
+                          <Info className="h-4 w-4 text-[var(--color-secondary-600)] shrink-0 mt-0.5" />
+                          <p className="leading-relaxed text-[var(--color-neutral-800)]">
+                            This is a short internal code used to identify the item — it fills in
+                            by itself from the selected attribute values, with the product&apos;s code added in front.
+                            You only need to change it if you want a shorter or different code.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowInfo(false)}
+                          className="text-neutral-400 hover:text-neutral-700 font-bold text-sm leading-none ml-1 p-0.5 cursor-pointer"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div
+                className={`flex items-stretch rounded-lg border transition-all ${
+                  extraSlugError || methods.formState.errors.slug
+                    ? "border-red-500 ring-2 ring-red-500/10"
+                    : "border-neutral-200 focus-within:border-secondary-600 focus-within:ring-2 focus-within:ring-secondary-600/20"
+                } bg-white overflow-hidden`}
+              >
+                <div
+                  className="flex items-center px-3 bg-neutral-100/90 border-r border-neutral-200 text-neutral-600 font-mono text-xs select-none max-w-[60%] shrink-0 truncate"
+                  title={
+                    slugPrefix
+                      ? `Product Prefix: ${slugPrefix}`
+                      : "Select Product to auto-generate prefix"
+                  }
+                >
+                  {slugPrefix ? (
+                    <span className="font-semibold text-neutral-800 tracking-wide truncate">
+                      {slugPrefix}
+                    </span>
+                  ) : (
+                    <span className="text-neutral-400 italic text-[11px]">
+                      [category_product_code]_
+                    </span>
+                  )}
+                </div>
+
+                <input
+                  type="text"
+                  value={extraSlug}
+                  onChange={(e) => handleExtraSlugChange(e.target.value)}
+                  placeholder="e.g. CLASSIC_MIX"
+                  className="flex-1 min-w-0 px-3 py-2 text-sm text-neutral-900 bg-transparent outline-none font-mono placeholder:text-neutral-400 placeholder:font-sans uppercase"
+                />
+              </div>
+
+              <div className="mt-1.5 min-h-[18px]">
+                {extraSlugError || methods.formState.errors.slug?.message ? (
+                  <p className="text-xs text-red-500 font-medium">
+                    {extraSlugError || methods.formState.errors.slug?.message}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-neutral-500 font-mono flex items-center gap-1 flex-wrap">
+                    <span className="font-sans font-medium text-neutral-600">Full Code:</span>
+                    {slugPrefix || extraSlug ? (
+                      <span className="text-secondary-700 font-semibold bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-200">
+                        {slugPrefix}
+                        <span className={extraSlug ? "text-secondary-800 font-bold" : "text-neutral-400 italic font-normal"}>
+                          {extraSlug || "ENTER_ITEM_CODE"}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-neutral-400 italic font-sans">
+                        Select product to generate prefix
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Price add-on & Featured Item */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              <div>
+                <label className="block text-xs font-semibold text-[var(--color-neutral-800)] mb-1.5">
+                  Price add-on (₹)
+                </label>
+                <FormInput
+                  name="priceAdjustment"
+                  type="number"
+                  step="any"
+                  placeholder="e.g. 100"
+                />
+                <p className="mt-1 text-[11px] text-neutral-500">
+                  Added on top of the product&apos;s base price. Leave as 0 if price doesn&apos;t change.
+                </p>
+              </div>
+              <FormCheckbox
+                name="isFeatured"
+                label="Featured Item"
+                description="Display this item prominently in featured sections"
+              />
+              <FormCheckbox
+                name="isActive"
+                label="Active"
+                description="Inactive items are hidden from customers"
+              />
+            </div>
+          </div>
+        </details>
 
         <div className="flex justify-end pt-2">
           <FormSubmitButton

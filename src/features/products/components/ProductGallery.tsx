@@ -18,6 +18,11 @@ interface ProductGalleryProps {
   className?: string;
   isVeg?: boolean;
   isInStock?: boolean;
+  /**
+   * The food-catalog quality seal. Off for catalogs where it means nothing
+   * (clothing, accessories); on by default so existing callers are unchanged.
+   */
+  showQualitySeal?: boolean;
 }
 
 function ProductGallery({
@@ -26,6 +31,7 @@ function ProductGallery({
   className,
   isVeg = true,
   isInStock = true,
+  showQualitySeal = true,
 }: ProductGalleryProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -93,12 +99,14 @@ function ProductGallery({
         </div>
 
         {/* Quality Seal */}
-        <div className="absolute top-3.5 right-3.5 z-20">
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-[#8B1D1D]/10 text-[#8B1D1D] border border-[#8B1D1D]/20 shadow-2xs backdrop-blur-xs">
-            <Sparkles className="w-3 h-3 text-[#8B1D1D]" />
-            Traditional
-          </span>
-        </div>
+        {showQualitySeal && (
+          <div className="absolute top-3.5 right-3.5 z-20">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-[#8B1D1D]/10 text-[#8B1D1D] border border-[#8B1D1D]/20 shadow-2xs backdrop-blur-xs">
+              <Sparkles className="w-3 h-3 text-[#8B1D1D]" />
+              Traditional
+            </span>
+          </div>
+        )}
 
         <ProductImage
           src={selected.url}

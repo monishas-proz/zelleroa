@@ -54,6 +54,15 @@ export interface CustomerVariantUnitPriceDto {
   id: string; // VariantUnitPrice UUID - this is what cart/wishlist APIs key off
   sku: string;
   measurement: VariantMeasurement;
+  /**
+   * The Size this row sells, when the Color was split by a Size attribute
+   * (VariantUnitPrice.attribute_value_id). Null for catalogs that use this
+   * table for pack sizes (250g/500g) instead of clothing sizes.
+   */
+  sizeId: string | null;
+  sizeLabel: string | null;
+  /** What the size/pack chip shows: `sizeLabel`, else the measurement label. */
+  label: string;
   basePrice: number;
   sellingPrice: number;
   isDefault: boolean;
@@ -181,4 +190,91 @@ export interface CustomerRelatedVariantDto {
   } | null;
   inStock: boolean;
   stockQuantity: number;
+}
+
+// ---------------------------------------------------------------------------
+// Style -> Item -> Color -> Size storefront flow
+//
+// The listing shows one card per Style; the Style detail page lists the Items
+// under it; picking an Item reveals its Colors, and each Color its own Sizes,
+// each with its own price and stock. These DTOs carry that whole tree in one
+// response so the client never has to re-fetch while the shopper switches
+// Item/Color/Size.
+// ---------------------------------------------------------------------------
+
+/** One Item under a Style, with the Colors the shopper picks between. */
+export interface CustomerStyleItemDto {
+  id: string; // Item UUID
+  styleId: string; // Style UUID
+  name: string;
+  slug: string;
+  shortDescription: string | null;
+  description: string | null;
+  isDefault: boolean;
+  outOfStock: boolean;
+  /** Default image: the default Color's primary image, else the Style's. */
+  image: string | null;
+  /** Shown before a Color is picked, and for Items with no Color split. */
+  images: CustomerVariantImageDto[];
+  minPrice: number;
+  maxPrice: number;
+  /** True when at least one Color carries Sizes (a Size attribute value). */
+  hasSizes: boolean;
+  inStock: boolean;
+  /** One entry per Color (ProductVariant), each with its own images/sizes. */
+  colors: CustomerVariantListItemDto[];
+  /**
+   * The Item's own extra attributes - Material, Fit, Pattern and so on. These
+   * describe the Item as a whole, so they are shown as plain facts rather than
+   * as something to pick; Color and Size are excluded, having their own
+   * selectors. Empty when the Item carries none.
+   */
+  attributes: Array<{ attributeName: string; valueId: string; value: string }>;
+}
+
+/**
+ * One Item on its own page, outside the Style that owns it: the same Item the
+ * Style detail page renders, plus the Style/Product context the standalone
+ * route needs for its breadcrumb, title and description fallbacks.
+ */
+export interface CustomerItemDetailDto extends CustomerStyleItemDto {
+  styleName: string;
+  styleSlug: string;
+  /** Style-level copy, shown when the Item carries none of its own. */
+  styleDescription: string | null;
+  styleShortDescription: string | null;
+  product: {
+    id: string;
+    name: string;
+    gender: "men" | "women" | "kids" | "unisex" | null;
+  };
+  brand: { id: string; name: string } | null;
+  category: { id: string; name: string } | null;
+}
+
+/** A Style with every Item under it - the storefront Style detail page. */
+export interface CustomerStyleDetailDto {
+  id: string; // Style UUID
+  name: string;
+  slug: string;
+  shortDescription: string | null;
+  description: string | null;
+  ingredients: string | null;
+  isReadyToMix: boolean;
+  cookingRecipe: string | null;
+  shelfLife: string | null;
+  vegType: "veg" | "nonveg" | "vegan" | "na";
+  product: {
+    id: string;
+    name: string;
+    gender: "men" | "women" | "kids" | "unisex" | null;
+  };
+  brand: { id: string; name: string } | null;
+  category: { id: string; name: string } | null;
+  /** Style-level gallery, shown until an Item/Color is picked. */
+  image: string | null;
+  images: CustomerVariantImageDto[];
+  minPrice: number;
+  maxPrice: number;
+  items: CustomerStyleItemDto[];
 }

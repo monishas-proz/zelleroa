@@ -544,28 +544,79 @@ function VariantUnitPriceList({
               </p>
 
               {hasDynamicSizes ? (
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-800 mb-1.5">
-                    Size <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={form.sizeValueId}
-                    onChange={(e) => setForm((f) => ({ ...f, sizeValueId: e.target.value }))}
-                    disabled={isBusy || Boolean(editingId)}
-                    className="w-full h-10 px-3 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 disabled:opacity-60 disabled:bg-neutral-100"
-                  >
-                    <option value="">Select size</option>
-                    {availableSizeOptions.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.value}
-                      </option>
-                    ))}
-                  </select>
-                  {editingId && (
-                    <p className="text-[11px] text-neutral-400 mt-1">
-                      Size can&apos;t be changed after creation — delete this row and add a new one instead.
-                    </p>
+                <div className="space-y-3">
+                  {/* Quick Pick Size Chips */}
+                  {!editingId && availableSizeOptions.length > 0 && (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">
+                        Quick Pick Size:
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {availableSizeOptions.map((s) => {
+                          const isSelected = form.sizeValueId === s.id;
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => {
+                                const sizeCode = s.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+                                const baseVariantSlug = (variant?.slug || "VAR").toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+                                const autoSku = `${baseVariantSlug}_${sizeCode}`;
+                                setForm((f) => ({
+                                  ...f,
+                                  sizeValueId: s.id,
+                                  sku: f.sku || autoSku,
+                                  stock: f.stock && f.stock !== "0" ? f.stock : "50",
+                                }));
+                              }}
+                              className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer select-none ${
+                                isSelected
+                                  ? "bg-secondary-600 text-white border-secondary-600 shadow-xs"
+                                  : "bg-white text-neutral-700 border-neutral-200 hover:border-secondary-500 hover:bg-secondary-50"
+                              }`}
+                            >
+                              + {s.value}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-800 mb-1.5">
+                      Size <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={form.sizeValueId}
+                      onChange={(e) => {
+                        const valId = e.target.value;
+                        const sObj = availableSizeOptions.find((s) => s.id === valId);
+                        const sizeCode = sObj ? sObj.value.toUpperCase().replace(/[^A-Z0-9]/g, "") : "";
+                        const baseVariantSlug = (variant?.slug || "VAR").toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+                        const autoSku = sizeCode ? `${baseVariantSlug}_${sizeCode}` : "";
+                        setForm((f) => ({
+                          ...f,
+                          sizeValueId: valId,
+                          sku: f.sku || autoSku,
+                        }));
+                      }}
+                      disabled={isBusy || Boolean(editingId)}
+                      className="w-full h-10 px-3 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 disabled:opacity-60 disabled:bg-neutral-100"
+                    >
+                      <option value="">Select size</option>
+                      {availableSizeOptions.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.value}
+                        </option>
+                      ))}
+                    </select>
+                    {editingId && (
+                      <p className="text-[11px] text-neutral-400 mt-1">
+                        Size can&apos;t be changed after creation — delete this row and add a new one instead.
+                      </p>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -60,12 +60,24 @@ function CartItem({
         : 0)
   );
 
+  // A line is bought under a Style, so that is what it is named and linked by;
+  // the Item name sits beneath it when the Style has more than one Item.
   const productName =
-    typeof item.productName === "string"
+    typeof item.styleName === "string"
+      ? item.styleName
+      : typeof item.productName === "string"
       ? item.productName
       : typeof item.product?.name === "string"
       ? item.product.name
       : "Fashion Item";
+
+  const itemName = typeof item.itemName === "string" ? item.itemName : "";
+
+  // The exact combination this line sells - stored per cart row, so Red/M and
+  // Red/L show as separate lines with their own colour, size and price.
+  const colorName = typeof item.colorName === "string" ? item.colorName : "";
+  const colorHex = typeof item.colorHex === "string" ? item.colorHex : "";
+  const sizeLabel = typeof item.sizeLabel === "string" ? item.sizeLabel : "";
 
   const variantName =
     typeof item.variantName === "string"
@@ -82,8 +94,12 @@ function CartItem({
       ? `${rawMeasurement.value} ${rawMeasurement.unit || ""}`.trim()
       : "";
 
+  // The Style detail page is keyed by the Style UUID, which is what the
+  // storefront listing links to as well.
   const productSlug =
-    typeof item.product?.slug === "string"
+    typeof item.styleId === "string"
+      ? item.styleId
+      : typeof item.product?.slug === "string"
       ? item.product.slug
       : typeof item.slug === "string"
       ? item.slug
@@ -175,15 +191,31 @@ function CartItem({
             )}
           </div>
 
+          {itemName && itemName !== productName && (
+            <p className="mt-0.5 text-xs font-semibold text-theme-text-subtle line-clamp-1">
+              {itemName}
+            </p>
+          )}
+
           <div className="flex flex-wrap items-center gap-2 text-xs text-theme-text-subtle mt-1">
-            {variantName && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-theme-surface-alt border border-theme-border text-theme-primary font-semibold">
-                {variantName}
+            {colorName ? (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-theme-surface-alt border border-theme-border text-theme-primary font-semibold">
+                <span
+                  className="h-2.5 w-2.5 rounded-full border border-theme-border"
+                  style={{ backgroundColor: colorHex || "#e5e5e5" }}
+                />
+                {colorName}
               </span>
+            ) : (
+              variantName && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-theme-surface-alt border border-theme-border text-theme-primary font-semibold">
+                  {variantName}
+                </span>
+              )
             )}
-            {measurement && (
+            {(sizeLabel || measurement) && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-theme-status-out-bg text-theme-status-out-fg font-medium">
-                Size: {measurement}
+                Size: {sizeLabel || measurement}
               </span>
             )}
             {sku && <span className="text-theme-text-muted">SKU: {sku}</span>}

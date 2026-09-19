@@ -1,33 +1,26 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { Clock, ArrowRight } from "lucide-react";
 import { SnackCard } from "./cards/SnackCard";
 import { ProductCardSkeleton } from "./cards/ProductCardSkeleton";
-import { useCustomerVariants } from "@/features/variants";
-import { useAddToCart } from "@/features/cart/hooks/use-cart";
-import {
-  useAddToWishlist,
-  useRemoveFromWishlist,
-  useWishlistedUnitPriceIds,
-} from "@/features/wishlist/hooks/use-wishlist";
-import { mapVariantToStorefrontProduct } from "@/lib/storefront";
-import { type StorefrontProduct } from "@/constants/storefront";
+import { useCustomerStyles } from "@/features/customers/hooks/use-customer-catalog";
+import { formatStylePriceRange, mapStyleToStorefrontProduct } from "@/lib/storefront";
 
 export interface ProductSectionProps {
   selectedCategoryId?: string | null;
 }
 
+/**
+ * The home page listing. It shows one card per Style - never one per Item or
+ * per Colour - so the shopper lands on the Style page and picks the Item,
+ * Colour and Size there, where price and stock are known.
+ */
 export function ProductSection({ selectedCategoryId }: ProductSectionProps) {
-  const router = useRouter();
-  const { data: session } = useSession();
   const [showAll, setShowAll] = React.useState(false);
-  const [toastMessage, setToastMessage] = React.useState<string | null>(null);
 
-  // Fetch variants from the real Customer Catalog API
-  const { data: response, isLoading, isError } = useCustomerVariants({
+  // Style listing from the real Customer Catalog API (POST /api/customer/styles)
+  const { data: response, isLoading, isError } = useCustomerStyles({
     categoryIds: selectedCategoryId ? [selectedCategoryId] : undefined,
     page: 1,
     pageSize: 20,
@@ -35,61 +28,13 @@ export function ProductSection({ selectedCategoryId }: ProductSectionProps) {
     sortOrder: "desc",
   });
 
-  const { wishlistedIds } = useWishlistedUnitPriceIds({ enabled: !!session });
-  const addToCart = useAddToCart();
-  const addToWishlist = useAddToWishlist();
-  const removeFromWishlist = useRemoveFromWishlist();
-
-  const products: StorefrontProduct[] = React.useMemo(() => {
-    return (response?.data ?? []).map(mapVariantToStorefrontProduct);
-  }, [response]);
-
-  const showNotification = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
-
-  const requireLogin = () => {
-    router.push("/login?callbackUrl=/");
-  };
-
-  const handleAddToCart = (product: StorefrontProduct, unitPriceId: string) => {
-    if (!session) return requireLogin();
-    addToCart.mutate(
-      { variantUnitPriceId: unitPriceId, quantity: 1 },
-      {
-        onSuccess: () => showNotification(`Added ${product.name} to cart`),
-        onError: () => showNotification("Could not add item to cart"),
-      }
-    );
-  };
-
-  const handleWishlistToggle = (product: StorefrontProduct, unitPriceId: string) => {
-    if (!session) return requireLogin();
-    if (wishlistedIds.has(unitPriceId)) {
-      removeFromWishlist.mutate(unitPriceId, {
-        onSuccess: () => showNotification(`Removed ${product.name} from wishlist`),
-      });
-    } else {
-      addToWishlist.mutate(unitPriceId, {
-        onSuccess: () => showNotification(`Added ${product.name} to wishlist`),
-      });
-    }
-  };
-
-  const visibleProducts = showAll ? products : products.slice(0, 4);
-  const totalStyles = response?.meta?.total ?? products.length;
+  const styles = React.useMemo(() => response?.data ?? [], [response]);
+  const visibleStyles = showAll ? styles : styles.slice(0, 4);
+  const totalStyles = response?.meta?.total ?? styles.length;
 
   return (
     <section className="relative w-full bg-theme-primary-light/40">
       <div className="w-full max-w-[1400px] 2xl:max-w-[1600px] 3xl:max-w-[1800px] mx-auto px-4 sm:px-6 md:px-8 py-10 sm:py-14">
-        {/* Toast alert feedback */}
-        {toastMessage && (
-          <div className="fixed top-24 right-4 z-50 rounded-xl bg-theme-text-primary text-white px-5 py-3 shadow-xl text-sm font-medium animate-in fade-in-0 duration-200">
-            {toastMessage}
-          </div>
-        )}
-
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-theme-primary">
@@ -104,14 +49,14 @@ export function ProductSection({ selectedCategoryId }: ProductSectionProps) {
             </p>
           </div>
 
-          {!isLoading && products.length > 0 && (
+          {!isLoading && styles.length > 0 && (
             <span className="text-xs font-semibold text-theme-text-subtle">
-              Showing {visibleProducts.length} of {totalStyles} styles
+              Showing {visibleStyles.length} of {totalStyles} styles
             </span>
           )}
         </div>
 
-        {/* Products Grid */}
+        {/* Styles Grid */}
         <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3 lg:grid-cols-4">
           {isLoading &&
             Array.from({ length: 4 }).map((_, index) => (
@@ -119,25 +64,20 @@ export function ProductSection({ selectedCategoryId }: ProductSectionProps) {
             ))}
 
           {!isLoading &&
-            visibleProducts.map((product) => (
+            visibleStyles.map((style) => (
               <SnackCard
-                key={product.id}
-                product={product}
+                key={style.id}
+                product={mapStyleToStorefrontProduct(style)}
+                subtitle={style.category?.name}
+                priceRangeText={formatStylePriceRange(style)}
                 showRating
-                isWishlisted={product.unitPrices.some((u) => wishlistedIds.has(u.id))}
-                onWishlistToggle={(unitPriceId) =>
-                  handleWishlistToggle(product, unitPriceId || product.unitPrices[0]?.id)
-                }
-                onAddToCart={(unitPriceId) =>
-                  handleAddToCart(product, unitPriceId || product.unitPrices[0]?.id)
-                }
-                disabled={addToCart.isPending}
+                viewOnly
               />
             ))}
         </div>
 
         {/* Empty State */}
-        {!isLoading && !isError && products.length === 0 && (
+        {!isLoading && !isError && styles.length === 0 && (
           <div className="py-16 text-center text-sm text-theme-text-subtle">
             <p className="text-base font-medium text-theme-text-primary">
               No items found in this collection.
@@ -149,7 +89,7 @@ export function ProductSection({ selectedCategoryId }: ProductSectionProps) {
         )}
 
         {/* View All Button */}
-        {products.length > 4 && (
+        {styles.length > 4 && (
           <div className="flex justify-center mt-10">
             <button
               type="button"

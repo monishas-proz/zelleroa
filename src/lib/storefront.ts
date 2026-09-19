@@ -1,7 +1,10 @@
 import { SNACKSLOGOS, type StorefrontProduct } from "@/constants/storefront";
-import { getImageUrl } from "@/lib/utils";
+import { formatPrice, getImageUrl } from "@/lib/utils";
 import { formatMeasurementLabel } from "@/features/variants/utils/measurement.util";
-import type { CustomerVariantListItemDto } from "@/features/customers/types";
+import type {
+  CustomerProductListItemDto,
+  CustomerVariantListItemDto,
+} from "@/features/customers/types";
 import type { CartItemResponse } from "@/features/cart/types";
 import type { CustomerWishlistItemDto } from "@/features/wishlist/types";
 
@@ -45,6 +48,39 @@ export function mapVariantToStorefrontProduct(
       isDefault: up.isDefault,
     })),
   };
+}
+
+/**
+ * Maps one storefront Style listing row into the shape the card renders.
+ *
+ * A Style has no single sellable price - Colour and Size decide that - so it
+ * carries no `unitPrices`: the card shows the Style's price range and links
+ * to its detail page instead of adding anything to the cart.
+ */
+export function mapStyleToStorefrontProduct(
+  style: CustomerProductListItemDto
+): StorefrontProduct {
+  const isDummyImage =
+    style.image?.startsWith("/logos/") && style.image?.endsWith(".png");
+
+  return {
+    id: style.id,
+    productId: style.id,
+    name: style.name,
+    image:
+      !isDummyImage && style.image
+        ? getImageUrl(style.image)
+        : resolveSnackFallbackImage(style.name),
+    unitPrices: [],
+  };
+}
+
+/** The "from ₹x" / "₹x - ₹y" line a Style card shows in place of one price. */
+export function formatStylePriceRange(style: CustomerProductListItemDto): string {
+  if (style.maxPrice > style.minPrice) {
+    return `${formatPrice(style.minPrice)} - ${formatPrice(style.maxPrice)}`;
+  }
+  return formatPrice(style.minPrice);
 }
 
 /**

@@ -11,11 +11,12 @@ export const GET = createApiHandler(
   {
     GET: async (_request, context) => {
       const itemUuid = context.params?.itemUuid;
-      if (!itemUuid) {
-        throw ApiError.badRequest("Item UUID is required");
+      const productUuid = context.params?.uuid;
+      if (!itemUuid || !productUuid) {
+        throw ApiError.badRequest("Product and item UUIDs are required");
       }
 
-      const groups = await attributeService.getAttributeValuesForItem(itemUuid);
+      const groups = await attributeService.getAttributeValuesForItem(itemUuid, productUuid);
       return apiSuccess(groups, "Item attribute values fetched successfully");
     },
   },
@@ -30,14 +31,16 @@ export const PUT = createApiHandler(
   {
     PUT: async (_request, context) => {
       const itemUuid = context.params?.itemUuid;
-      if (!itemUuid) {
-        throw ApiError.badRequest("Item UUID is required");
+      const productUuid = context.params?.uuid;
+      if (!itemUuid || !productUuid) {
+        throw ApiError.badRequest("Product and item UUIDs are required");
       }
 
       const body = context.body as SetItemAttributeValuesInput;
       const groups = await attributeService.setAttributeValuesForItem(
         itemUuid,
-        body.attributeValueIds
+        body.attributeValueIds,
+        productUuid
       );
 
       return apiSuccess(groups, "Item attribute values updated successfully");
