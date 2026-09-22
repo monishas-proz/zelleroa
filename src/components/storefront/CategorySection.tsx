@@ -7,6 +7,7 @@ import { SectionHeading } from "./heading/SectionHeading";
 import { Section } from "./Section";
 import { useCustomerCategories, type CustomerCategoryDto } from "@/features/categories";
 import { getImageUrl } from "@/lib/utils";
+import { categoryHref } from "@/features/customers/utils/catalog-listing-query";
 
 const fallbackCategoryLogos: Record<string, string> = {
   "flavors & spices": CATEGORYLOGOS.flavourSpices,
@@ -204,7 +205,7 @@ export function CategorySection() {
     return (
       <Link
         key={`${keyPrefix}-${category.id}-${index}`}
-        href={`/categories/${category.id}`}
+        href={categoryHref(category)}
         className="flex flex-col items-center shrink-0 group cursor-pointer select-none focus:outline-none"
       >
         {/* Circular Avatar Container */}

@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { db } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma";
 import { retireUniqueValue } from "@/lib/utils/retire-unique-value";
@@ -137,14 +138,59 @@ export const itemRepository = {
     });
   },
 
-  async updateByUuid(uuid: string, data: Prisma.ItemUncheckedUpdateInput) {
+  /**
+   * The Item's price is the one price every Color x Size under it sells at.
+   * When it changes, every size row still on the old Item price moves with it
+   * (with a price-history entry); rows the admin deliberately priced
+   * differently on the size table keep their own price.
+   */
+  async updateByUuid(
+    uuid: string,
+    data: Prisma.ItemUncheckedUpdateInput,
+    adminId?: bigint | null
+  ) {
     const existing = await db.item.findFirst({ where: { uuid, deleted_at: null } });
     if (!existing) return null;
 
-    return db.item.update({
-      where: { id: existing.id },
-      data,
-      include: itemInclude,
+    const oldPrice = Number(existing.base_price);
+    const newPrice = data.base_price !== undefined ? Number(data.base_price) : oldPrice;
+
+    return db.$transaction(async (tx) => {
+      if (newPrice !== oldPrice) {
+        const followers = await tx.variantUnitPrice.findMany({
+          where: {
+            deleted_at: null,
+            base_price: oldPrice,
+            variant: { itemId: existing.id, deleted_at: null },
+          },
+          select: { id: true },
+        });
+        if (followers.length > 0) {
+          const now = new Date();
+          await tx.variant_price_history.createMany({
+            data: followers.map((row) => ({
+              uuid: crypto.randomUUID(),
+              variant_unit_price_id: row.id,
+              old_base_price: oldPrice,
+              new_base_price: newPrice,
+              changed_at: now,
+              is_active: true,
+              created_by: adminId ?? null,
+              updated_by: adminId ?? null,
+            })),
+          });
+          await tx.variantUnitPrice.updateMany({
+            where: { id: { in: followers.map((row) => row.id) } },
+            data: { base_price: newPrice, ...(adminId ? { updated_by: adminId } : {}) },
+          });
+        }
+      }
+
+      return tx.item.update({
+        where: { id: existing.id },
+        data,
+        include: itemInclude,
+      });
     });
   },
 

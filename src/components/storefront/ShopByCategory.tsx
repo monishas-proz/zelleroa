@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
@@ -6,18 +7,19 @@ interface CategoryCard {
   name: string;
   subtitle: string;
   tag: string;
+  image: string;
   href?: string;
   cta?: string;
   comingSoon?: boolean;
 }
 
 const CATEGORIES: CategoryCard[] = [
-  { slug: "men", name: "Men", subtitle: "Shirts • T-Shirts • Jeans", tag: "Collection", href: "/men", cta: "Explore" },
-  { slug: "women", name: "Women", subtitle: "Dresses • Tops • Ethnic", tag: "Collection", href: "/women", cta: "Explore" },
-  { slug: "kids", name: "Kids", subtitle: "Boys • Girls • Baby", tag: "Collection", href: "/kids", cta: "Explore" },
-  { slug: "accessories", name: "Accessories", subtitle: "Bags • Watches • Shoes", tag: "Collection", href: "/accessories", cta: "Explore" },
-  { slug: "electronics", name: "Electronics", subtitle: "Audio • Wearables • Smart", tag: "Ecosystem", comingSoon: true, cta: "Pre-launch alerts ready" },
-  { slug: "home-living", name: "Home Living", subtitle: "Decors • Bedding • Kitchen", tag: "Living", comingSoon: true, cta: "Curations dropping soon" },
+  { slug: "men", name: "Men", subtitle: "Shirts • T-Shirts • Jeans", image: "https://images.unsplash.com/photo-1617137968427-85924c800a22?auto=format&fit=crop&w=600&q=80", tag: "Collection", href: "/men", cta: "Explore" },
+  { slug: "women", name: "Women", subtitle: "Dresses • Tops • Ethnic", image: "https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=600&q=80", tag: "Collection", href: "/women", cta: "Explore" },
+  { slug: "kids", name: "Kids", subtitle: "Boys • Girls • Baby", image: "https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?auto=format&fit=crop&w=600&q=80", tag: "Collection", href: "/kids", cta: "Explore" },
+  { slug: "accessories", name: "Accessories", subtitle: "Bags • Watches • Shoes", image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80", tag: "Collection", href: "/accessories", cta: "Explore" },
+  { slug: "electronics", name: "Electronics", subtitle: "Audio • Wearables • Smart", image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80", tag: "Ecosystem", comingSoon: true, cta: "Pre-launch alerts ready" },
+  { slug: "home-living", name: "Home Living", subtitle: "Decors • Bedding • Kitchen", image: "https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?auto=format&fit=crop&w=600&q=80", tag: "Living", comingSoon: true, cta: "Curations dropping soon" },
 ];
 
 export function ShopByCategory() {
@@ -51,8 +53,16 @@ export function ShopByCategory() {
             const CardInner = (
               <>
                 <div className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-gradient-to-br from-slate-700 via-slate-600 to-slate-800">
+                  <Image
+                    src={category.image}
+                    alt={`${category.name} collection`}
+                    fill
+                    sizes="(min-width: 1024px) 16vw, (min-width: 640px) 33vw, 50vw"
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                   {category.comingSoon && (
-                    <span className="absolute left-2.5 top-2.5 rounded bg-theme-primary px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+                    <span className="absolute left-2.5 top-2.5 z-10 rounded bg-theme-primary px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
                       Coming Soon
                     </span>
                   )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { couponKeys } from "@/lib/api/query-keys";
 import { getCoupons, getCoupon } from "../api/get-coupons";
 import type { GetCouponsParams } from "../types";
@@ -15,6 +15,9 @@ export function useCoupons(params?: GetCouponsParams) {
   return useQuery({
     queryKey: couponKeys.list(queryParams),
     queryFn: () => getCoupons(queryParams),
+    // Keep the current rows on screen while the next page/search loads,
+    // instead of dropping the whole table back to a skeleton.
+    placeholderData: keepPreviousData,
   });
 }
 

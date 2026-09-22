@@ -46,6 +46,13 @@ export const itemEntityFormSchema = z.object({
 
 export type ItemEntityFormValues = z.infer<typeof itemEntityFormSchema>;
 
+// When the price is shown it is the Item's one selling price, so it must be set.
+const pricedItemEntityFormSchema = itemEntityFormSchema.extend({
+  basePrice: z
+    .number({ message: "Price is required" })
+    .gt(0, "Price must be more than 0"),
+});
+
 export interface ItemEntityFormProps {
   initialData?: Partial<ItemEntityFormValues>;
   isEditing?: boolean;
@@ -58,6 +65,12 @@ export interface ItemEntityFormProps {
   codePlaceholder?: string;
   /** Where this Item gets auto-selected when it is the default. */
   defaultItemDescription?: string;
+  /**
+   * Only the admin-only Item (e.g. "Regular Fit") asks for a price: it is the
+   * one price every Color x Size under it sells at. A Style never asks - its
+   * "from" price is the cheapest of its Items' sizes.
+   */
+  showPrice?: boolean;
 }
 
 function toItemCode(raw: string): string {
@@ -92,11 +105,12 @@ function ItemEntityForm({
   skuPlaceholder = "e.g. TSHIRT-VNECK",
   codePlaceholder = "e.g. v-neck-t-shirt",
   defaultItemDescription = "Auto-selected on the product page",
+  showPrice = true,
 }: ItemEntityFormProps) {
   const [codeTouched, setCodeTouched] = React.useState<boolean>(() => Boolean(initialData?.slug));
 
   const methods = useForm<ItemEntityFormValues>({
-    resolver: zodResolver(itemEntityFormSchema),
+    resolver: zodResolver(showPrice ? pricedItemEntityFormSchema : itemEntityFormSchema),
     mode: "onChange",
     reValidateMode: "onChange",
     defaultValues: buildDefaults(initialData),
@@ -139,13 +153,16 @@ function ItemEntityForm({
       <form onSubmit={methods.handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormInput name="name" label="Item Name" placeholder={namePlaceholder} required />
-          <FormInput
-            name="basePrice"
-            type="number"
-            label="Base Price"
-            placeholder="e.g. 599"
-            required
-          />
+          {showPrice && (
+            <FormInput
+              name="basePrice"
+              type="number"
+              label="Price (₹)"
+              placeholder="e.g. 599"
+              description="What customers pay for every color and size of this item. Only sizes that cost more or less need their own price later."
+              required
+            />
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

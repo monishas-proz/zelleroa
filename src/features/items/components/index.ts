@@ -1,5 +1,4 @@
 export * from "./ItemForm";
 export * from "./ItemCard";
-export * from "./ItemAttributesPanel";
+export * from "./ItemColorsPanel";
 export * from "./ItemVariantDetails";
-export * from "./ItemColorImagesManager";

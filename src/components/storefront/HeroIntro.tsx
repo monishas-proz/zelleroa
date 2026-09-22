@@ -1,4 +1,5 @@
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Zap, ShieldCheck, RefreshCcw, ArrowRight, ShoppingBag } from "lucide-react";
 
@@ -68,11 +69,14 @@ export function HeroIntro() {
         {/* Right: image + trending card */}
         <div className="relative">
           <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-sm font-semibold uppercase tracking-widest text-white/40">
-                Lifestyle Photo
-              </span>
-            </div>
+            <Image
+              src="https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80"
+              alt="Shopper carrying bags from the new season collection"
+              fill
+              priority
+              sizes="(min-width: 1024px) 50vw, 100vw"
+              className="object-cover"
+            />
           </div>
 
           <div className="absolute -bottom-6 left-4 right-4 sm:left-8 sm:right-auto sm:w-[340px] flex items-center gap-3 rounded-xl border border-theme-border bg-white p-4 shadow-lg">

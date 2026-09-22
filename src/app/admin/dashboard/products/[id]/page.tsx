@@ -11,7 +11,6 @@ import {
   Package,
   Layers,
   Tag,
-  Sparkles,
   Pencil,
   Trash2,
   Eye,
@@ -57,7 +56,6 @@ import {
   VariantCard,
   VariantCustomerPreviewModal,
   VariantUnitPriceList,
-  VariantGenerator,
   type VariantFormValues,
   type UnitFormItem,
 } from "@/features/variants/components";
@@ -71,7 +69,7 @@ import { useStyles, useCreateStyle, useUpdateStyle, useDeleteStyle } from "@/fea
 import { StyleForm, StyleCard, type StyleFormValues } from "@/features/styles/components";
 import type { AdminStyleResponse } from "@/features/styles/types";
 import { useItems, useCreateItem, useUpdateItem, useDeleteItem } from "@/features/items/hooks";
-import { ItemForm, ItemAttributesPanel, type ItemFormValues } from "@/features/items/components";
+import { ItemForm, ItemColorsPanel, type ItemFormValues } from "@/features/items/components";
 import type { AdminItemResponse } from "@/features/items/types";
 
 type VariantFilter = "active" | "inactive";
@@ -280,7 +278,6 @@ export default function AdminProductDetailsPage() {
   // Reference queries for modal form dropdowns (lazy-loaded when modals open)
   const [isEditProductOpen, setIsEditProductOpen] = React.useState(false);
   const [isAddVariantOpen, setIsAddVariantOpen] = React.useState(false);
-  const [isGenerateVariantsOpen, setIsGenerateVariantsOpen] = React.useState(false);
   const [newlyCreatedVariant, setNewlyCreatedVariant] = React.useState<AdminVariantResponse | null>(null);
   const [editingVariant, setEditingVariant] = React.useState<AdminVariantResponse | null>(null);
   const [editVariantTab, setEditVariantTab] = React.useState<"details" | "pricing">("details");
@@ -994,18 +991,20 @@ export default function AdminProductDetailsPage() {
           <section className="bg-white border border-cream-border rounded-lg overflow-hidden">
             <div className="p-3.5 sm:p-4 border-b border-cream-border flex items-center gap-2.5">
               <h2 className="text-base font-bold text-neutral-900 tracking-tight">
-                Item Attributes
+                Colors &amp; Sizes
               </h2>
               <span className="text-xs text-neutral-400 hidden sm:inline">
                 For &ldquo;{items.find((i) => i.id === selectedItemUuid)?.name || "this item"}&rdquo;
               </span>
             </div>
             <div className="p-4">
-              <ItemAttributesPanel
+              <ItemColorsPanel
                 productUuid={canonicalProductId}
                 itemUuid={selectedItemUuid}
-                itemSlug={items.find((i) => i.id === selectedItemUuid)?.slug}
-                onGenerated={() => refetchVariants()}
+                itemName={items.find((i) => i.id === selectedItemUuid)?.name}
+                categoryUuid={product?.categoryId ?? null}
+                onChanged={() => refetchVariants()}
+                onBulkEditPrices={() => setIsPriceEditOpen(true)}
               />
             </div>
           </section>
@@ -1103,16 +1102,6 @@ export default function AdminProductDetailsPage() {
               >
                 <IndianRupee className="w-3.5 h-3.5" />
                 <span>Edit prices</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsGenerateVariantsOpen(true)}
-                className="px-3.5 py-1.5 rounded-md border border-secondary-200 bg-secondary-50 hover:bg-secondary-100 text-secondary-600 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
-                title="Bulk-create Items from Color/Size/etc. combinations"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Generate Variants</span>
               </button>
 
               <button
@@ -1631,24 +1620,6 @@ export default function AdminProductDetailsPage() {
         />
       </FormModal>
 
-      {/* 4b. Generate Variants Modal (bulk Cartesian combination generation) */}
-      <FormModal
-        open={isGenerateVariantsOpen}
-        onClose={() => {
-          setIsGenerateVariantsOpen(false);
-          refetchVariants();
-        }}
-        title="Generate Variants"
-        description={`Create every combination of Color, Size, etc. for ${product.name} in one go`}
-        size="lg"
-      >
-        <VariantGenerator
-          productUuid={canonicalProductId}
-          itemUuid={items.length > 1 ? selectedItemUuid || undefined : undefined}
-          onGenerated={() => refetchVariants()}
-        />
-      </FormModal>
-
       {/* 5. Add Variant Modal */}
       <FormModal
         open={isAddVariantOpen}
@@ -2112,11 +2083,12 @@ export default function AdminProductDetailsPage() {
           )
         ) : (
           <div className="space-y-4">
-            <ItemAttributesPanel
+            <ItemColorsPanel
               productUuid={canonicalProductId}
               itemUuid={newlyCreatedItem.id}
-              itemSlug={newlyCreatedItem.slug}
-              onGenerated={() => refetchVariants()}
+              itemName={newlyCreatedItem.name}
+              categoryUuid={product?.categoryId ?? null}
+              onChanged={() => refetchVariants()}
             />
             <div className="flex justify-end">
               <Button

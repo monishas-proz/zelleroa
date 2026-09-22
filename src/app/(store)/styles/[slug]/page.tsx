@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { catalogService } from "@/features/customers/services/catalog.service";
+import { styleDefaultItemId, itemHref } from "@/features/customers/utils/style-default-item";
 import { StyleDetailClient } from "./StyleDetailClient";
 
 interface StyleDetailPageProps {
@@ -58,6 +60,12 @@ export async function generateMetadata({
 
 export default async function StyleDetailPage({ params }: StyleDetailPageProps) {
   const { slug } = await params;
+  const style = await getStyleForSeo(slug);
+
+  // A Style has no page of its own to pick Items on - it opens its default
+  // Item. Called outside any try/catch: `redirect` works by throwing.
+  const itemId = style ? styleDefaultItemId(style) : null;
+  if (itemId) redirect(itemHref(itemId));
 
   return <StyleDetailClient slug={slug} />;
 }

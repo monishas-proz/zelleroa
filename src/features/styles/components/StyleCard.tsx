@@ -64,11 +64,6 @@ export function StyleCard({ item, isSelected, onSelect, onEdit, onDelete }: Styl
           <span className="text-[10px] text-neutral-400">
             {item.itemCount} item{item.itemCount === 1 ? "" : "s"}
           </span>
-          {item.basePrice > 0 && (
-            <span className="text-[10px] text-neutral-500 font-semibold">
-              ₹{item.basePrice.toFixed(0)}
-            </span>
-          )}
         </div>
       </div>
 

@@ -4,10 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import type { CategoryTreeNode } from "@/features/categories/types";
+import { categoryHref } from "@/features/customers/utils/catalog-listing-query";
 
 interface MobileCategoryAccordionProps {
   nodes: CategoryTreeNode[];
-  path?: string[];
   depth?: number;
   onNavigate?: () => void;
 }
@@ -15,7 +15,6 @@ interface MobileCategoryAccordionProps {
 /** Recursive expand/collapse accordion for the mobile drawer's category tree. */
 export function MobileCategoryAccordion({
   nodes,
-  path = [],
   depth = 0,
   onNavigate,
 }: MobileCategoryAccordionProps) {
@@ -24,8 +23,7 @@ export function MobileCategoryAccordion({
   return (
     <div className={depth > 0 ? "pl-4 border-l border-white/10" : undefined}>
       {nodes.map((node) => {
-        const nodePath = [...path, node.slug];
-        const href = `/${nodePath.join("/")}`;
+        const href = categoryHref(node);
         const hasChildren = node.children.length > 0;
         const isExpanded = expandedId === node.id;
 
@@ -60,7 +58,6 @@ export function MobileCategoryAccordion({
               <div className="bg-black/20 py-1 animate-in fade-in slide-in-from-top-2 duration-200">
                 <MobileCategoryAccordion
                   nodes={node.children}
-                  path={nodePath}
                   depth={depth + 1}
                   onNavigate={onNavigate}
                 />

@@ -182,7 +182,7 @@ export default function AdminCouponsPage() {
     },
   ];
 
-  if (isLoading) return <AdminTableSkeleton />;
+  if (isLoading && !data) return <AdminTableSkeleton />;
   if (error) return <ErrorState message="Failed to load coupons" onRetry={() => refetch()} />;
 
   return (

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { catalogService } from "@/features/customers/services/catalog.service";
+import { styleDefaultItemId, itemHref } from "@/features/customers/utils/style-default-item";
 import { ProductDetailClient } from "./ProductDetailClient";
 
 interface ProductDetailPageProps {
@@ -60,48 +62,11 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   const { slug } = await params;
   const style = await getStyleForSeo(slug);
 
-  // Every sellable Colour+Size row under the Style - that is what an offer
-  // actually quotes a price for.
-  const sellableRows =
-    style?.items.flatMap((item) =>
-      item.colors.flatMap((color) => color.unitPrices)
-    ) ?? [];
+  // A Style is never shown as a page of Items to choose between - each Item
+  // has its own page, so this link opens the Style's default Item. Called
+  // outside any try/catch: `redirect` works by throwing.
+  const itemId = style ? styleDefaultItemId(style) : null;
+  if (itemId) redirect(itemHref(itemId));
 
-  const jsonLd = style
-    ? {
-        "@context": "https://schema.org",
-        "@type": "Product",
-        name: style.name,
-        description: style.description || style.shortDescription || undefined,
-        image: style.image ? [style.image] : undefined,
-        brand: style.brand ? { "@type": "Brand", name: style.brand.name } : undefined,
-        sku: sellableRows[0]?.sku,
-        offers:
-          sellableRows.length > 0
-            ? {
-                "@type": "AggregateOffer",
-                priceCurrency: "INR",
-                lowPrice: Math.min(...sellableRows.map((r) => r.sellingPrice)),
-                highPrice: Math.max(...sellableRows.map((r) => r.sellingPrice)),
-                offerCount: sellableRows.length,
-                availability: sellableRows.some((r) => r.inStock)
-                  ? "https://schema.org/InStock"
-                  : "https://schema.org/OutOfStock",
-              }
-            : undefined,
-      }
-    : null;
-
-  return (
-    <>
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-          // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-      )}
-      <ProductDetailClient slug={slug} />
-    </>
-  );
+  return <ProductDetailClient slug={slug} />;
 }

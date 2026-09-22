@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { ImageWithFallback } from "@/components/common/ImageWithFallback";
 import type { CategoryListItem } from "../types";
+import { categoryHref } from "@/features/customers/utils/catalog-listing-query";
 
 interface CategoryCardProps {
   category: CategoryListItem;
@@ -11,7 +12,7 @@ interface CategoryCardProps {
 
 function CategoryCard({ category }: CategoryCardProps) {
   return (
-    <Link href={`/categories/${category.slug}`}>
+    <Link href={categoryHref({ slug: category.slug, id: String(category.id) })}>
       <Card className="group overflow-hidden transition-shadow hover:shadow-md">
         <div className="relative aspect-video overflow-hidden bg-muted">
           {category.image ? (

@@ -127,7 +127,12 @@ function formatAdminVariantResponse(
     out_of_stock?: boolean;
     createdAt: Date;
     updatedAt: Date;
-    item?: { uuid: string | null; name: string; slug?: string | null } | null;
+    item?: {
+      uuid: string | null;
+      name: string;
+      slug?: string | null;
+      base_price?: Prisma.Decimal | number | null;
+    } | null;
     product_variant_images?: Array<{ image_url: string; is_primary: boolean }> | null;
     variant_unit_prices?: VariantUnitPriceWithRelations[] | null;
     variant_attribute_values?: Array<{
@@ -185,6 +190,7 @@ function formatAdminVariantResponse(
     colorName: variant.color_name ?? null,
     colorHex: variant.color_hex ?? null,
     priceAdjustment: Number(variant.price_adjustment ?? 0),
+    itemPrice: variant.item?.base_price != null ? Number(variant.item.base_price) : undefined,
     isFeatured: Boolean(variant.is_featured),
     primaryImage,
     isActive: Boolean(variant.isActive),
@@ -822,8 +828,7 @@ export const variantService = {
           // This generator supports at most one Size-axis attribute value per
           // row (VariantUnitPrice.attribute_value_id is a single FK); with
           // multiple non-color attributes selected, only the first is used as
-          // the Size identity and the rest are recorded for information only
-          // via price-adjustment in the computed price.
+          // the Size identity and the rest are recorded for information only.
           const sizeEntry = sizeCombo[0];
           const sizeKey = sizeEntry?.valueId.toString();
 
@@ -836,11 +841,10 @@ export const variantService = {
             continue;
           }
 
-          const priceAdjustmentSum = comboTogether.reduce((sum, v) => sum + v.priceAdjustment, 0);
-          const basePrice =
-            data.defaultPrice !== undefined
-              ? data.defaultPrice
-              : itemBasePrice + priceAdjustmentSum;
+          // Every new Color x Size starts at the Item's price - the one place
+          // a price is entered. Sizes that cost more/less are changed on the
+          // size table afterwards.
+          const basePrice = data.defaultPrice ?? itemBasePrice;
 
           const skuBase =
             [skuPart(itemSlug), ...comboTogether.map((v) => skuPart(v.value))]

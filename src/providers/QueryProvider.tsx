@@ -20,7 +20,14 @@ function makeQueryClient() {
         retry: (failureCount, error) => {
           // If 401 Unauthorized, apiClient already performed silent refresh and retry.
           // Do not retry 401s further in React Query to prevent infinite/duplicate loops.
-          if (error instanceof ApiClientError && error.status === 401) {
+          // Any other 4xx is the server rejecting the request itself (not found,
+          // bad input, forbidden) - repeating it just triples the failed traffic
+          // on every page, so only retry network/5xx failures.
+          if (
+            error instanceof ApiClientError &&
+            error.status >= 400 &&
+            error.status < 500
+          ) {
             return false;
           }
           return failureCount < 2;

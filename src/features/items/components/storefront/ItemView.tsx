@@ -44,8 +44,8 @@ interface ItemViewProps {
  * the price together. What goes in the cart is never the Item itself but the
  * exact Colour+Size row selected here.
  *
- * Used both on the standalone Item page and inside the Style page, where the
- * shopper picks an Item first.
+ * Everything shown belongs to this one Item - there is no way to switch to a
+ * sibling Item from here; the shopper goes back to the listing for that.
  */
 export function ItemView({ item, returnUrl, eyebrow, className }: ItemViewProps) {
   const router = useRouter();

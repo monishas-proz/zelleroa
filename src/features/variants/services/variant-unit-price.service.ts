@@ -99,33 +99,13 @@ async function generateSku(
 }
 
 /**
- * Item.base_price + this variant's legacy manual color add-on + every one of
- * its (non-Size) attribute values' own price add-on + the picked Size value's
- * own price add-on — used when an admin leaves "Price" blank instead of
- * typing a fully independent price.
+ * A size row created without a price sells at its Item's price - the one
+ * place a price is entered. Color/size "add-ons" are no longer part of it.
  */
-function computeAutoPrice(
-  variant: {
-    item?: { base_price?: Prisma.Decimal | number | null } | null;
-    price_adjustment?: Prisma.Decimal | number | null;
-    variant_attribute_values?: Array<{
-      attribute_values: { price_adjustment?: Prisma.Decimal | number | null };
-    }> | null;
-  },
-  sizeValuePriceAdjustment?: Prisma.Decimal | number | null
-): number {
-  const itemBase = Number(variant.item?.base_price ?? 0);
-  const legacyColorAdjustment = Number(variant.price_adjustment ?? 0);
-  const attributeAdjustmentsTotal = (variant.variant_attribute_values ?? []).reduce(
-    (sum, vav) => sum + Number(vav.attribute_values.price_adjustment ?? 0),
-    0
-  );
-  return (
-    itemBase +
-    legacyColorAdjustment +
-    attributeAdjustmentsTotal +
-    Number(sizeValuePriceAdjustment ?? 0)
-  );
+function itemPriceOf(variant: {
+  item?: { base_price?: Prisma.Decimal | number | null } | null;
+}): number {
+  return Number(variant.item?.base_price ?? 0);
 }
 
 export const variantUnitPriceService = {
@@ -157,11 +137,11 @@ export const variantUnitPriceService = {
     }
 
     let sizeValueInternalId: bigint | null = null;
-    let sizeValue: { value: string; price_adjustment: Prisma.Decimal | number } | null = null;
+    let sizeValue: { value: string } | null = null;
     if (data.sizeValueId) {
       const resolved = await db.attributeValue.findFirst({
         where: { uuid: data.sizeValueId, is_active: true },
-        select: { id: true, value: true, price_adjustment: true },
+        select: { id: true, value: true },
       });
       if (!resolved) {
         throw ApiError.badRequest("Invalid size attribute value");
@@ -203,10 +183,10 @@ export const variantUnitPriceService = {
 
     let basePrice = data.basePrice;
     if (basePrice === undefined) {
-      basePrice = computeAutoPrice(variant, sizeValue?.price_adjustment);
+      basePrice = itemPriceOf(variant);
       if (basePrice <= 0) {
         throw ApiError.badRequest(
-          "Enter a price, or set a base price / color add-on / size add-on to auto-calculate one"
+          "Enter a price for this size, or set the Item's price first"
         );
       }
     }

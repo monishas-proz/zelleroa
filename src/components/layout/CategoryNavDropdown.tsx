@@ -9,6 +9,7 @@ import { ICONS, CATEGORYLOGOS } from "@/constants/storefront";
 import { useCustomerCategories } from "@/features/customers/hooks/use-customer-catalog";
 import type { CustomerCategoryDto } from "@/features/customers/types/catalog.types";
 import { getImageUrl } from "@/lib/utils";
+import { categoryHref } from "@/features/customers/utils/catalog-listing-query";
 
 const fallbackCategoryLogos: Record<string, string> = {
   "flavors & spices": CATEGORYLOGOS.flavourSpices,
@@ -181,12 +182,12 @@ export function CategoryNavDropdown({
                 {categories.map((category) => {
                   const categoryIcon = resolveCategoryIcon(category);
                   const isCategoryActive =
-                    pathname === `/categories/${category.id}`;
+                    pathname === categoryHref(category);
 
                   return (
                     <Link
                       key={category.id}
-                      href={`/categories/${category.id}`}
+                      href={categoryHref(category)}
                       onClick={() => setIsOpen(false)}
                       className={`
                         w-full flex items-center justify-between px-3 py-2 rounded-xl text-left

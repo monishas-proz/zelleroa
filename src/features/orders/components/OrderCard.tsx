@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronRight, ArrowRight, Package, Calendar } from "lucide-react";
-import { formatDateTime, formatPrice } from "@/lib/utils";
+import { formatDateTime, formatPrice, getImageUrl } from "@/lib/utils";
 import { ProductImage } from "@/components/common/ProductImage";
 import type {
   OrderListItem,
@@ -159,7 +159,7 @@ export function OrderCard({ order }: OrderCardProps) {
                 {/* Product Thumbnail with Fallback */}
                 <div className="relative h-13 w-13 sm:h-14 sm:w-14 rounded-xl border border-theme-border-subtle bg-theme-surface-alt shrink-0 overflow-hidden">
                   <ProductImage
-                    src={imgSrc}
+                    src={imgSrc ? getImageUrl(imgSrc) : null}
                     alt={productName}
                     fallbackText={productName}
                     containerClassName="w-full h-full"

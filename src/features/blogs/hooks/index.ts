@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { blogKeys } from "@/lib/api/query-keys";
 import { getBlogs, getBlog } from "../api/get-blogs";
 import type { GetBlogsParams } from "../types";
@@ -15,6 +15,9 @@ export function useBlogs(params?: GetBlogsParams) {
   return useQuery({
     queryKey: blogKeys.list(queryParams),
     queryFn: () => getBlogs(queryParams),
+    // Keep the current rows on screen while the next page/search loads,
+    // instead of dropping the whole table back to a skeleton.
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { customerCatalogApi } from "../api/customer-catalog.api";
 import type {
@@ -17,6 +17,10 @@ export const CUSTOMER_CATALOG_QUERY_KEYS = {
     [...CUSTOMER_CATALOG_QUERY_KEYS.all, "products", params ?? {}] as const,
   styles: (params?: CustomerProductListInput) =>
     [...CUSTOMER_CATALOG_QUERY_KEYS.all, "styles", params ?? {}] as const,
+  listing: (category: string, queryString: string, pageSize: number) =>
+    [...CUSTOMER_CATALOG_QUERY_KEYS.all, "listing", category, queryString, pageSize] as const,
+  categoryMenu: (category: string) =>
+    [...CUSTOMER_CATALOG_QUERY_KEYS.all, "category-menu", category] as const,
   item: (uuid: string) =>
     [...CUSTOMER_CATALOG_QUERY_KEYS.all, "item", uuid] as const,
   product: (uuid: string) =>
@@ -56,6 +60,37 @@ export function useCustomerProducts(
     placeholderData: keepPreviousData,
     staleTime: 1000 * 60, // 1 minute
     ...options,
+  });
+}
+
+/**
+ * Category page listing, one infinite-scroll page at a time. Keyed by the
+ * category and the filter query string, so each filter combination is cached
+ * on its own and the previous results stay on screen while the next load.
+ */
+export function useCategoryListing(category: string, queryString: string, pageSize = 24) {
+  return useInfiniteQuery({
+    queryKey: CUSTOMER_CATALOG_QUERY_KEYS.listing(category, queryString, pageSize),
+    queryFn: ({ pageParam }) =>
+      customerCatalogApi.getCategoryListing({ category, queryString, page: pageParam, pageSize }),
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.meta && last.meta.page < last.meta.totalPages ? last.meta.page + 1 : undefined,
+    placeholderData: keepPreviousData,
+    staleTime: 1000 * 60,
+  });
+}
+
+/**
+ * Header menu preview for a category - its Products and their Items. Only
+ * fetched once the menu opens (`enabled`), then cached.
+ */
+export function useCategoryMenu(category: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: CUSTOMER_CATALOG_QUERY_KEYS.categoryMenu(category),
+    queryFn: () => customerCatalogApi.getCategoryMenu(category),
+    enabled: !!category && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 5,
   });
 }
 

@@ -40,6 +40,22 @@ export const orderItemInclude = Prisma.validator<Prisma.OrderItemInclude>()({
       id: true,
       uuid: true,
       name: true,
+      images: {
+        where: { is_active: true },
+        orderBy: [{ is_primary: "desc" }, { sort_order: "asc" }],
+        take: 1,
+      },
+    },
+  },
+  // Direct variant link — variant_unit_price is nullable, so it can't be the
+  // only path to the color's images.
+  variant: {
+    select: {
+      product_variant_images: {
+        where: { is_active: true },
+        orderBy: [{ is_primary: "desc" }, { sort_order: "asc" }],
+        take: 1,
+      },
     },
   },
   variant_unit_price: {
@@ -153,8 +169,11 @@ export function formatOrderItem(
     unitPrice?.unit_value ?? 0
   );
 
+  // Most specific first: color (variant) → Style gallery → product.
   const primaryImage =
     variant?.product_variant_images?.[0]?.image_url ||
+    item.variant?.product_variant_images?.[0]?.image_url ||
+    item.style?.images?.[0]?.image_url ||
     item.product?.images?.[0]?.image_url ||
     null;
 

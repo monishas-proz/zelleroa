@@ -62,9 +62,14 @@ const reviewInclude = {
 export const reviewRepository = {
   async findProductByIdentifier(identifier: string) {
     const isNum = !isNaN(Number(identifier)) && !identifier.includes("-");
+    // Storefront cards are Styles, not Products, so the id they carry is a
+    // Style uuid/slug. Resolve those to the owning Product instead of 404ing -
+    // reviews are stored at product level and that is what the card renders.
     const orConditions: Prisma.ProductWhereInput[] = [
       { uuid: identifier },
       { slug: identifier },
+      { styles: { some: { uuid: identifier, deleted_at: null } } },
+      { styles: { some: { slug: identifier, deleted_at: null } } },
     ];
     if (isNum) {
       orConditions.push({ id: BigInt(identifier) });

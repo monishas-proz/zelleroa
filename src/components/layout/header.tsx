@@ -15,8 +15,18 @@ import { useCustomerWishlistCount } from "@/features/customers/hooks/use-custome
 import { useCustomerCartCount } from "@/features/customers/hooks/use-customer-cart";
 import { useCustomerProfile } from "@/features/customers/hooks/use-customer-profile";
 import { useCategoryTree } from "@/features/categories/hooks";
+import { categoryHref } from "@/features/customers/utils/catalog-listing-query";
+import type { CategoryTreeNode } from "@/features/categories/types";
 import { MegaMenu } from "./MegaMenu";
 import { MobileCategoryAccordion } from "./MobileCategoryAccordion";
+
+/** True when the current page is this category's listing or one of its descendants'. */
+function isInCategoryTree(node: CategoryTreeNode, pathname: string): boolean {
+  return (
+    pathname.toLowerCase() === categoryHref(node).toLowerCase() ||
+    node.children.some((child) => isInCategoryTree(child, pathname))
+  );
+}
 
 export function Header() {
   const [isOpen, setIsOpen] = React.useState(false);
@@ -175,8 +185,7 @@ export function Header() {
             <MegaMenu
               key={root.id}
               root={root}
-              path={[root.slug]}
-              isActive={pathname === `/${root.slug}` || pathname.startsWith(`/${root.slug}/`)}
+              isActive={isInCategoryTree(root, pathname)}
             />
           ))}
 

@@ -43,6 +43,7 @@ function StyleForm({
       skuPlaceholder="e.g. TSHIRT-VNECK"
       codePlaceholder="e.g. v-neck-t-shirt"
       defaultItemDescription="Auto-selected on the product page"
+      showPrice={false}
       onSubmit={(data: ItemEntityFormValues) =>
         onSubmit({ ...data, cookingRecipe: initialData?.cookingRecipe ?? "" })
       }

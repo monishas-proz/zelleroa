@@ -9,6 +9,7 @@ import type {
   CustomerStyleDetailDto,
   CustomerItemDetailDto,
 } from "../types/catalog.types";
+import type { CategoryListingDto, CategoryMenuDto } from "../types/catalog-listing.types";
 import type {
   CustomerBrandListInput,
   CustomerCategoryListInput,
@@ -112,6 +113,42 @@ export const customerCatalogApi = {
       data: response.data ?? [],
       meta: response.meta as PaginationMeta | undefined,
     };
+  },
+
+  /**
+   * Category page listing: a page of Style cards plus the category's own
+   * filters. `queryString` is the storefront page's filter query string
+   * (see `serializeListingQuery`), forwarded unchanged.
+   * GET /api/customer/catalog/listing
+   */
+  async getCategoryListing(params: {
+    category: string;
+    queryString: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{ data: CategoryListingDto; meta: PaginationMeta }> {
+    const qs = new URLSearchParams(params.queryString);
+    qs.set("category", params.category);
+    qs.set("page", String(params.page));
+    qs.set("pageSize", String(params.pageSize));
+    const response = await apiClient.get<CategoryListingDto>(
+      `/api/customer/catalog/listing?${qs.toString()}`
+    );
+    return {
+      data: response.data!,
+      meta: response.meta as PaginationMeta,
+    };
+  },
+
+  /**
+   * Header menu preview: Products (with their Items) under a category.
+   * GET /api/customer/catalog/menu?category=
+   */
+  async getCategoryMenu(category: string): Promise<CategoryMenuDto> {
+    const response = await apiClient.get<CategoryMenuDto>(
+      `/api/customer/catalog/menu?category=${encodeURIComponent(category)}`
+    );
+    return response.data ?? { products: [] };
   },
 
   /**

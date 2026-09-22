@@ -25,6 +25,8 @@ interface UnitPriceRowFormState {
   unitValue: string;
   sku: string;
   basePrice: string;
+  /** Sell this size at the Item's price (the default) instead of its own. */
+  useItemPrice: boolean;
   stock: string;
   isDefault: boolean;
   isActive: boolean;
@@ -36,6 +38,7 @@ const emptyRow: UnitPriceRowFormState = {
   unitValue: "",
   sku: "",
   basePrice: "",
+  useItemPrice: true,
   stock: "0",
   isDefault: false,
   isActive: true,
@@ -96,19 +99,9 @@ function VariantUnitPriceList({
     units.find((u: AdminUnitResponse) => u.isActive) ??
     null;
 
-  // Legacy manual "Color price add-on" field on the item itself, plus every
-  // attribute value this item has (Color, Fabric, ... whatever the product
-  // uses) - each configured independently under Catalog > Attributes.
-  const legacyColorAdjustment = Number(variant?.priceAdjustment ?? 0);
-  const attributeAdjustments = variant?.attributeValues ?? [];
-  const attributeAdjustmentsTotal = attributeAdjustments.reduce(
-    (sum, av) => sum + Number(av.priceAdjustment ?? 0),
-    0
-  );
-  const sizeValuePriceAdjustment = (sizeValueId: string): number => {
-    if (sizeChart.length > 0) return 0; // size chart entries don't carry a price add-on
-    return Number(sizeAttribute?.values.find((v) => v.id === sizeValueId)?.priceAdjustment ?? 0);
-  };
+  // The Item's price is the one price entered for the whole Item; a size only
+  // carries a price of its own when it genuinely costs more or less.
+  const itemPrice = variant?.itemPrice && variant.itemPrice > 0 ? variant.itemPrice : null;
 
   const createMutation = useCreateVariantUnitPrice();
   const updateMutation = useUpdateVariantUnitPrice();
@@ -128,18 +121,6 @@ function VariantUnitPriceList({
 
   const selectedUnit = units.find((u: AdminUnitResponse) => u.id === form.unitId);
   const fieldConfig = getMeasurementFieldConfig(selectedUnit ?? null);
-
-  const autoCalcTotal =
-    legacyColorAdjustment +
-    attributeAdjustmentsTotal +
-    (hasDynamicSizes && form.sizeValueId ? sizeValuePriceAdjustment(form.sizeValueId) : 0);
-  const hasAutoCalcInputs = autoCalcTotal !== 0;
-  const autoCalcBreakdown = [
-    ...(legacyColorAdjustment !== 0 ? [`color +₹${legacyColorAdjustment}`] : []),
-    ...attributeAdjustments
-      .filter((av) => Number(av.priceAdjustment ?? 0) !== 0)
-      .map((av) => `${av.attributeName} +₹${av.priceAdjustment}`),
-  ].join(", ");
 
   // Sizes already used by another row for this Color, excluded from the "add"
   // dropdown so the same Size can't be picked twice (the server also rejects
@@ -166,7 +147,7 @@ function VariantUnitPriceList({
   };
 
   const startAdd = () => {
-    setForm(emptyRow);
+    setForm({ ...emptyRow, useItemPrice: itemPrice !== null });
     setFormError(null);
     setEditingId(null);
     setIsAdding(true);
@@ -179,6 +160,7 @@ function VariantUnitPriceList({
       unitValue: String(item.unitValue ?? ""),
       sku: item.sku,
       basePrice: String(item.basePrice ?? ""),
+      useItemPrice: itemPrice !== null && item.basePrice === itemPrice,
       stock: String(item.stock ?? 0),
       isDefault: item.isDefault,
       isActive: item.isActive,
@@ -264,19 +246,15 @@ function VariantUnitPriceList({
       setFormError("SKU is required");
       return;
     }
-    const trimmedBasePrice = form.basePrice.trim();
-    let basePrice: number | undefined;
-    if (trimmedBasePrice !== "") {
-      basePrice = Number(trimmedBasePrice);
-      if (Number.isNaN(basePrice) || basePrice < 0) {
-        setFormError("Base price must be a non-negative number");
+    let basePrice: number;
+    if (form.useItemPrice && itemPrice !== null) {
+      basePrice = itemPrice;
+    } else {
+      basePrice = Number(form.basePrice.trim());
+      if (form.basePrice.trim() === "" || Number.isNaN(basePrice) || basePrice <= 0) {
+        setFormError("Enter the price for this size");
         return;
       }
-    } else if (!editingId && !hasAutoCalcInputs) {
-      setFormError(
-        "Enter a price, or set a color/size price add-on first so it can be auto-calculated"
-      );
-      return;
     }
     const stock = Number(form.stock);
     if (Number.isNaN(stock) || stock < 0 || !Number.isInteger(stock)) {
@@ -289,7 +267,7 @@ function VariantUnitPriceList({
       unitValue,
       ...(hasDynamicSizes ? { sizeValueId: form.sizeValueId } : {}),
       sku: form.sku.trim(),
-      ...(basePrice !== undefined ? { basePrice } : {}),
+      basePrice,
       stock,
       isDefault: form.isDefault,
       isActive: form.isActive,
@@ -408,8 +386,19 @@ function VariantUnitPriceList({
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
-                <span className="text-sm font-bold text-secondary-900 font-mono">
-                  ₹{item.basePrice.toLocaleString("en-IN")}
+                <span className="flex flex-col items-end leading-tight">
+                  <span className="text-sm font-bold text-secondary-900 font-mono">
+                    ₹{item.basePrice.toLocaleString("en-IN")}
+                  </span>
+                  {itemPrice !== null && (
+                    <span
+                      className={`text-[10px] font-semibold ${
+                        item.basePrice === itemPrice ? "text-neutral-400" : "text-amber-700"
+                      }`}
+                    >
+                      {item.basePrice === itemPrice ? "Item price" : "Own price"}
+                    </span>
+                  )}
                 </span>
 
                 <span
@@ -539,7 +528,7 @@ function VariantUnitPriceList({
             <div className="p-6 bg-cream-50/60 space-y-4">
               <p className="text-xs text-neutral-500 -mt-1">
                 {hasDynamicSizes
-                  ? "Add one row for every Size you sell this color in — e.g. S, M, L and XL — each with its own price, SKU and stock. Different colors can have different sizes."
+                  ? "Add one row for every Size you sell this color in — e.g. S, M, L and XL — with its SKU and stock. Each size sells at the Item's price unless you give it its own."
                   : "Add one row for every option you sell this item in — e.g. 250 Grams, 500 Grams and 1 Kilogram — each with its own price, SKU and stock."}
               </p>
 
@@ -697,7 +686,25 @@ function VariantUnitPriceList({
                   <label className="block text-xs font-semibold text-neutral-800 mb-1.5">
                     Price {hasDynamicSizes ? "" : "per pack"} (₹)
                   </label>
-                  <div className="flex gap-2">
+                  {itemPrice !== null && (
+                    <label className="mb-2 inline-flex items-center gap-2 text-xs font-medium text-neutral-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.useItemPrice}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            useItemPrice: e.target.checked,
+                            basePrice: e.target.checked ? "" : f.basePrice || String(itemPrice),
+                          }))
+                        }
+                        disabled={isBusy}
+                        className="w-4 h-4 accent-secondary-600"
+                      />
+                      Same as item price (₹{itemPrice.toLocaleString("en-IN")})
+                    </label>
+                  )}
+                  {(itemPrice === null || !form.useItemPrice) && (
                     <input
                       type="number"
                       step="any"
@@ -705,31 +712,16 @@ function VariantUnitPriceList({
                       value={form.basePrice}
                       onChange={(e) => setForm((f) => ({ ...f, basePrice: e.target.value }))}
                       disabled={isBusy}
-                      placeholder={
-                        hasAutoCalcInputs ? `auto = ₹${autoCalcTotal}` : "e.g. 260"
-                      }
+                      placeholder="e.g. 649"
                       className="w-full h-10 px-3 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary-600/20 focus:border-secondary-600 disabled:opacity-60 disabled:bg-neutral-100"
                     />
-                    {hasAutoCalcInputs && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={isBusy}
-                        onClick={() =>
-                          setForm((f) => ({ ...f, basePrice: String(autoCalcTotal) }))
-                        }
-                        className="h-10 shrink-0 text-xs font-semibold whitespace-nowrap"
-                        title="Fill from this item's attribute value price add-ons"
-                      >
-                        Auto-fill ₹{autoCalcTotal}
-                      </Button>
-                    )}
-                  </div>
+                  )}
                   <p className="text-[11px] text-neutral-400 mt-1">
-                    {hasAutoCalcInputs
-                      ? `Leave blank to auto-calculate from this color/size's price add-ons (${autoCalcBreakdown}, plus the product's base price).`
-                      : "What customer pays for this option. Leave blank to use the product's base price as-is."}
+                    {itemPrice === null
+                      ? "What the customer pays for this option."
+                      : form.useItemPrice
+                        ? "Follows the Item's price - change it there and this size moves with it."
+                        : "Only for a size that costs more or less than the rest, e.g. XXL."}
                   </p>
                 </div>
               </div>

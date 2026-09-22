@@ -282,7 +282,7 @@ export const itemService = {
       }
     }
 
-    const updated = await itemRepository.updateByUuid(itemUuid, updateData);
+    const updated = await itemRepository.updateByUuid(itemUuid, updateData, adminId);
     if (!updated) {
       throw ApiError.notFound("Item not found");
     }

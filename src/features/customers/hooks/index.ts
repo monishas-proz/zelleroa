@@ -49,6 +49,7 @@ export {
   useCustomerProducts,
   useCustomerProduct,
   useCustomerStyles,
+  useCategoryListing,
   useCustomerStyle,
   useCustomerItem,
   useCustomerCategories,

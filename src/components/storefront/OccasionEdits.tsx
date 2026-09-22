@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
@@ -8,6 +9,7 @@ interface Edit {
   description: string;
   href: string;
   gradient: string;
+  image: string;
 }
 
 const EDITS: Edit[] = [
@@ -18,6 +20,7 @@ const EDITS: Edit[] = [
     description: "Breathable fabrics and effortless silhouettes built for all-day wear.",
     href: "/products",
     gradient: "from-stone-400 via-stone-300 to-stone-200",
+    image: "https://images.unsplash.com/photo-1516762689617-e1cffcef479d?auto=format&fit=crop&w=800&q=80",
   },
   {
     slug: "weekend",
@@ -26,6 +29,7 @@ const EDITS: Edit[] = [
     description: "Smart-casual layers and vibrant tones for relaxed outings and travel.",
     href: "/products",
     gradient: "from-amber-700 via-amber-600 to-amber-500",
+    image: "https://images.unsplash.com/photo-1488161628813-04466f872be2?auto=format&fit=crop&w=800&q=80",
   },
   {
     slug: "festive",
@@ -34,6 +38,7 @@ const EDITS: Edit[] = [
     description: "Traditional craftsmanship reimagined with contemporary cuts for celebratory events.",
     href: "/products?sortBy=discount",
     gradient: "from-slate-900 via-purple-950 to-slate-900",
+    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80",
   },
 ];
 
@@ -60,6 +65,13 @@ export function OccasionEdits() {
               href={edit.href}
               className={`group relative flex aspect-[3/4] flex-col justify-end overflow-hidden rounded-xl bg-gradient-to-br ${edit.gradient} p-5`}
             >
+              <Image
+                src={edit.image}
+                alt={edit.title}
+                fill
+                sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                className="object-cover transition-transform duration-500 group-hover:scale-105"
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
 
               <div className="relative">

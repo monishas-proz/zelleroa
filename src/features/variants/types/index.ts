@@ -84,8 +84,13 @@ export interface AdminVariantResponse {
   slug: string;
   colorName: string | null;
   colorHex: string | null;
-  /** Amount added to the product base price whenever this color is picked. */
+  /**
+   * @deprecated no longer part of any price. A color has no price of its own:
+   * sizes sell at `itemPrice` unless given their own price on the size table.
+   */
   priceAdjustment: number;
+  /** The parent Item's price - what every size of this color sells at by default. */
+  itemPrice?: number;
   isFeatured: boolean;
   primaryImage: string | null;
   isActive: boolean;

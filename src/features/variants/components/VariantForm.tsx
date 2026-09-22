@@ -6,7 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Info, ChevronDown } from "lucide-react";
 import type { UnitOption } from "../types";
-import { FormInput } from "@/components/forms/form-input";
 import { FormSelect } from "@/components/forms/form-select";
 import { FormCheckbox } from "@/components/forms/form-checkbox";
 import { FormSubmitButton } from "@/components/forms/form-submit-button";
@@ -371,10 +370,12 @@ function VariantForm({
           );
         })()}
 
-        {/* 2. Secondary / Advanced Options (Item Code, Price Add-on, Featured) */}
+        {/* 2. Secondary / Advanced Options (Item Code, Featured). A color never
+            carries a price of its own - price lives on the Item, and on a
+            size row only when that size costs more or less. */}
         <details className="group rounded-xl border border-neutral-200/80 bg-neutral-50/50 p-4 font-sans text-xs">
           <summary className="flex items-center justify-between font-semibold text-neutral-700 cursor-pointer select-none">
-            <span>Advanced Options (Item Code, Price Add-on, Featured)</span>
+            <span>Advanced Options (Item Code, Featured)</span>
             <ChevronDown className="h-4 w-4 text-neutral-400 group-open:rotate-180 transition-transform" />
           </summary>
           <div className="mt-4 space-y-4 pt-3 border-t border-neutral-200/60">
@@ -479,22 +480,8 @@ function VariantForm({
               </div>
             </div>
 
-            {/* Price add-on & Featured Item */}
+            {/* Featured & Active */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              <div>
-                <label className="block text-xs font-semibold text-[var(--color-neutral-800)] mb-1.5">
-                  Price add-on (₹)
-                </label>
-                <FormInput
-                  name="priceAdjustment"
-                  type="number"
-                  step="any"
-                  placeholder="e.g. 100"
-                />
-                <p className="mt-1 text-[11px] text-neutral-500">
-                  Added on top of the product&apos;s base price. Leave as 0 if price doesn&apos;t change.
-                </p>
-              </div>
               <FormCheckbox
                 name="isFeatured"
                 label="Featured Item"

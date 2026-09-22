@@ -165,7 +165,7 @@ export default function AdminBlogsPage() {
     },
   ];
 
-  if (isLoading) return <AdminTableSkeleton />;
+  if (isLoading && !data) return <AdminTableSkeleton />;
   if (error) return <ErrorState message="Failed to load blogs" onRetry={() => refetch()} />;
 
   return (

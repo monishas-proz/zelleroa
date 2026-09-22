@@ -30,6 +30,7 @@ import { ProductReviewsSection } from "@/features/reviews/components/ProductRevi
 import type { CustomerProductDetailDto, CustomerItemDto, CustomerVariantListItemDto } from "../types";
 import { sanitizeRichText } from "@/lib/sanitize-html";
 import { toast } from "@/components/ui/Toast";
+import { categoryHref } from "@/features/customers/utils/catalog-listing-query";
 
 interface ProductDetailsProps {
   product: CustomerProductDetailDto;
@@ -451,7 +452,7 @@ function ProductDetails({ product }: ProductDetailsProps) {
           <div className="flex flex-wrap items-center gap-2">
             {product.category && (
               <Link
-                href={`/categories/${product.category.id}`}
+                href={categoryHref(product.category)}
                 className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-[#8B1D1D]/10 text-[#8B1D1D] hover:bg-[#8B1D1D]/20 transition-colors"
               >
                 {product.category.name}

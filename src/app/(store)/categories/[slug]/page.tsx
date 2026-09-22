@@ -1,82 +1,21 @@
-import type { Metadata } from "next";
-import { catalogService } from "@/features/customers/services/catalog.service";
-import { CategoryProductsClient } from "./CategoryProductsClient";
+import { redirect } from "next/navigation";
 
-interface CategoryPageProps {
+interface LegacyCategoryPageProps {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-const SITE_NAME = "Zellora";
-
-async function getCategoryForSeo(slug: string) {
-  if (slug === "all") return null;
-  try {
-    return await catalogService.getCategoryByUuid(slug);
-  } catch {
-    return null;
+/**
+ * `/categories/:slug` is the old listing URL. The listing now lives at
+ * `/category/:slug`; keep old links (and their filters) working.
+ */
+export default async function LegacyCategoryPage({ params, searchParams }: LegacyCategoryPageProps) {
+  const [{ slug }, rawSearchParams] = await Promise.all([params, searchParams]);
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(rawSearchParams)) {
+    if (Array.isArray(value)) value.forEach((v) => qs.append(key, v));
+    else if (value !== undefined) qs.set(key, value);
   }
-}
-
-export async function generateMetadata({
-  params,
-}: CategoryPageProps): Promise<Metadata> {
-  const { slug } = await params;
-  const category = await getCategoryForSeo(slug);
-
-  const title = category
-    ? `${category.name} | ${SITE_NAME}`
-    : `Shop All Collections | ${SITE_NAME}`;
-  const description = category
-    ? `Shop the ${category.name} collection at ${SITE_NAME} - handcrafted fashion and premium fabrics curated with care.`
-    : `Browse the full ${SITE_NAME} collection - premium fashion, watches, and lifestyle pieces.`;
-  const canonicalUrl = `${SITE_URL}/categories/${slug}`;
-
-  return {
-    title,
-    description,
-    alternates: { canonical: canonicalUrl },
-    openGraph: {
-      title,
-      description,
-      url: canonicalUrl,
-      siteName: SITE_NAME,
-      type: "website",
-      images: category?.image ? [{ url: category.image }] : undefined,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: category?.image ? [category.image] : undefined,
-    },
-  };
-}
-
-export default async function CategoryPage({ params }: CategoryPageProps) {
-  const { slug } = await params;
-  const category = await getCategoryForSeo(slug);
-
-  const jsonLd = category
-    ? {
-        "@context": "https://schema.org",
-        "@type": "CollectionPage",
-        name: category.name,
-        url: `${SITE_URL}/categories/${slug}`,
-        isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
-      }
-    : null;
-
-  return (
-    <>
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-          // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-      )}
-      <CategoryProductsClient slug={slug} />
-    </>
-  );
+  const suffix = qs.toString();
+  redirect(`/category/${encodeURIComponent(slug)}${suffix ? `?${suffix}` : ""}`);
 }

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
@@ -8,6 +9,14 @@ export function PromoBanner() {
     <section className="w-full bg-white">
       <div className="w-full max-w-[1400px] 2xl:max-w-[1600px] 3xl:max-w-[1800px] mx-auto px-4 sm:px-6 md:px-8 py-8 sm:py-10">
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-6 py-12 sm:py-16 text-center">
+          <Image
+            src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1600&q=80"
+            alt=""
+            fill
+            sizes="(min-width: 1400px) 1400px, 100vw"
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-slate-900/80" />
           <div className="pointer-events-none absolute -left-10 top-1/2 h-56 w-56 -translate-y-1/2 rounded-full bg-white/5 blur-3xl" />
           <div className="pointer-events-none absolute -right-10 top-1/3 h-56 w-56 -translate-y-1/2 rounded-full bg-theme-primary/20 blur-3xl" />
 

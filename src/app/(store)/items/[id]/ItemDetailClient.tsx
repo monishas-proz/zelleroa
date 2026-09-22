@@ -6,6 +6,7 @@ import { ItemViewSkeleton } from "@/features/items/components/storefront/ItemVie
 import { ErrorState } from "@/components/ui/error-state";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { categoryHref } from "@/features/customers/utils/catalog-listing-query";
 
 export function ItemDetailClient({ itemId }: { itemId: string }) {
   const { data: item, isLoading, error, refetch } = useCustomerItem(itemId);
@@ -42,9 +43,10 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
         items={[
           { label: "Products", href: "/products" },
           ...(item.category
-            ? [{ label: item.category.name, href: `/categories/${item.category.id}` }]
+            ? [{ label: item.category.name, href: categoryHref(item.category) }]
             : []),
-          { label: item.styleName, href: `/styles/${item.styleId}` },
+          // No link to the Style: it would open a different Item. The shopper
+          // goes back to the category listing to pick another one.
           { label: item.name },
         ]}
       />
