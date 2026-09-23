@@ -1114,7 +1114,7 @@ function ProductDetails({ product }: ProductDetailsProps) {
           </div>
           <div>
             <h4 className="text-xs sm:text-sm font-bold text-[#2B1B17] uppercase tracking-wide">FREE SHIPPING</h4>
-            <p className="text-xs text-stone-500 mt-0.5">On all orders above ₹999</p>
+            <p className="text-xs text-stone-500 mt-0.5">Across Tamil Nadu · ₹80 other states</p>
           </div>
         </div>
 
@@ -1124,7 +1124,7 @@ function ProductDetails({ product }: ProductDetailsProps) {
           </div>
           <div>
             <h4 className="text-xs sm:text-sm font-bold text-[#2B1B17] uppercase tracking-wide">FAST DELIVERY</h4>
-            <p className="text-xs text-stone-500 mt-0.5">Delivered in 3–5 days pan-India</p>
+            <p className="text-xs text-stone-500 mt-0.5">Delivered in 3–7 days pan-India</p>
           </div>
         </div>
 

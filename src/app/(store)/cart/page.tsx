@@ -144,8 +144,9 @@ export default function CartPage() {
     subtotal,
     discount: 0,
     tax: 0,
-    shippingCharge: subtotal >= 500 || subtotal === 0 ? 0 : 40,
-    grandTotal: subtotal + (subtotal >= 500 || subtotal === 0 ? 0 : 40),
+    // Delivery depends on the destination state, which is only known at checkout.
+    shippingCharge: 0,
+    grandTotal: subtotal,
     totalItems: totalItemsCount,
   };
 

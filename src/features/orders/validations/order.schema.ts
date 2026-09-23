@@ -223,6 +223,7 @@ export const checkoutSummarySchema = z
   .object({
     deliveryMethod: z.string().optional().default("STANDARD"),
     couponCode: z.string().trim().max(50).optional(),
+    shippingAddressId: z.string().optional(),
   })
   .passthrough();
 

@@ -13,6 +13,8 @@ function formatStyleListRow(style: Awaited<ReturnType<typeof styleRepository.fin
     productSlug: style.product?.slug ?? "",
     categoryId: style.product?.categoryId ? String(style.product.categoryId) : null,
     categoryName: null,
+    brandId: style.brand?.uuid ?? null,
+    brandName: style.brand?.name ?? null,
     name: style.name,
     slug: style.slug,
     sku: style.sku,

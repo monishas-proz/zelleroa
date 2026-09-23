@@ -10,6 +10,7 @@ import { cartRepository } from "@/features/cart/repositories/cart.repository";
 import { generateAccessToken, generateRefreshToken } from "@/lib/auth/jwt";
 import { getAttributingAgent } from "@/lib/referral/agent-attribution";
 import { orderRepository } from "../repositories/order.repository";
+import { getShippingCharge } from "../shipping";
 import type {
   OrderDetailResponse,
   OrderListItemResponse,
@@ -254,9 +255,9 @@ export const orderService = {
 
 
 
-    // Free delivery is judged on what the customer actually pays, after offers and coupon.
+    // Delivery is free within Tamil Nadu and a flat charge for every other state.
     const payableBeforeShipping = subtotal - totalDiscount;
-    const shippingCharge = payableBeforeShipping >= 499 ? 0 : 49;
+    const shippingCharge = getShippingCharge(shippingAddress.state);
     const totalAmount = payableBeforeShipping + shippingCharge;
 
     // Commission attribution: referral_agent cookie takes priority over the
@@ -773,7 +774,8 @@ export const orderService = {
   async getCheckoutSummary(
     userId: number | string | bigint,
     deliveryMethod?: string,
-    couponCode?: string
+    couponCode?: string,
+    shippingAddressId?: string
   ) {
     const user = await userRepository.findById(String(userId));
     if (!user || !user.internalId) throw ApiError.unauthorized("User not found");
@@ -797,7 +799,24 @@ export const orderService = {
     }));
 
     const pricing = await offerService.priceCartItems(lines);
-    const deliveryCharge = deliveryMethod === "EXPRESS" || deliveryMethod === "express" ? 100 : 0;
+    // Delivery depends on the destination state; until an address is chosen
+    // there is nothing to charge yet, and order creation recomputes it anyway.
+    const isAddressNumeric = !!shippingAddressId && /^\d+$/.test(shippingAddressId);
+    const shippingAddress = shippingAddressId
+      ? await db.customerAddress.findFirst({
+          where: {
+            userId: user.internalId,
+            is_active: true,
+            deleted_at: null,
+            OR: [
+              { uuid: shippingAddressId },
+              ...(isAddressNumeric ? [{ id: BigInt(shippingAddressId) }] : []),
+            ],
+          },
+          select: { state: true },
+        })
+      : null;
+    const deliveryCharge = shippingAddress ? getShippingCharge(shippingAddress.state) : 0;
 
     let couponResult: { code: string; discount: number } | null = null;
     let couponError: string | null = null;

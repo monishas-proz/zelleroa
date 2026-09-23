@@ -38,7 +38,7 @@ export default function CheckoutPaymentPage() {
     isLoading: summaryLoading,
     error: summaryError,
     refetch: refetchSummary,
-  } = useCheckoutSummary(checkout.deliveryMethod, checkout.couponCode);
+  } = useCheckoutSummary(checkout.deliveryMethod, checkout.couponCode, checkout.addressId);
 
   if (status === "loading" || cartLoading || addressesLoading) {
     return <LoadingState text="Loading payment..." />;

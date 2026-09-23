@@ -120,9 +120,9 @@ export function Header() {
       {/* Top promo bar */}
       <div className="w-full bg-[var(--brown-600)] text-white text-[11px] sm:text-xs font-medium">
         <div className="w-full max-w-[1400px] 2xl:max-w-[1600px] 3xl:max-w-[1800px] mx-auto px-4 sm:px-6 md:px-8 h-8 flex items-center justify-center gap-2 sm:gap-6 text-center">
-          <span className="truncate">Free Shipping Across India on Orders Above ₹999</span>
+          <span className="truncate">Free Delivery Across Tamil Nadu · ₹80 for Other States</span>
           <span className="hidden sm:inline text-white/40">|</span>
-          <span className="hidden sm:inline truncate">Express 48-Hour Delivery in Metro Cities</span>
+          <span className="hidden sm:inline truncate">Delivered in 3–7 Days</span>
           <span className="hidden md:inline text-white/40">|</span>
           <span className="hidden md:inline truncate">Easy 15-Day Hassle-Free Returns</span>
         </div>

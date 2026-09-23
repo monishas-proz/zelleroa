@@ -6,11 +6,39 @@ import { cartService } from "@/features/cart/services/cart.service";
 import { orderService } from "@/features/orders/services/order.service";
 import { getRazorpayClient, getRazorpayPublicKey } from "../config/razorpay.config";
 import { paymentRepository } from "../repositories/payment.repository";
+import { getShippingCharge } from "@/features/orders/shipping";
 import type {
   CreateRazorpayOrderInput,
   VerifyRazorpayPaymentInput,
   RazorpayOrderResponse,
 } from "../validations/payment.schema";
+
+/**
+ * Delivery charge for the customer's chosen address - must match what
+ * orderService.createCustomerOrder charges once the payment is verified.
+ */
+async function resolveShippingCharge(userId: number | bigint, shippingAddressId?: string) {
+  if (!shippingAddressId) {
+    throw ApiError.badRequest("Please select a delivery address before paying.");
+  }
+  const isNumeric = /^\d+$/.test(shippingAddressId);
+  const address = await db.customerAddress.findFirst({
+    where: {
+      userId,
+      is_active: true,
+      deleted_at: null,
+      OR: [
+        { uuid: shippingAddressId },
+        ...(isNumeric ? [{ id: BigInt(shippingAddressId) }] : []),
+      ],
+    },
+    select: { state: true },
+  });
+  if (!address) {
+    throw ApiError.badRequest("Shipping address not found or does not belong to customer");
+  }
+  return getShippingCharge(address.state);
+}
 
 export const razorpayService = {
   /**
@@ -39,7 +67,7 @@ export const razorpayService = {
       }
 
       const payableBeforeShipping = cart.total;
-      const shippingCharge = payableBeforeShipping >= 499 ? 0 : 49;
+      const shippingCharge = await resolveShippingCharge(userId, input.shippingAddressId);
       const payableAmount = payableBeforeShipping + shippingCharge;
       if (payableAmount <= 0) {
         throw ApiError.badRequest("Invalid cart payable amount.");
@@ -492,7 +520,7 @@ export const razorpayService = {
       throw ApiError.badRequest("Your cart is empty. Please add items before checking out.");
 
     const payableBeforeShipping = cart.total;
-    const shippingCharge = payableBeforeShipping >= 499 ? 0 : 49;
+    const shippingCharge = await resolveShippingCharge(userId, input.shippingAddressId);
     const payableAmount = payableBeforeShipping + shippingCharge;
     if (payableAmount <= 0) throw ApiError.badRequest("Invalid cart amount.");
 
