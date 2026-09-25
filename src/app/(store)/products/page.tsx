@@ -74,6 +74,17 @@ export default function ShopAllPage() {
       ? (raw as GenderFilter)
       : undefined;
   });
+  // Nav links change only `?gender=` on this same route, so the page stays
+  // mounted and the initial state above never re-runs - follow the URL.
+  const urlGender = searchParams.get("gender");
+  useEffect(() => {
+    setGenderFilter(
+      (VALID_GENDERS as readonly string[]).includes(urlGender ?? "")
+        ? (urlGender as GenderFilter)
+        : undefined
+    );
+    setPage(1);
+  }, [urlGender]);
   const [sortKey, setSortKey] = useState("createdAt_desc");
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
@@ -274,7 +285,7 @@ export default function ShopAllPage() {
             </Link>
             <ChevronRight className="w-3.5 h-3.5" />
             <span className="text-[#7A6258]">
-              Products
+              Shop All
             </span>
             {selectedCategoryIds.length === 1 && currentCategory && (
               <>
@@ -288,7 +299,7 @@ export default function ShopAllPage() {
               <>
                 <ChevronRight className="w-3.5 h-3.5" />
                 <span className="font-bold text-[#2D1810]">
-                  {selectedCategoryIds.length} Categories
+                  Selected Collections
                 </span>
               </>
             )}

@@ -227,7 +227,7 @@ export const catalogListingRepository = {
    * each with its live Items (across all its Styles). Only Items with a
    * sellable Colour are included - the same rule the listing applies.
    */
-  async findMenuProducts(params: { categoryIds: bigint[]; take: number }) {
+  async findMenuProducts(params: { categoryIds: bigint[]; take: number; gender?: "men" | "women" | "kids" | "unisex" }) {
     const sellableItemWhere = {
       deleted_at: null,
       isActive: true,
@@ -245,6 +245,12 @@ export const catalogListingRepository = {
         isActive: true,
         deleted_at: null,
         categoryId: { in: params.categoryIds },
+        ...(params.gender
+          ? {
+              gender:
+                params.gender === "unisex" ? "unisex" : { in: [params.gender, "unisex"] },
+            }
+          : {}),
         styles: { some: { isActive: true, deleted_at: null, items: { some: sellableItemWhere } } },
       },
       orderBy: { createdAt: "desc" },

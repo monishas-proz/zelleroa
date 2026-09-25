@@ -30,7 +30,9 @@ const productFormSchema = z.object({
   hsnCodeId: z
     .string()
     .min(1, "Please select an HSN code"),
-  gender: z.enum(["men", "women", "kids", "unisex"]).optional(),
+  gender: z.enum(["men", "women", "kids", "unisex"], {
+    message: "Please select a gender / audience",
+  }),
   productImage: z.string().optional(),
 });
 
@@ -126,7 +128,7 @@ function ProductForm({
       categoryId: initialData?.categoryId || "",
       brandId: defaultBrandId,
       hsnCodeId: initialData?.hsnCodeId || "",
-      gender: initialData?.gender || "unisex",
+      gender: initialData?.gender || ("" as ProductFormValues["gender"]),
       productImage: initialImageUrl || "",
     },
   });
@@ -337,6 +339,7 @@ function ProductForm({
             label="Gender / Audience"
             placeholder="Select audience"
             options={GENDER_OPTIONS}
+            required
           />
         </div>
 

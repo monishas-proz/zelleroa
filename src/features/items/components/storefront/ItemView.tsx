@@ -1,8 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Heart, Loader2, Minus, Plus, ShoppingBag } from "lucide-react";
+import {
+  Heart,
+  Loader2,
+  Minus,
+  PackageCheck,
+  Plus,
+  RotateCcw,
+  ShoppingBag,
+  Video,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/Toast";
 import { ProductGallery } from "@/features/products/components/ProductGallery";
@@ -154,32 +164,34 @@ export function ItemView({ item, returnUrl, eyebrow, className }: ItemViewProps)
         {/* 1. Gallery - keyed on the Colour so it resets to the first image of
             whichever Colour is selected. */}
         <div className="lg:col-span-6">
-          <ProductGallery
-            key={selectedColor?.id ?? item.id}
-            images={galleryImages}
-            productName={item.name}
-            isInStock={inStock}
-            isVeg={false}
-            showQualitySeal={false}
-          />
+          <div className="overflow-hidden rounded-2xl border border-theme-border bg-theme-surface shadow-sm">
+            <ProductGallery
+              key={selectedColor?.id ?? item.id}
+              images={galleryImages}
+              productName={item.name}
+              isInStock={inStock}
+              isVeg={false}
+              showQualitySeal={false}
+            />
+          </div>
         </div>
 
         <div className="space-y-6 lg:col-span-6">
           {/* 2. Name, with the 10. rating summary beside it */}
           <div className="space-y-2">
             {eyebrow && (
-              <p className="text-xs font-bold uppercase tracking-wide text-theme-text-subtle">
+              <span className="inline-flex rounded-full bg-theme-primary-light px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-theme-primary">
                 {eyebrow}
-              </p>
+              </span>
             )}
-            <h1 className="text-2xl font-bold leading-tight text-theme-text-primary sm:text-3xl">
+            <h1 className="text-2xl font-bold leading-tight tracking-tight text-theme-text-primary sm:text-3xl">
               {item.name}
             </h1>
 
             {reviewCount > 0 && (
               <a
                 href="#item-reviews"
-                className="inline-flex items-center gap-2 text-sm text-theme-text-subtle hover:text-theme-text-primary"
+                className="inline-flex items-center gap-2 rounded-full text-sm text-theme-text-subtle transition-colors hover:text-theme-primary"
               >
                 <ReviewRatingStars rating={averageRating} size="sm" showScore />
                 <span>
@@ -201,7 +213,7 @@ export function ItemView({ item, returnUrl, eyebrow, className }: ItemViewProps)
             size={selectedSize}
             minPrice={item.minPrice}
             maxPrice={item.maxPrice}
-            className="border-y border-theme-border-subtle py-4"
+            className="py-4"
           />
 
           {/* 4. Colour */}
@@ -223,24 +235,28 @@ export function ItemView({ item, returnUrl, eyebrow, className }: ItemViewProps)
           )}
 
           {/* 6. Extra attributes */}
-          <ItemAttributeFacts item={item} selectedColor={selectedColor} />
+          <ItemAttributeFacts
+            item={item}
+            selectedColor={selectedColor}
+            selectedSize={selectedSize}
+          />
 
           {/* 9. Quantity and add to cart */}
           <div className="space-y-3 pt-2">
             {purchasable && purchasable.stock <= 5 && (
-              <p className="text-sm font-semibold text-amber-700">
+              <p className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700">
                 Only {purchasable.stock} left in stock
               </p>
             )}
 
             <div className="flex items-center gap-3">
-              <div className="flex h-12 items-center rounded-xl border border-theme-border">
+              <div className="flex h-12 items-center rounded-xl border border-theme-border bg-theme-surface shadow-sm">
                 <button
                   type="button"
                   onClick={() => setQuantity(quantity - 1)}
                   disabled={quantity <= 1}
                   aria-label="Decrease quantity"
-                  className="flex h-full w-10 cursor-pointer items-center justify-center text-theme-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex h-full w-10 cursor-pointer items-center justify-center text-theme-text-primary transition-colors hover:text-theme-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-theme-text-primary"
                 >
                   <Minus className="h-4 w-4" />
                 </button>
@@ -252,7 +268,7 @@ export function ItemView({ item, returnUrl, eyebrow, className }: ItemViewProps)
                   onClick={() => setQuantity(quantity + 1)}
                   disabled={!purchasable || quantity >= maxQuantity}
                   aria-label="Increase quantity"
-                  className="flex h-full w-10 cursor-pointer items-center justify-center text-theme-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex h-full w-10 cursor-pointer items-center justify-center text-theme-text-primary transition-colors hover:text-theme-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-theme-text-primary"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
@@ -262,7 +278,7 @@ export function ItemView({ item, returnUrl, eyebrow, className }: ItemViewProps)
                 type="button"
                 onClick={handleAddToCart}
                 disabled={addToCart.isPending || !inStock}
-                className="h-12 flex-1 rounded-xl text-base font-semibold"
+                className="h-12 flex-1 rounded-xl text-base font-semibold shadow-md shadow-theme-primary/20 transition-all hover:shadow-lg hover:shadow-theme-primary/30"
               >
                 {addToCart.isPending ? (
                   <>
@@ -283,7 +299,12 @@ export function ItemView({ item, returnUrl, eyebrow, className }: ItemViewProps)
                 onClick={handleWishlistToggle}
                 disabled={wishlistPending}
                 aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
-                className="h-12 w-12 shrink-0 rounded-xl"
+                className={cn(
+                  "h-12 w-12 shrink-0 rounded-xl shadow-sm transition-colors",
+                  isInWishlist
+                    ? "border-rose-200 bg-rose-50 hover:bg-rose-100"
+                    : "hover:border-rose-200 hover:bg-rose-50"
+                )}
               >
                 {wishlistPending ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -300,14 +321,45 @@ export function ItemView({ item, returnUrl, eyebrow, className }: ItemViewProps)
 
       {/* 8. Detailed description */}
       {description && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-bold text-theme-text-primary">Description</h2>
+        <section className="space-y-4 rounded-2xl border border-theme-border bg-theme-surface p-5 shadow-sm sm:p-6">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-theme-text-primary">
+            <span className="h-5 w-1 rounded-full bg-theme-primary" />
+            Description
+          </h2>
           <div
             className="prose prose-sm max-w-none text-theme-text-secondary"
             dangerouslySetInnerHTML={{ __html: sanitizeRichText(description) }}
           />
         </section>
       )}
+
+      {/* Return details, shown on every Item */}
+      <section className="space-y-4 rounded-2xl border border-theme-border bg-theme-surface p-5 shadow-sm sm:p-6">
+        <h2 className="flex items-center gap-2 text-lg font-bold text-theme-text-primary">
+          <span className="h-5 w-1 rounded-full bg-theme-primary" />
+          Returns &amp; Refunds
+        </h2>
+        <ul className="space-y-2 text-sm text-theme-text-secondary">
+          <li className="flex items-start gap-2.5">
+            <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-theme-primary" />
+            Raise a return request within 3 days of delivery.
+          </li>
+          <li className="flex items-start gap-2.5">
+            <Video className="mt-0.5 h-4 w-4 shrink-0 text-theme-primary" />
+            A complete unboxing video is required with your request.
+          </li>
+          <li className="flex items-start gap-2.5">
+            <PackageCheck className="mt-0.5 h-4 w-4 shrink-0 text-theme-primary" />
+            Eligible for wrong, damaged, size or quality issues.
+          </li>
+        </ul>
+        <Link
+          href="/return-refund-policy"
+          className="inline-block text-sm font-semibold text-theme-primary hover:underline"
+        >
+          View full return &amp; refund policy
+        </Link>
+      </section>
 
       {/* 10. Reviews and ratings, for the Colour on screen */}
       <section id="item-reviews" className="scroll-mt-24">

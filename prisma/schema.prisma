@@ -197,6 +197,8 @@ model User {
   permissions_permissions_created_byTousers                           Permission[]               @relation("permissions_created_byTousers")
   permissions_permissions_updated_byTousers                           Permission[]               @relation("permissions_updated_byTousers")
   pincode_serviceability_pincode_serviceability_created_byTousers     pincode_serviceability[]   @relation("pincode_serviceability_created_byTousers")
+  header_menu_items_header_menu_items_created_byTousers                HeaderMenuItem[]           @relation("header_menu_items_created_byTousers")
+  header_menu_items_header_menu_items_updated_byTousers                HeaderMenuItem[]           @relation("header_menu_items_updated_byTousers")
   pincode_serviceability_pincode_serviceability_updated_byTousers     pincode_serviceability[]   @relation("pincode_serviceability_updated_byTousers")
   product_attribute_values_product_attribute_values_created_byTousers product_attribute_values[] @relation("product_attribute_values_created_byTousers")
   product_attribute_values_product_attribute_values_updated_byTousers product_attribute_values[] @relation("product_attribute_values_updated_byTousers")
@@ -342,12 +344,50 @@ model ProductCategory {
   offer_categories                           offer_categories[]
   coupon_categories                          coupon_categories[]
   size_charts                                size_charts[]
+  headerMenuLinks                            HeaderMenuItemCategory[]
 
   @@index([parentId], map: "fk_cat_parent")
   @@index([created_by], map: "fk_categories_created_by")
   @@index([updated_by], map: "fk_categories_updated_by")
   @@index([slug], map: "idx_cat_slug")
   @@map("product_categories")
+}
+
+model HeaderMenuItem {
+  id                                          BigInt                   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                                        String?                  @default("UUID()") @db.VarChar(255)
+  label                                       String                   @db.VarChar(150)
+  link                                        String?                  @db.VarChar(500)
+  /** Audience this nav item targets - appended as ?gender= on every link it resolves to. */
+  gender                                      products_gender?
+  sortOrder                                   Int                      @default(0) @map("sort_order")
+  isActive                                    Boolean                  @default(true) @map("is_active")
+  createdAt                                   DateTime                 @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                                   DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  deleted_at                                  DateTime?                @db.Timestamp(0)
+  created_by                                  BigInt?                  @db.UnsignedBigInt
+  updated_by                                  BigInt?                  @db.UnsignedBigInt
+  categories                                  HeaderMenuItemCategory[]
+  users_header_menu_items_created_byTousers   User?                    @relation("header_menu_items_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_header_menu_created_by")
+  users_header_menu_items_updated_byTousers   User?                    @relation("header_menu_items_updated_byTousers", fields: [updated_by], references: [id], onUpdate: NoAction, map: "fk_header_menu_updated_by")
+
+  @@index([created_by], map: "fk_header_menu_created_by")
+  @@index([updated_by], map: "fk_header_menu_updated_by")
+  @@map("header_menu_items")
+}
+
+model HeaderMenuItemCategory {
+  id               BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
+  headerMenuItemId BigInt          @map("header_menu_item_id") @db.UnsignedBigInt
+  categoryId       BigInt          @map("category_id") @db.UnsignedBigInt
+  sortOrder        Int             @default(0) @map("sort_order")
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
+  headerMenuItem   HeaderMenuItem  @relation(fields: [headerMenuItemId], references: [id], onDelete: Cascade, map: "fk_hmic_item")
+  category         ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade, map: "fk_hmic_category")
+
+  @@unique([headerMenuItemId, categoryId], map: "uq_hmic_item_category")
+  @@index([categoryId], map: "fk_hmic_category")
+  @@map("header_menu_item_categories")
 }
 
 model ProductBrand {
@@ -979,6 +1019,8 @@ model OrderItem {
   product_name_snapshot               String            @db.VarChar(200)
   item_name_snapshot                  String            @db.VarChar(200)
   variant_snapshot                    String            @db.VarChar(100)
+  /// Selected options at purchase time: [{ name, value }] (Color, Size, custom attributes).
+  attributes_snapshot                 Json?
   sku_snapshot                        String            @db.VarChar(100)
   quantity                            Int
   unit_price                          Decimal           @db.Decimal(10, 2)

@@ -1143,8 +1143,8 @@ function ProductDetails({ product }: ProductDetailsProps) {
             <RotateCcw className="w-5 h-5 stroke-[1.8]" />
           </div>
           <div>
-            <h4 className="text-xs sm:text-sm font-bold text-[#2B1B17] uppercase tracking-wide">EASY 7-DAY RETURNS</h4>
-            <p className="text-xs text-stone-500 mt-0.5">Hassle-free exchange & return policy</p>
+            <h4 className="text-xs sm:text-sm font-bold text-[#2B1B17] uppercase tracking-wide">EASY 3-DAY RETURNS</h4>
+            <p className="text-xs text-stone-500 mt-0.5">Request within 3 days of delivery, with an unboxing video</p>
           </div>
         </div>
       </div>

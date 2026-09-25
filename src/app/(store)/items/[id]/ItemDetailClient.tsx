@@ -41,7 +41,7 @@ export function ItemDetailClient({ itemId }: { itemId: string }) {
     <PageContainer>
       <Breadcrumb
         items={[
-          { label: "Products", href: "/products" },
+          { label: "Shop All", href: "/products" },
           ...(item.category
             ? [{ label: item.category.name, href: categoryHref(item.category) }]
             : []),

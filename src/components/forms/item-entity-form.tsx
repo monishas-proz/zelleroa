@@ -94,6 +94,11 @@ export interface ItemEntityFormProps {
   brandDescription?: string;
   /** What the admin calls this level in labels - "Item" or "Type". */
   entityLabel?: string;
+  /**
+   * Admin-only levels (the Model) never reach customers, so they skip the
+   * storefront copy fields: descriptions and "Featured".
+   */
+  compact?: boolean;
 }
 
 function toItemCode(raw: string): string {
@@ -133,6 +138,7 @@ function ItemEntityForm({
   brandOptions,
   brandDescription,
   entityLabel = "Item",
+  compact = false,
 }: ItemEntityFormProps) {
   const entityLower = entityLabel.toLowerCase();
   const showBrand = Boolean(brandOptions);
@@ -226,25 +232,31 @@ function ItemEntityForm({
           </div>
         </div>
 
-        <FormTextarea
-          name="shortDescription"
-          label="Short Description"
-          placeholder={`Brief summary of the ${entityLower} (max 500 characters)`}
-          rows={2}
-        />
+        {!compact && (
+          <>
+            <FormTextarea
+              name="shortDescription"
+              label="Short Description"
+              placeholder={`Brief summary of the ${entityLower} (max 500 characters)`}
+              rows={2}
+            />
 
-        <FormRichText
-          name="description"
-          label={`${entityLabel} Description`}
-          placeholder={`Detailed ${entityLower} information and description`}
-        />
+            <FormRichText
+              name="description"
+              label={`${entityLabel} Description`}
+              placeholder={`Detailed ${entityLower} information and description`}
+            />
+          </>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormCheckbox
-            name="isFeatured"
-            label={`Featured ${entityLabel}`}
-            description="Display prominently in featured sections"
-          />
+          {!compact && (
+            <FormCheckbox
+              name="isFeatured"
+              label={`Featured ${entityLabel}`}
+              description="Display prominently in featured sections"
+            />
+          )}
           <FormCheckbox
             name="isDefault"
             label={`Default ${entityLabel}`}

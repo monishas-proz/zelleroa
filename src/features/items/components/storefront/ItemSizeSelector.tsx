@@ -35,7 +35,7 @@ export function ItemSizeSelector({
   return (
     <div className="space-y-2.5">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-bold text-theme-text-primary">Size</h3>
+        <h3 className="text-sm font-bold tracking-wide text-theme-text-primary">Size</h3>
         {action}
       </div>
 
@@ -53,13 +53,13 @@ export function ItemSizeSelector({
               disabled={!size.inStock}
               onClick={() => onSelect(size.id)}
               className={cn(
-                "min-w-14 rounded-xl border px-3.5 py-2 text-sm font-semibold transition-all",
+                "min-w-14 rounded-full border px-4 py-2 text-sm font-semibold transition-all duration-200",
                 isSelected
-                  ? "border-theme-primary bg-theme-primary text-theme-primary-fg"
-                  : "border-theme-border bg-theme-surface text-theme-text-primary hover:border-theme-primary/50",
+                  ? "border-theme-primary bg-theme-primary text-theme-primary-fg shadow-md shadow-theme-primary/25 scale-[1.03]"
+                  : "border-theme-border bg-theme-surface text-theme-text-primary hover:border-theme-primary/50 hover:shadow-sm",
                 size.inStock
                   ? "cursor-pointer"
-                  : "cursor-not-allowed text-theme-text-subtle line-through opacity-50 hover:border-theme-border"
+                  : "cursor-not-allowed text-theme-text-subtle line-through opacity-50 hover:border-theme-border hover:shadow-none"
               )}
             >
               <span className="block leading-tight">{size.label}</span>

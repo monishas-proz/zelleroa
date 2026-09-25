@@ -4,7 +4,7 @@ import { Prisma } from "@/generated/prisma";
 import { ApiError } from "@/lib/api/api-error";
 import { formatVariantMeasurement } from "@/features/variants/utils/measurement.util";
 import { reservationService } from "@/features/inventory/services/reservation.service";
-import { getDelhiveryTrackingUrl } from "@/lib/shipping/delhivery-client";
+import { getIndiaPostTrackingUrl, INDIA_POST_PARTNER_CODE } from "@/lib/shipping/india-post";
 import type {
   OrderDetailResponse,
   OrderListItemResponse,
@@ -64,6 +64,7 @@ export const orderItemInclude = Prisma.validator<Prisma.OrderItemInclude>()({
       uuid: true,
       sku: true,
       unit_value: true,
+      attribute_value: { select: { value: true } },
       // Live sku/unit fallback for display; the authoritative values for an
       // already-placed order are the *_snapshot fields on OrderItem itself.
       product_units: {
@@ -80,6 +81,7 @@ export const orderItemInclude = Prisma.validator<Prisma.OrderItemInclude>()({
           id: true,
           uuid: true,
           variant_name: true,
+          color_name: true,
           product_variant_images: {
             where: { is_active: true },
             orderBy: [{ is_primary: "desc" }, { sort_order: "asc" }],
@@ -188,6 +190,15 @@ export function formatOrderItem(
     variantName: item.variant_snapshot,
     sku: item.sku_snapshot,
     measurement,
+    // Historical selection; orders placed before snapshots existed fall back to live data.
+    attributes: Array.isArray(item.attributes_snapshot)
+      ? (item.attributes_snapshot as unknown as Array<{ name: string; value: string }>)
+      : [
+          ...(variant?.color_name ? [{ name: "Color", value: variant.color_name }] : []),
+          ...(unitPrice?.attribute_value?.value
+            ? [{ name: "Size", value: unitPrice.attribute_value.value }]
+            : []),
+        ],
     primaryImage,
     quantity: item.quantity,
     unitPrice: Number(item.unit_price),
@@ -279,8 +290,8 @@ export function formatCourierShipment(
     carrier: shipment.delivery_partners.name,
     trackingNumber: shipment.tracking_number,
     trackingUrl:
-      shipment.delivery_partners.code === "DELHIVERY"
-        ? getDelhiveryTrackingUrl(shipment.tracking_number)
+      shipment.delivery_partners.code === INDIA_POST_PARTNER_CODE
+        ? getIndiaPostTrackingUrl(shipment.tracking_number)
         : "",
     status: shipment.status,
     timeline: (shipment.shipment_tracking || []).map((t) => ({
@@ -467,6 +478,7 @@ export const orderRepository = {
       variantUnitPriceId: bigint;
       productName: string;
       itemName: string;
+      attributes?: Array<{ name: string; value: string }>;
       variantName: string;
       sku: string;
       quantity: number;
@@ -576,6 +588,7 @@ export const orderRepository = {
           product_name_snapshot: item.productName,
           item_name_snapshot: item.itemName,
           variant_snapshot: item.variantName,
+          attributes_snapshot: item.attributes ?? [],
           sku_snapshot: item.sku,
           quantity: item.quantity,
           unit_price: item.unitPrice,

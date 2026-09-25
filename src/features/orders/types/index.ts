@@ -24,6 +24,8 @@ export interface OrderItemResponse {
   variantName: string; // snapshot
   sku: string; // snapshot
   measurement: VariantMeasurement;
+  /** Options selected at purchase time (Color, Size, custom attributes). */
+  attributes: Array<{ name: string; value: string }>;
   primaryImage: string | null;
   quantity: number;
   /** Undiscounted price per unit at the time the order was placed. */

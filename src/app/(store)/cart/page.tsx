@@ -140,13 +140,17 @@ export default function CartPage() {
       }, 0)
   );
 
+  // `subtotal` is at catalog prices; the offer engine's discount comes back on
+  // the cart, so the payable total is subtotal minus that discount.
+  const discount = Number(cart?.totalDiscount ?? 0);
+
   const summary = {
     subtotal,
-    discount: 0,
+    discount,
     tax: 0,
     // Delivery depends on the destination state, which is only known at checkout.
     shippingCharge: 0,
-    grandTotal: subtotal,
+    grandTotal: Math.max(0, subtotal - discount),
     totalItems: totalItemsCount,
   };
 

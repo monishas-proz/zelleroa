@@ -32,7 +32,10 @@ export function OrderItemsList({
         const totalPrice =
           "totalPrice" in item ? item.totalPrice : item.total || 0;
         const sku = "sku" in item ? item.sku : "";
-        const variantText = item.variantName || sku || "";
+        const attributes = "attributes" in item ? item.attributes : [];
+        const variantText = attributes.length
+          ? attributes.map((a) => `${a.name}: ${a.value}`).join(" | ")
+          : item.variantName || sku || "";
 
         return (
           <div key={item.id} className="flex items-center gap-4 py-3">

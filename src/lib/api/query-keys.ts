@@ -52,3 +52,4 @@ export const adminReviewKeys = createQueryKeyFactory("admin-reviews");
 export const adminContactKeys = createQueryKeyFactory("admin-contacts");
 export const adminBulkOrderKeys = createQueryKeyFactory("admin-bulk-orders");
 export const companyKeys = createQueryKeyFactory("company");
+export const headerMenuKeys = createQueryKeyFactory("header-menu");

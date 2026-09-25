@@ -172,7 +172,7 @@ export default function AdminStyleDetailsPage() {
               className="h-9 rounded-lg bg-[var(--color-secondary-600)] px-4 text-xs font-semibold text-white hover:bg-[var(--color-secondary-700)]"
             >
               <Plus className="mr-1.5 h-3.5 w-3.5" />
-              Add Type
+              Add Model
             </Button>
           </div>
           {productUuid && (
@@ -255,11 +255,11 @@ export default function AdminStyleDetailsPage() {
           setIsAddItemOpen(false);
           setNewlyCreatedItem(null);
         }}
-        title={newlyCreatedItem ? "Choose Attribute Values" : "Add Type"}
+        title={newlyCreatedItem ? "Choose Attribute Values" : "Add Model"}
         description={
           newlyCreatedItem
             ? `Pick which ${colorColumnLabel}/${sizeColumnLabel}/etc. values "${newlyCreatedItem.name}" comes in`
-            : `Create a new Type under "${style.name}" (e.g. "Regular Fit", "Slim Fit")`
+            : `Create a new Model under "${style.name}" (e.g. "Regular Fit", "Slim Fit")`
         }
         size="lg"
       >
@@ -286,10 +286,10 @@ export default function AdminStyleDetailsPage() {
                 });
                 const created = (res as any)?.data as AdminItemResponse | undefined;
                 if (created) setNewlyCreatedItem(created);
-                toast.success("Type created", `"${formData.name}" is ready for Colors & Sizes.`);
+                toast.success("Model created", `"${formData.name}" is ready for Colors & Sizes.`);
                 refetchItems();
               } catch (err: any) {
-                toast.error("Failed to create type", err?.message || "Please try again.");
+                toast.error("Failed to create model", err?.message || "Please try again.");
               }
             }}
           />
@@ -369,7 +369,7 @@ export default function AdminStyleDetailsPage() {
       <FormModal
         open={Boolean(editingItem)}
         onClose={() => setEditingItem(null)}
-        title="Edit Type"
+        title="Edit Model"
         description={`Update information for ${editingItem?.name || ""}`}
         size="lg"
       >
@@ -409,10 +409,10 @@ export default function AdminStyleDetailsPage() {
                   },
                 });
                 setEditingItem(null);
-                toast.success("Type updated", `"${formData.name}" was saved.`);
+                toast.success("Model updated", `"${formData.name}" was saved.`);
                 refetchItems();
               } catch (err: any) {
-                toast.error("Failed to update type", err?.message || "Please try again.");
+                toast.error("Failed to update model", err?.message || "Please try again.");
               }
             }}
           />
@@ -436,10 +436,10 @@ export default function AdminStyleDetailsPage() {
               styleUuid,
               itemUuid: target.id,
             });
-            toast.success("Type deleted", `"${target.name}" was removed.`);
+            toast.success("Model deleted", `"${target.name}" was removed.`);
             refetchItems();
           } catch (err: any) {
-            toast.error("Failed to delete type", err?.message || "Please try again.");
+            toast.error("Failed to delete model", err?.message || "Please try again.");
           }
         }}
         confirmText="Delete"

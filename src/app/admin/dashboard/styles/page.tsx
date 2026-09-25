@@ -184,7 +184,7 @@ export default function AdminStylesPage() {
     <div className="flex flex-1 min-h-0 flex-col">
       <AdminPageHeader
         title="Item Management"
-        description="Manage the sellable Items customers see - each groups one or more admin-only Types."
+        description="Manage the sellable Items customers see - each groups one or more admin-only Models."
       />
 
       <AdminContent className="flex-1 min-h-0 overflow-hidden">

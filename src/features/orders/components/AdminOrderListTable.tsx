@@ -18,6 +18,7 @@ import { DataTable } from "@/components/admin/data-table/DataTable";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { FormModal } from "@/components/common/FormModal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SearchInput } from "@/components/ui/search-input";
@@ -32,7 +33,7 @@ import {
   usePackAdminOrder,
   useCancelOrderAdmin,
 } from "@/features/orders/hooks";
-import { useShipViaCourier, useRefreshCourierTracking } from "@/features/delivery/hooks";
+import { useShipViaCourier } from "@/features/delivery/hooks";
 import { OrderDetailView } from "@/features/orders/components/OrderDetailView";
 import {
   OrderStatusBadge,
@@ -82,7 +83,8 @@ export function AdminOrderListTable({
   const packOrder = usePackAdminOrder();
   const cancelOrder = useCancelOrderAdmin();
   const shipViaCourier = useShipViaCourier();
-  const refreshCourierTracking = useRefreshCourierTracking();
+  const [indiaPostOpen, setIndiaPostOpen] = useState(false);
+  const [consignmentNumber, setConsignmentNumber] = useState("");
 
   const orders = data?.data ?? [];
   const meta = data?.meta;
@@ -569,12 +571,7 @@ export function AdminOrderListTable({
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => {
-                      shipViaCourier.mutate(
-                        { orderId: orderDetail.id },
-                        { onSuccess: () => refetch() }
-                      );
-                    }}
+                    onClick={() => setIndiaPostOpen(true)}
                     disabled={isTransitionPending}
                   >
                     {shipViaCourier.isPending ? (
@@ -582,28 +579,7 @@ export function AdminOrderListTable({
                     ) : (
                       <Package className="mr-1.5 h-4 w-4" />
                     )}
-                    Ship via Delhivery
-                  </Button>
-                )}
-
-                {orderDetail.courierShipment && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      refreshCourierTracking.mutate(
-                        { shipmentId: orderDetail.courierShipment!.id },
-                        { onSuccess: () => refetch() }
-                      );
-                    }}
-                    disabled={refreshCourierTracking.isPending}
-                  >
-                    {refreshCourierTracking.isPending ? (
-                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Truck className="mr-1.5 h-4 w-4" />
-                    )}
-                    Refresh Tracking
+                    Ship via India Post
                   </Button>
                 )}
 
@@ -644,6 +620,47 @@ export function AdminOrderListTable({
       </FormModal>
 
       {/* Assign Staff Modal */}
+      <FormModal
+        open={indiaPostOpen}
+        onClose={() => setIndiaPostOpen(false)}
+        title="Ship via India Post"
+        description="Enter the Speed Post consignment number from the booking receipt."
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIndiaPostOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={shipViaCourier.isPending || !consignmentNumber.trim()}
+              onClick={() => {
+                if (!orderDetail) return;
+                shipViaCourier.mutate(
+                  { orderId: orderDetail.id, trackingNumber: consignmentNumber.trim().toUpperCase() },
+                  {
+                    onSuccess: () => {
+                      setIndiaPostOpen(false);
+                      setConsignmentNumber("");
+                      refetch();
+                    },
+                  }
+                );
+              }}
+            >
+              {shipViaCourier.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              Mark as Shipped
+            </Button>
+          </>
+        }
+      >
+        <Input
+          placeholder="EE123456789IN"
+          value={consignmentNumber}
+          onChange={(e) => setConsignmentNumber(e.target.value)}
+          maxLength={13}
+        />
+      </FormModal>
+
       <AssignStaffModal
         open={!!assignStaffOrder}
         onClose={() => setAssignStaffOrder(null)}

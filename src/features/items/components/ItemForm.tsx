@@ -41,7 +41,8 @@ function ItemForm({
       skuPlaceholder="e.g. TSHIRT-VNECK-REGULAR"
       codePlaceholder="e.g. regular-fit"
       defaultItemDescription="Auto-selected on the item page"
-      entityLabel="Type"
+      entityLabel="Model"
+      compact
     />
   );
 }

@@ -33,6 +33,7 @@ import {
   Mail,
   PackagePlus,
   HelpCircle,
+  Menu,
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { APP_NAME } from "@/lib/constants";
@@ -68,6 +69,7 @@ const sidebarItems: SidebarItem[] = [
     icon: Package,
     children: [
       { label: "Categories", href: "/admin/dashboard/categories", icon: FolderTree },
+      { label: "Header Menu", href: "/admin/dashboard/header-menu", icon: Menu },
       { label: "Products", href: "/admin/dashboard/products", icon: Package },
       { label: "Items", href: "/admin/dashboard/styles", icon: Layers },
       { label: "Colors", href: "/admin/dashboard/variants", icon: Layers },

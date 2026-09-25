@@ -59,6 +59,9 @@ export const orderService = {
         items: {
           where: {
             is_active: true,
+            // The cart view hides lines for deleted products, so the customer
+            // can't remove them; don't let those block checkout.
+            product: { is: { isActive: true, deleted_at: null } },
           },
           include: {
             product: true,
@@ -66,7 +69,20 @@ export const orderService = {
             item: true,
             variant_unit_price: {
               include: {
-                variant: true,
+                variant: {
+                  include: {
+                    variant_attribute_values: {
+                      include: {
+                        product_attributes: { select: { name: true } },
+                        attribute_values: { select: { value: true } },
+                      },
+                    },
+                  },
+                },
+                attribute_value: {
+                  include: { attribute: { select: { name: true } } },
+                },
+                product_units: { select: { name: true, code: true } },
                 inventories: {
                   select: { quantity_available: true },
                 },
@@ -90,6 +106,7 @@ export const orderService = {
       variantUnitPriceId: bigint;
       productName: string;
       itemName: string;
+      attributes: Array<{ name: string; value: string }>;
       variantName: string;
       sku: string;
       quantity: number;
@@ -121,6 +138,24 @@ export const orderService = {
         !variant.isActive ||
         variant.deleted_at !== null
       ) {
+        const reason = !item.product
+          ? "product missing"
+          : !item.product.isActive || item.product.deleted_at !== null
+            ? "product inactive/deleted"
+            : !item.style
+              ? "style missing"
+              : !item.style.isActive || item.style.deleted_at !== null
+                ? "style inactive/deleted"
+                : !unitPriceRow
+                  ? "price row missing"
+                  : !unitPriceRow.isActive || unitPriceRow.deleted_at !== null
+                    ? "price row inactive/deleted"
+                    : !variant
+                      ? "variant missing"
+                      : "variant inactive/deleted";
+        console.error(
+          `[order] cart item ${item.id} unavailable: ${reason}`
+        );
         throw ApiError.badRequest(
           `Product variant "${variant?.variant_name || item.product?.name || "item"}" is no longer available`
         );
@@ -142,7 +177,31 @@ export const orderService = {
       const totalPrice = unitPrice * item.quantity;
       subtotal += totalPrice;
 
+      const attributes: Array<{ name: string; value: string }> = [];
+      if (variant.color_name) {
+        attributes.push({ name: "Color", value: variant.color_name });
+      }
+      if (unitPriceRow.attribute_value) {
+        attributes.push({
+          name: unitPriceRow.attribute_value.attribute?.name || "Size",
+          value: unitPriceRow.attribute_value.value,
+        });
+      } else if (Number(unitPriceRow.unit_value) > 0 && unitPriceRow.product_units) {
+        attributes.push({
+          name: "Size",
+          value: `${Number(unitPriceRow.unit_value)} ${unitPriceRow.product_units.code || unitPriceRow.product_units.name}`,
+        });
+      }
+      for (const av of variant.variant_attribute_values ?? []) {
+        const name = av.product_attributes?.name;
+        const value = av.attribute_values?.value;
+        if (name && value && !attributes.some((a) => a.name === name && a.value === value)) {
+          attributes.push({ name, value });
+        }
+      }
+
       orderItemsData.push({
+        attributes,
         productId: item.productId,
         styleId: item.styleId,
         itemId: item.itemId,

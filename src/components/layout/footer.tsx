@@ -146,6 +146,11 @@ export function Footer() {
                 </button>
               </li>
               <li>
+                <Link href="/offers" className="hover:text-theme-primary transition-colors">
+                  Offers &amp; Deals
+                </Link>
+              </li>
+              <li>
                 <Link href="/orders" className="hover:text-theme-primary transition-colors">
                   Track Order
                 </Link>
